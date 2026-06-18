@@ -117,12 +117,77 @@ Weekly Overview content, curriculum browser, lesson editor, AI, and Word export.
 - Full end-to-end Microsoft login still needs the Entra + Supabase config in
   `SETUP.md`; the code wiring and non-auth rendering are correct without it.
 
+## Phase 3 — Lesson Plan Editor ✅ (this phase, editor branch)
+
+Goal: the editor for an **existing** plan — the core screen where a teacher
+writes a 50-minute lesson. Built in parallel with the Weekly Overview on a
+separate branch, kept to disjoint files (all new code under editor-specific
+paths; shared files are imported, never modified). **Stops before** the
+plan-creation flow / curriculum picker, AI features, and Word export.
+
+### Done
+
+- **Route `app/plan/[id]`** (`src/app/plan/[id]/page.tsx`, force-dynamic) — a
+  server component that loads the plan with the auth'd client (RLS), 404s via
+  `notFound()` when missing/not permitted, and hands off to the client editor
+  inside the existing `AppShell`.
+- **Data layer** (`src/lib/editor/load-plan.ts`) — `loadPlanForEditor(id)` joins
+  the plan → class (school/subject/year/group/literacy), resolves the locked
+  curriculum context (daily LO, focus area = linguistic skill, theme) from
+  `curriculum_lesson_id` via the curriculum utils, and loads `activity_bank`
+  rows for the blocks that have them (`cfu`, `exit_ticket`). Returns one
+  serializable `EditorPlanData`. (The Supabase client is still untyped — the
+  generated `Database` is a placeholder — so the joined rows are shaped by hand.)
+- **Server actions** (`src/lib/actions/lesson-plan.ts`) — `saveLessonPlan`
+  (autosave objective + blocks) and `submitLessonPlan` (persist, then set
+  `status='submitted'` + `submitted_at`, guarded by a non-empty objective). Both
+  go through the auth'd client; RLS scopes the write.
+- **Editor components** (`src/components/editor/`):
+  - `LessonPlanEditor` (client orchestrator) — holds objective/blocks/selection
+    state, **debounced autosave (~1.5 s)** with a Saving/Saved indicator, and the
+    submit flow.
+  - `EditorHeader` — slim header carrying **curriculum context only** (class ·
+    date · centre · focus area · theme + daily LO), the save indicator, a
+    disabled **Export to Word**, and **Submit for approval**.
+  - `SmarttObjectiveBox` — the pink box; the single home of the objective. The
+    opening stem is enforced (shown muted, teacher edits only the remainder); the
+    six SMARTT criteria are guidance chips; **"Check my objective" is rendered but
+    un-wired** (no faked results).
+  - `BlockList` — left summary in `DEFAULT_BLOCKS` order (name · phase tag ·
+    duration · live content preview), routines grouped, homework separated, and a
+    **timing meter** (in-session total excluding homework vs 50 min, with an
+    over-target warning).
+  - `BlockPanel` — the selected block: title + "?" guidance, a phase dropdown,
+    **activities-first** (cfu/exit_ticket cards first; "?" reveals literate/
+    illiterate variants per class literacy; Add prefills the fields), then the
+    editing fields (Teacher does · Students do · **Resources** · Duration).
+  - `ActivityCard`, `fields` (Textarea/Select/FieldLabel primitives).
+- **Editor helpers** — `src/lib/block-guidance.ts` (Purpose/Technique/Success per
+  block type), `src/lib/editor/objective.ts` (stem enforce/strip/compose + SMARTT
+  criteria), `src/lib/editor/phase.ts` (phase tag/label/options).
+- **Test seed** — `supabase/admin/seed_one_plan.sql`: one `in_progress` plan for
+  the seeded Shatila · Year 2 · Group A class, `blocks = DEFAULT_BLOCKS`,
+  `curriculum_lesson_id = 1.S5.K0.H2` (a real Year 2 Reading / "Food and drinks"
+  lesson). Parameterized by `teacher_uid`; prints the new plan id. Run note in
+  the file header (run `assign_teacher.sql` first).
+
+### Verified
+
+- `npm run build` passes (Next 16.2.9); `npm run lint` clean. Route map adds
+  `/plan/[id]` (dynamic). No globals.css/AppShell/shared-type changes (clean
+  merge with the overview branch expected; only build-state.md / lockfile may
+  conflict).
+- Not applied to a live DB in this workspace (no Docker/Supabase CLI). To test:
+  apply migrations + seed, provision a teacher (`assign_teacher.sql`), run
+  `seed_one_plan.sql`, open `/plan/<printed id>`.
+
 ## Next slice (not started)
 
-1. **Weekly Overview** — the home content (calendar matrix + status board) and
-   its data wiring (classes, lesson_plans, statuses) inside the existing shell.
-2. **Curriculum browser.**
-3. **Lesson editor** — SMARTT objective + the 9 in-session blocks + activity bank.
-4. **AI assistance**, **Word (.docx) export**, **coordinator UI**.
+1. **Bridge after merge** — the plan-creation flow + curriculum picker, wiring
+   the Weekly Overview's empty slots to create plans the editor then opens.
+2. **AI assistance** — objective check (wire the existing affordance) + activity
+   suggestions.
+3. **Word (.docx) export**, **coordinator review UI**.
+4. **Full activity-bank + guidance content** (beyond the current sample).
 5. **Multi-subject curriculum** — populate `subject`, ingestion script (the old
    spreadsheet→JSON generator was never in the repo and must be rebuilt).

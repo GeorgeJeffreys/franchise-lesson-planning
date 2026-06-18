@@ -1,0 +1,37 @@
+import { notFound } from 'next/navigation';
+import { AppShell } from '@/components/app-shell/AppShell';
+import { LessonPlanEditor } from '@/components/editor/LessonPlanEditor';
+import { loadPlanForEditor } from '@/lib/editor/load-plan';
+import { createClient } from '@/lib/supabase/server';
+
+// Rendered per-request: the plan is loaded with the auth'd client (RLS).
+export const dynamic = 'force-dynamic';
+
+export default async function PlanEditorPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const data = await loadPlanForEditor(id);
+  if (!data) notFound();
+
+  // Display name for the shell chrome.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user?.id ?? '')
+    .maybeSingle();
+  const name = profile?.full_name ?? user?.email ?? 'there';
+
+  return (
+    <AppShell name={name} subtitle={`${data.classContext.schoolName} · ${data.classContext.subjectName}`}>
+      <LessonPlanEditor data={data} />
+    </AppShell>
+  );
+}
