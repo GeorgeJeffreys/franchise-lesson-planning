@@ -1,6 +1,106 @@
 @import "tailwindcss";
 
 /*
- * Foundation phase: Tailwind v4 only, no design system yet. Brand tokens, fonts
- * and theming are intentionally deferred to the design-system slice.
+ * Design tokens — extracted from the approved Claude Design output
+ * (design-reference: Login + Weekly Overview). Tailwind v4 is CSS-first: the
+ * @theme block below defines the design system as CSS variables, which Tailwind
+ * turns into utilities (bg-teal, text-ink, rounded-lg, shadow-card, font-display…).
+ *
+ * Values come from the design, not invented defaults. Keep this the single
+ * source of truth for colour, type, radius and shadow; primitives consume these
+ * tokens rather than hard-coding hex.
  */
+@theme {
+  /* ── Type ──────────────────────────────────────────────────────────────── */
+  --font-sans: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sacramento), cursive; /* the wordmark only */
+
+  /* ── Brand ─────────────────────────────────────────────────────────────── */
+  --color-pink: #b62a5c;
+  --color-teal: #1f7a6c;
+  --color-cream: #f5ede5;
+
+  /* ── Neutral ramp (warm, sampled from the design) ──────────────────────── */
+  --color-ink: #2a2422; /* primary text */
+  --color-neutral-900: #3a332e;
+  --color-neutral-800: #5c544e;
+  --color-neutral-700: #756b64; /* secondary text */
+  --color-neutral-600: #8a8178; /* muted text */
+  --color-neutral-500: #9a918b;
+  --color-neutral-400: #a79e94; /* faint text */
+  --color-neutral-300: #c7bfb5; /* dividers */
+  --color-neutral-200: #ddd4c8; /* strong borders / inputs */
+  --color-neutral-150: #e7decf; /* card borders */
+  --color-neutral-100: #efe8dd; /* subtle borders */
+  --color-neutral-50: #fbf8f3; /* off-white surface */
+  --color-sand: #ded9d2; /* app page background */
+  --color-white: #ffffff;
+
+  /* ── Semantic surfaces / text / borders ────────────────────────────────── */
+  --color-background: #ded9d2;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #fbf8f3;
+  --color-surface-cream: #f5ede5;
+  --color-text: #2a2422;
+  --color-text-muted: #756b64;
+  --color-text-faint: #a79e94;
+  --color-border: #e7decf;
+  --color-border-strong: #ddd4c8;
+
+  /* ── Status palette (Weekly Overview) — fg / bg / border per state ──────── */
+  --color-status-approved: #2e7d5b;
+  --color-status-approved-bg: #e2f0e8;
+  --color-status-approved-border: #c9e4d5;
+
+  --color-status-progress: #b0651e;
+  --color-status-progress-bg: #f6ecda;
+  --color-status-progress-border: #ecd9be;
+
+  --color-status-submitted: #1f7a6c;
+  --color-status-submitted-bg: #e4f0ed;
+  --color-status-submitted-border: #cfe6e0;
+
+  --color-status-review: #b62a5c;
+  --color-status-review-bg: #f7e4eb;
+  --color-status-review-border: #f0cbd8;
+
+  --color-status-idle: #9a918b;
+  --color-status-idle-bg: #efeae3;
+  --color-status-idle-border: #e2dbd0;
+
+  /* ── Radius ────────────────────────────────────────────────────────────── */
+  --radius-badge: 6px;
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+
+  /* ── Shadow ────────────────────────────────────────────────────────────── */
+  --shadow-card: 0 18px 40px -28px rgba(60, 40, 30, 0.5);
+}
+
+/* ── Base styles ─────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+  }
+}
+
+/*
+ * Diagonal stripe wash used on the login brand panel (from the Login design).
+ * It's a painted texture, not a token, so it lives here as a utility.
+ */
+@utility stripe {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.1) 9px,
+    rgba(255, 255, 255, 0.02) 9px,
+    rgba(255, 255, 255, 0.02) 18px
+  );
+}

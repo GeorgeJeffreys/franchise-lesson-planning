@@ -65,12 +65,63 @@ npm run gen:types       # regenerate src/types/database.types.ts
 
 Or link a project (`supabase link --project-ref <ref>`) and `supabase db push`.
 
+## Phase 2 — Design foundation + Microsoft SSO ✅ (this phase)
+
+Goal: a design-token layer from the approved design, a minimal primitive set, a
+minimal authed app shell, and a working Microsoft SSO login. **Stops before the
+Weekly Overview content, curriculum browser, lesson editor, AI, and Word export.**
+
+### Done
+
+- **Design source of truth** — vendored the approved Claude Design HTML into
+  `design-reference/` (`Login`, `Weekly Overview`, `Curriculum Browser`, `Lesson
+  Plan Editor`, `support.js` + README). Login drives `/login`; Weekly Overview
+  drives the shared chrome.
+- **Design tokens** (`src/app/globals.css`, Tailwind v4 CSS-first `@theme`) —
+  brand (pink/teal/cream), a warm neutral ramp, semantic surface/text/border
+  tokens, the 5 Weekly-Overview status colours (fg/bg/border each), radii,
+  `shadow-card`, and a `.stripe` utility. Base styles set the sand background and
+  Sora body type. Tokens are sampled from the design, not invented.
+- **Fonts** (`src/app/fonts.ts`) — Sora (UI) and Sacramento (wordmark only) via
+  `next/font/google`, wired to `--font-sans` / `--font-display` and applied on
+  `<html>` in `layout.tsx`.
+- **UI primitives** (`src/components/ui/`) — `Button` (primary/secondary ×
+  sm/md), `Wordmark` (Sacramento), `Card`. Plus `src/lib/cn.ts`. Deliberately no
+  form-field primitive: the SSO login has no inputs.
+- **Auth flow** (`@supabase/ssr`, PKCE):
+  - `/login` (`src/app/login/page.tsx`) — two-pane design; teal welcome panel +
+    `MicrosoftSignInButton` (client) calling `signInWithOAuth({ provider: 'azure',
+    redirectTo: <origin>/auth/callback, scopes: 'openid profile email' })`.
+  - `/auth/callback` (`src/app/auth/callback/route.ts`) — exchanges the code for
+    a session, backfills `profiles.full_name` from the identity if missing
+    (safety net), redirects to `/`. Open-redirect-safe `next` handling.
+  - `signOut` server action (`src/lib/actions/auth.ts`) → `/login`.
+  - `src/proxy.ts` already treats `/login` and `/auth` (incl. `/auth/callback`)
+    as public; everything else protected.
+- **App shell** (`src/components/app-shell/`) — `AppShell` (top-bar chrome:
+  wordmark + signed-in user + sign-out) wrapping the landing. `SignOutForm` posts
+  to the server action. `src/app/page.tsx` now renders the shell + a placeholder
+  body ("Signed in as {name} — your weekly overview is coming next") and
+  temporarily prints the auth uid for provisioning.
+- **Admin provisioning** — `supabase/admin/assign_teacher.sql` (+ README): sets a
+  profile's school/subject to the seeded English values and assigns the seeded
+  classes; idempotent; service-role only.
+- **Docs** — `SETUP.md` (DB apply, Entra app registration, Supabase Azure
+  provider, site/redirect URLs, env vars, run, test-teacher provisioning).
+
+### Verified
+
+- `npm run build` passes (Next 16.2.9). `npm run lint` clean.
+- Route map: `/` dynamic, `/auth/callback` dynamic (route handler), `/login`
+  static, Proxy active.
+- Full end-to-end Microsoft login still needs the Entra + Supabase config in
+  `SETUP.md`; the code wiring and non-auth rendering are correct without it.
+
 ## Next slice (not started)
 
-1. **Auth phase** — Microsoft SSO login UI + `/auth/callback` route; provision
-   real users; seed `profiles` / `class_teachers`; replace the placeholder
-   landing. (The `handle_new_user` trigger already makes first sign-in work.)
-2. **Design system / tokens.**
+1. **Weekly Overview** — the home content (calendar matrix + status board) and
+   its data wiring (classes, lesson_plans, statuses) inside the existing shell.
+2. **Curriculum browser.**
 3. **Lesson editor** — SMARTT objective + the 9 in-session blocks + activity bank.
 4. **AI assistance**, **Word (.docx) export**, **coordinator UI**.
 5. **Multi-subject curriculum** — populate `subject`, ingestion script (the old

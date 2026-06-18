@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#DED9D2">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#DED9D2"/>
+    <rect x="200" y="150" width="800" height="500" rx="28" fill="#ffffff" stroke="#E7DECF" stroke-width="3"/>
+    <rect x="200" y="150" width="800" height="90" rx="28" fill="#FBF8F3"/>
+    <circle cx="250" cy="195" r="22" fill="#1F7A6C"/>
+    <rect x="290" y="184" width="150" height="14" rx="7" fill="#2A2422"/>
+    <rect x="290" y="206" width="110" height="10" rx="5" fill="#A79E94"/>
+    <rect x="250" y="290" width="120" height="40" rx="8" fill="#2E7D5B"/>
+    <rect x="390" y="290" width="120" height="40" rx="8" fill="#F6ECDA"/>
+    <rect x="530" y="290" width="120" height="40" rx="8" fill="#EFEAE3"/>
+    <rect x="670" y="290" width="120" height="40" rx="8" fill="#F7E4EB"/>
+    <rect x="250" y="360" width="120" height="40" rx="8" fill="#EFEAE3"/>
+    <rect x="390" y="360" width="120" height="40" rx="8" fill="#E4F0ED"/>
+    <rect x="530" y="360" width="120" height="40" rx="8" fill="#F6ECDA"/>
+    <rect x="670" y="360" width="120" height="40" rx="8" fill="#EFEAE3"/>
+    <rect x="250" y="430" width="120" height="40" rx="8" fill="#E2F0E8"/>
+    <rect x="390" y="430" width="120" height="40" rx="8" fill="#E2F0E8"/>
+    <rect x="530" y="430" width="120" height="40" rx="8" fill="#E4F0ED"/>
+    <rect x="670" y="430" width="120" height="40" rx="8" fill="#F6ECDA"/>
+    <text x="600" y="560" font-family="Georgia, serif" font-size="60" fill="#B62A5C" text-anchor="middle" font-style="italic">Alsama</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Sacramento&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #DED9D2; }
+</style>
+</helmet>
+
+<div ref="{{ setRoot }}" style="font-family: Sora, sans-serif; color: #2A2422; background: #DED9D2; min-height: 100vh; padding: 40px 40px 90px; -webkit-font-smoothing: antialiased;">
+
+  <!-- Prototype nav -->
+  <div style="max-width: 1240px; margin: 0 auto 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A79E94; margin-right: 4px;">Teacher workflow</span>
+    <a href="weekly-overview.html" style="text-decoration: none; font-size: 13px; font-weight: 600; color: #fff; background: #1F7A6C; border: 1px solid #1F7A6C; padding: 7px 13px; border-radius: 9px;">Weekly Overview</a>
+    <a href="curriculum-browser.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Curriculum Browser</a>
+    <a href="lesson-plan-editor.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Lesson Plan Editor</a>
+  </div>
+
+  <!-- Canvas heading -->
+  <div style="max-width: 1240px; margin: 0 auto 8px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: Sacramento, cursive; font-size: 40px; line-height: 0.8; color: #B62A5C;">Alsama</span>
+      <span style="width: 1px; height: 26px; background: #C7BFB5;"></span>
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8178; font-weight: 600;">Lesson Planning</span>
+    </div>
+    <h1 style="margin: 14px 0 4px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">Weekly Overview — structural explorations</h1>
+    <p style="margin: 0; color: #756B64; font-size: 15px; max-width: 760px;">The home screen after login. Two ways to organise the same week of lessons — a week <b style="color:#1F7A6C;">Calendar</b> matrix and a <b style="color:#1F7A6C;">Status</b> board — each scannable at a glance.</p>
+  </div>
+
+  <!-- ============================ VARIANT A — MATRIX ============================ -->
+  <div style="max-width: 1240px; margin: 38px auto 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: #1F7A6C; padding: 5px 11px; border-radius: 7px;">VARIANT A</span>
+      <span style="font-size: 17px; font-weight: 600;">Week matrix</span>
+      <span style="color: #8A8178; font-size: 14px;">— sessions down, weekdays across. The whole week in one scan; status colour carries the glance.</span>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -28px rgba(60,40,30,0.5);">
+      <!-- top bar -->
+      <div style="padding: var(--pad, 20px) var(--pad, 20px); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #EFE8DD;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 42px; height: 42px; border-radius: 50%; background: #1F7A6C; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px;">LH</span>
+          <div>
+            <div style="font-size: 16px; font-weight: 600;">Layla Haddad</div>
+            <div style="font-size: 13px; color: #8A8178;">Shatila Centre · English</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <!-- week nav -->
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <span style="font-size: 14px; font-weight: 600; min-width: 168px; text-align: center;">16 – 20 June 2026</span>
+            <button style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+          </div>
+          <!-- toggle -->
+          <div style="display: inline-flex; background: #F3ECE2; border: 1px solid #E0D6C7; border-radius: 9px; padding: 2px; font-size: 13px; font-weight: 500;">
+            <span style="padding: 6px 14px; border-radius: 7px; background: #1F7A6C; color: #fff;">Calendar</span>
+            <span style="padding: 6px 14px; border-radius: 7px; color: #8A8178; cursor: pointer;">Status</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- matrix -->
+      <div style="overflow-x: auto;">
+        <div style="min-width: 900px; display: grid; grid-template-columns: 150px repeat(5, 1fr);">
+          <!-- header row -->
+          <div style="padding: 11px 14px; font-size: 12px; color: #A79E94; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; background: #FBF8F3; border-bottom: 1px solid #EFE8DD;"></div>
+          <div style="padding: 11px 14px; font-size: 12px; color: #756B64; font-weight: 600; background: #FBF8F3; border-bottom: 1px solid #EFE8DD; border-left: 1px solid #F0EAE1;">Mon</div>
+          <div style="padding: 11px 14px; font-size: 12px; color: #2A2422; font-weight: 700; background: #F5EDE5; border-bottom: 1px solid #ECE1D1; border-left: 1px solid #EAD9C5;">Tue · today</div>
+          <div style="padding: 11px 14px; font-size: 12px; color: #756B64; font-weight: 600; background: #FBF8F3; border-bottom: 1px solid #EFE8DD; border-left: 1px solid #F0EAE1;">Wed</div>
+          <div style="padding: 11px 14px; font-size: 12px; color: #756B64; font-weight: 600; background: #FBF8F3; border-bottom: 1px solid #EFE8DD; border-left: 1px solid #F0EAE1;">Thu</div>
+          <div style="padding: 11px 14px; font-size: 12px; color: #756B64; font-weight: 600; background: #FBF8F3; border-bottom: 1px solid #EFE8DD; border-left: 1px solid #F0EAE1;">Fri</div>
+
+          <!-- ROW: Year 2 A -->
+          <div style="padding: 14px; border-bottom: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><div style="font-size: 13.5px; font-weight: 600;">Year 2 · A</div><div style="font-size: 11.5px; color: #A79E94;">English</div></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Greetings &amp; introductions</div><span style="font-size: 11px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border-radius: 6px; padding: 2px 7px;">● Approved</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #ECE1D1; border-left: 1px solid #EAD9C5; background: #FFFCF7; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#2A2422; font-weight:500;">Read a café menu &amp; identify food words</div><span style="font-size: 11px; font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 6px; padding: 2px 7px;">● In progress</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Order food: please &amp; thank you</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Numbers &amp; prices</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Role-play: at the café</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+
+          <!-- ROW: Year 1 B -->
+          <div style="padding: 14px; border-bottom: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><div style="font-size: 13.5px; font-weight: 600;">Year 1 · B</div><div style="font-size: 11.5px; color: #A79E94;">English</div></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Letter sounds: m, a, t</div><span style="font-size: 11px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border-radius: 6px; padding: 2px 7px;">● Submitted</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #ECE1D1; border-left: 1px solid #EAD9C5; background: #FFFCF7; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Blending CVC words</div><span style="font-size: 11px; font-weight: 600; color: #B62A5C; background: #F7E4EB; border-radius: 6px; padding: 2px 7px;">● Needs Review</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Family words: mum, dad</div><span style="font-size: 11px; font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 6px; padding: 2px 7px;">● In progress</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Describe my family</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+          <div style="padding: 11px; border-bottom: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Draw &amp; label my family</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+
+          <!-- ROW: Year 3 A -->
+          <div style="padding: 14px; display: flex; flex-direction: column; justify-content: center;"><div style="font-size: 13.5px; font-weight: 600;">Year 3 · A</div><div style="font-size: 11.5px; color: #A79E94;">English</div></div>
+          <div style="padding: 11px; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Past tense: regular verbs</div><span style="font-size: 11px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border-radius: 6px; padding: 2px 7px;">● Approved</span></div>
+          <div style="padding: 11px; border-left: 1px solid #EAD9C5; background: #FFFCF7; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Write a short diary entry</div><span style="font-size: 11px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border-radius: 6px; padding: 2px 7px;">● Approved</span></div>
+          <div style="padding: 11px; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Connectives: and, but, so</div><span style="font-size: 11px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border-radius: 6px; padding: 2px 7px;">● Submitted</span></div>
+          <div style="padding: 11px; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Plan a story</div><span style="font-size: 11px; font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 6px; padding: 2px 7px;">● In progress</span></div>
+          <div style="padding: 11px; border-left: 1px solid #F0EAE1; cursor: pointer;"><div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 8px; color:#3A332E;">Write a story opening</div><span style="font-size: 11px; font-weight: 600; color: #9A918B; background: #EFEAE3; border-radius: 6px; padding: 2px 7px;">○ Not started</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ VARIANT C — STATUS BOARD ============================ -->
+  <div style="max-width: 1240px; margin: 56px auto 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: #2A2422; padding: 5px 11px; border-radius: 7px;">VARIANT C</span>
+      <span style="font-size: 17px; font-weight: 600;">Status board</span>
+      <span style="color: #8A8178; font-size: 14px;">— same week, grouped by what needs you. Answers “what should I do next?” before “what day is it?”.</span>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -28px rgba(60,40,30,0.5);">
+      <div style="padding: var(--pad, 20px); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #EFE8DD;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 40px; height: 40px; border-radius: 50%; background: #2A2422; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px;">LH</span>
+          <div><div style="font-size: 16px; font-weight: 600;">Layla Haddad</div><div style="font-size: 13px; color: #8A8178;">Shatila Centre · English · 15 lessons this week</div></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <span style="font-size: 14px; font-weight: 600; min-width: 168px; text-align: center;">16 – 20 June 2026</span>
+            <button style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+          </div>
+          <div style="display: inline-flex; background: #F3ECE2; border: 1px solid #E0D6C7; border-radius: 9px; padding: 2px; font-size: 13px; font-weight: 500;">
+            <span style="padding: 6px 14px; border-radius: 7px; color: #8A8178; cursor: pointer;">Calendar</span>
+            <span style="padding: 6px 14px; border-radius: 7px; background: #2A2422; color: #fff;">Status</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- columns -->
+      <div style="padding: var(--pad, 20px); display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--rg, 12px); overflow-x: auto;">
+        <!-- Not started -->
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 12.5px; font-weight: 600; color: #9A918B;">○ Not started</span><span style="font-size: 12px; color: #A79E94;">6</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="background: #FBF8F3; border: 1px solid #EFE8DD; border-radius: 11px; padding: 10px 12px; cursor: pointer;"><div style="font-size: 11px; color: #A79E94; font-weight: 600; margin-bottom: 3px;">Year 2 · A · Wed</div><div style="font-size: 12.5px; line-height: 1.3; color:#5C544E;">Order food: please &amp; thank you</div></div>
+            <div style="background: #FBF8F3; border: 1px solid #EFE8DD; border-radius: 11px; padding: 10px 12px; cursor: pointer;"><div style="font-size: 11px; color: #A79E94; font-weight: 600; margin-bottom: 3px;">Year 2 · A · Thu</div><div style="font-size: 12.5px; line-height: 1.3; color:#5C544E;">Numbers &amp; prices</div></div>
+            <div style="background: #FBF8F3; border: 1px solid #EFE8DD; border-radius: 11px; padding: 10px 12px; cursor: pointer;"><div style="font-size: 11px; color: #A79E94; font-weight: 600; margin-bottom: 3px;">Year 2 · A · Fri</div><div style="font-size: 12.5px; line-height: 1.3; color:#5C544E;">Role-play: at the café</div></div>
+            <div style="font-size: 11.5px; color: #A79E94; text-align: center; padding: 6px;">+ 3 more</div>
+          </div>
+        </div>
+        <!-- In progress -->
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 12.5px; font-weight: 600; color: #B0651E;">● In progress</span><span style="font-size: 12px; color: #A79E94;">3</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <a href="lesson-plan-editor.html" style="display:block; text-decoration:none; color:inherit; background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #8A8178; font-weight: 600; margin-bottom: 4px;">Year 2 · A · Tue</div><div style="font-size: 13px; line-height: 1.35;">Read a café menu &amp; identify food words</div></a>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #8A8178; font-weight: 600; margin-bottom: 4px;">Year 1 · B · Wed</div><div style="font-size: 13px; line-height: 1.35;">Family words: mum, dad</div></div>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #8A8178; font-weight: 600; margin-bottom: 4px;">Year 3 · A · Thu</div><div style="font-size: 13px; line-height: 1.35;">Plan a story</div></div>
+          </div>
+        </div>
+        <!-- Submitted -->
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 12.5px; font-weight: 600; color: #1F7A6C;">● Submitted</span><span style="font-size: 12px; color: #A79E94;">2</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="background: #fff; border: 1px solid #CFE6E0; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #1F7A6C; font-weight: 600; margin-bottom: 4px;">Year 1 · B · Mon</div><div style="font-size: 13px; line-height: 1.35;">Letter sounds: m, a, t</div><div style="font-size: 11px; color: #A79E94; margin-top: 6px;">Awaiting approval</div></div>
+            <div style="background: #fff; border: 1px solid #CFE6E0; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #1F7A6C; font-weight: 600; margin-bottom: 4px;">Year 3 · A · Wed</div><div style="font-size: 13px; line-height: 1.35;">Connectives: and, but, so</div><div style="font-size: 11px; color: #A79E94; margin-top: 6px;">Awaiting approval</div></div>
+          </div>
+        </div>
+        <!-- Needs Review -->
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 12.5px; font-weight: 600; color: #B62A5C;">● Needs Review</span><span style="font-size: 12px; color: #A79E94;">1</span></div>
+          <div style="background: #FCF1F5; border: 1px solid #F0CBD8; border-radius: 11px; padding: 11px 12px; cursor: pointer;">
+            <div style="font-size: 11px; color: #B62A5C; font-weight: 600; margin-bottom: 4px;">Year 1 · B · Tue</div>
+            <div style="font-size: 13px; line-height: 1.35;">Blending CVC words</div>
+            <div style="font-size: 11px; color: #B0651E; margin-top: 7px;">“Add a measurable verb to the objective.”</div>
+          </div>
+        </div>
+        <!-- Approved -->
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 12.5px; font-weight: 600; color: #2E7D5B;">● Approved</span><span style="font-size: 12px; color: #A79E94;">3</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="background: #fff; border: 1px solid #C9E4D5; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #2E7D5B; font-weight: 600; margin-bottom: 4px;">Year 2 · A · Mon</div><div style="font-size: 13px; line-height: 1.35;">Greetings &amp; introductions</div></div>
+            <div style="background: #fff; border: 1px solid #C9E4D5; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #2E7D5B; font-weight: 600; margin-bottom: 4px;">Year 3 · A · Mon</div><div style="font-size: 13px; line-height: 1.35;">Past tense: regular verbs</div></div>
+            <div style="background: #fff; border: 1px solid #C9E4D5; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="font-size: 11px; color: #2E7D5B; font-weight: 600; margin-bottom: 4px;">Year 3 · A · Tue</div><div style="font-size: 13px; line-height: 1.35;">Write a short diary entry</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:1500},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Calm&quot;,&quot;Balanced&quot;,&quot;Dense&quot;],&quot;default&quot;:&quot;Balanced&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { setRoot: (el) => { this.root = el; this.applyDensity(); } };
+  }
+  componentDidMount() { this.applyDensity(); }
+  componentDidUpdate() { this.applyDensity(); }
+  applyDensity() {
+    const el = this.root;
+    if (!el) return;
+    const d = this.props.density || "Balanced";
+    const map = {
+      Calm:     { pad: "26px", gap: "22px", rg: "14px" },
+      Balanced: { pad: "20px", gap: "18px", rg: "10px" },
+      Dense:    { pad: "14px", gap: "12px", rg: "7px" },
+    };
+    const v = map[d] || map.Balanced;
+    el.style.setProperty("--pad", v.pad);
+    el.style.setProperty("--gap", v.gap);
+    el.style.setProperty("--rg", v.rg);
+  }
+}
+</script>
+</body>
+</html>

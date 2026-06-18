@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#DED9D2">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#DED9D2"/>
+    <rect x="400" y="210" width="400" height="370" rx="24" fill="#ffffff" stroke="#E7DECF" stroke-width="4"/>
+    <rect x="432" y="250" width="180" height="20" rx="10" fill="#2A2422"/>
+    <rect x="432" y="296" width="336" height="50" rx="12" fill="#FBF2F5" stroke="#F1D8E1" stroke-width="3"/>
+    <rect x="432" y="372" width="160" height="40" rx="10" fill="#E4F0ED"/>
+    <rect x="608" y="372" width="160" height="40" rx="10" fill="#FBF8F3" stroke="#E7DECF" stroke-width="2"/>
+    <rect x="432" y="430" width="336" height="34" rx="10" fill="#FBF8F3" stroke="#E7DECF" stroke-width="2"/>
+    <rect x="432" y="478" width="336" height="34" rx="10" fill="#FBF8F3" stroke="#E7DECF" stroke-width="2"/>
+    <text x="600" y="650" font-family="Georgia, serif" font-size="44" fill="#B62A5C" text-anchor="middle" font-style="italic">Alsama</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Sacramento&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #DED9D2; }
+  textarea.lp { width: 100%; font-family: Sora, sans-serif; font-size: 13.5px; line-height: 1.55; color: #3A332E; background: #FBF8F3; border: 1px solid #E7DECF; border-radius: 10px; padding: 11px 12px; resize: vertical; outline: none; }
+  textarea.lp:focus { border-color: #1F7A6C; background: #fff; }
+  textarea.lp::placeholder { color: #BCB3A8; }
+  select.lp { font-family: Sora, sans-serif; font-size: 12px; font-weight: 600; color: #186155; background: #E4F0ED; border: 1px solid #CFE6E0; border-radius: 8px; padding: 6px 26px 6px 10px; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231F7A6C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+</style>
+</helmet>
+
+<div ref="{{ setRoot }}" style="font-family: Sora, sans-serif; color: #2A2422; background: #DED9D2; min-height: 100vh; padding: 40px 40px 90px; -webkit-font-smoothing: antialiased;">
+
+  <!-- Prototype nav -->
+  <div style="max-width: 1340px; margin: 0 auto 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A79E94; margin-right: 4px;">Teacher workflow</span>
+    <a href="weekly-overview.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Weekly Overview</a>
+    <a href="curriculum-browser.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Curriculum Browser</a>
+    <a href="lesson-plan-editor.html" style="text-decoration: none; font-size: 13px; font-weight: 600; color: #fff; background: #1F7A6C; border: 1px solid #1F7A6C; padding: 7px 13px; border-radius: 9px;">Lesson Plan Editor</a>
+  </div>
+
+  <!-- Canvas heading -->
+  <div style="max-width: 1340px; margin: 0 auto 8px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: Sacramento, cursive; font-size: 40px; line-height: 0.8; color: #B62A5C;">Alsama</span>
+      <span style="width: 1px; height: 26px; background: #C7BFB5;"></span>
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8178; font-weight: 600;">Lesson Planning</span>
+    </div>
+    <h1 style="margin: 14px 0 4px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">Lesson Plan Editor — activities-first</h1>
+    <p style="margin: 0; color: #756B64; font-size: 15px; max-width: 860px;">The writing space stays hidden until you <b style="color:#1F7A6C;">add a pre-approved activity</b>. Teaching guidance and each activity's detail hide behind a <b>?</b>. Try it — add an activity, open a <b>?</b>, change I&nbsp;do&nbsp;/&nbsp;We&nbsp;do&nbsp;/&nbsp;You&nbsp;do.</p>
+  </div>
+
+  <!-- ============================ LESSON PLAN EDITOR ============================ -->
+  <div style="max-width: 1340px; margin: 32px auto 0;">
+    <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -28px rgba(60,40,30,0.5);">
+      <!-- SLIM HEADER -->
+      <div style="padding: var(--pad, 22px) var(--pad, 22px) 0;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 600;">Year 2 · Group A <span style="font-size: 13px; font-weight: 500; color: #756B64; background: #F3ECE2; padding: 3px 9px; border-radius: 6px;">English</span></div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: #8A8178; font-size: 13.5px; margin-top: 6px;">
+              <span>Tuesday, 17 June 2026</span><span style="color:#D4CABB;">·</span><span>Shatila Centre</span><span style="color:#D4CABB;">·</span>
+              <span style="font-weight: 600; color: #1F7A6C; background: #E4F0ED; border-radius: 6px; padding: 2px 8px;">Reading</span>
+              <span style="font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 6px; padding: 2px 8px;">Food &amp; Drink</span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #2E7D5B;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-11"></path></svg> Saved</span>
+            <button style="display: inline-flex; align-items: center; gap: 7px; font-family: inherit; font-size: 14px; font-weight: 500; color: #2A2422; background: #fff; border: 1px solid #DDD4C8; padding: 9px 14px; border-radius: 9px; cursor: pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 8h6M9 12h6M9 16h3"></path></svg> Export to Word</button>
+            <button style="display: inline-flex; align-items: center; gap: 7px; font-family: inherit; font-size: 14px; font-weight: 600; color: #fff; background: #1F7A6C; border: 1px solid #1F7A6C; padding: 9px 16px; border-radius: 9px; cursor: pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg> Submit for approval</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SMARTT OBJECTIVE — the single home of the objective -->
+      <div style="margin: var(--gap, 18px) var(--pad, 22px) 0; background: #FBF2F5; border: 1px solid #F1D8E1; border-radius: 14px; padding: 16px 18px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #B62A5C;">SMARTT objective</span>
+            <span style="font-size: 12px; color: #B89AA4;">the one target for this lesson — set it here</span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <span style="font-size: 11px; font-weight: 500; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 999px; padding: 3px 9px;">✓ Specific</span>
+            <span style="font-size: 11px; font-weight: 500; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 999px; padding: 3px 9px;">✓ Measurable</span>
+            <span style="font-size: 11px; font-weight: 500; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 999px; padding: 3px 9px;">✓ Achievable</span>
+            <span style="font-size: 11px; font-weight: 500; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 999px; padding: 3px 9px;">✓ Relevant</span>
+            <span style="font-size: 11px; font-weight: 500; color: #B0651E; background: #F6ECDA; border: 1px solid #E8D6B8; border-radius: 999px; padding: 3px 9px;">~ Time-bound</span>
+            <span style="font-size: 11px; font-weight: 500; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 999px; padding: 3px 9px;">✓ Tangible</span>
+          </div>
+        </div>
+        <div style="background: #fff; border: 1px solid #ECE1D1; border-radius: 12px; padding: 15px 17px; display: flex; gap: 14px; align-items: flex-start;">
+          <div style="flex: 1; font-size: 17px; line-height: 1.5;"><span style="color: #A79E94;">By the end of this session, students will be able to</span> <span style="color:#2A2422; font-weight: 500;">read a short café menu and <span style="color:#B62A5C;">identify</span> five familiar food words.</span></div>
+          <button style="font-family: inherit; font-size: 13px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border: 1px solid #CFE6E0; padding: 9px 13px; border-radius: 9px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg> Check my objective</button>
+        </div>
+        <div style="margin-top: 9px; display: flex; gap: 9px; align-items: start; font-size: 12.5px; color: #756B64; background: #fff; border: 1px dashed #E6CDD7; border-radius: 9px; padding: 9px 12px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="color:#1F7A6C; flex-shrink:0; margin-top:1px;"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"></path></svg>
+          <span><b style="color:#3A332E;">Looking good.</b> Measurable verb (<i>identify</i>), specific (five food words), tangible (a café menu). To be fully time-bound you could add “in 10 minutes”.</span>
+        </div>
+      </div>
+
+      <!-- SPLIT -->
+      <div style="display: grid; grid-template-columns: 360px 1fr; margin-top: var(--gap, 18px); border-top: 1px solid #EFE8DD;">
+        <!-- LEFT SIDEBAR — section + teacher's words -->
+        <div style="border-right: 1px solid #EFE8DD; padding: var(--pad, 22px); background: #FBF8F3; display: flex; flex-direction: column;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #A79E94; margin: 0 2px 10px;">Lesson blocks · 50 min</div>
+          <div style="background: #F3ECE2; border: 1px dashed #DACFBE; border-radius: 11px; padding: 9px 12px; margin-bottom: var(--rg, 12px);">
+            <div style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 13px; font-weight: 500; color: #756B64;">Standard routines</span><span style="font-size: 12px; color: #A79E94;">3 min · auto</span></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: var(--rg, 12px);">
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">Homework check</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">2 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Check yesterday's menu words</div></div>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">Recap</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">5 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Flashcard drill: 8 food words</div></div>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">New content</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">10 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Reading a café menu, modelled aloud</div><span style="display: inline-block; margin-top: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; color: #1F7A6C; background: #E4F0ED; padding: 2px 7px; border-radius: 5px;">I DO</span></div>
+            <div style="background: #fff; border: 1.5px solid #1F7A6C; border-radius: 11px; padding: 11px 12px; box-shadow: 0 0 0 4px rgba(31,122,108,0.10); cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600; color: #186155;">Check for Understanding</span><span style="font-size: 12px; color: #1F7A6C; font-weight: 600; white-space: nowrap;">5 min</span></div><div style="{{ o1_previewStyle }}">{{ o1_preview }}</div><span style="display: inline-block; margin-top: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; color: #B0651E; background: #F6ECDA; padding: 2px 7px; border-radius: 5px;">WE DO · EDITING</span></div>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">Practice</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">20 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Order from the menu, in pairs</div><span style="display: inline-block; margin-top: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; color: #B62A5C; background: #F7E4EB; padding: 2px 7px; border-radius: 5px;">YOU DO</span></div>
+            <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">Exit ticket</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">5 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Name 3 foods you read today</div></div>
+          </div>
+          <div style="margin-top: var(--rg, 12px); border-top: 1px dashed #DACFBE; padding-top: var(--rg, 12px);">
+            <div style="background: #FBF6EF; border: 1px solid #ECE1D1; border-radius: 11px; padding: 11px 12px; cursor: pointer;"><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;"><span style="font-size: 14px; font-weight: 600;">Homework</span><span style="font-size: 12px; color: #8A8178; white-space: nowrap;">30–60 min</span></div><div style="font-size: 12px; color: #756B64; margin-top: 3px;">Read a café menu at home · not counted in 50 min</div></div>
+          </div>
+          <div style="margin-top: auto; padding-top: var(--gap, 18px);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><span style="font-size: 12px; color: #756B64; display: inline-flex; align-items: center; gap: 5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg> Lesson time</span><span style="font-size: 13px; font-weight: 600; color: #2E7D5B;">50 / 50 min · on target</span></div>
+            <div style="height: 8px; background: #ECE5DA; border-radius: 99px; overflow: hidden;"><div style="width: 100%; height: 100%; background: #2E7D5B; border-radius: 99px;"></div></div>
+          </div>
+        </div>
+
+        <!-- RIGHT — reveal on add -->
+        <div style="padding: var(--pad, 22px);">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <span style="font-size: 21px; font-weight: 600;">Check for Understanding</span>
+                <button onClick="{{ o1_onGuidance }}" title="Teaching guidance" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #CFE6E0; background: #E4F0ED; color: #1F7A6C; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">?</button>
+              </div>
+              <div style="margin-top: 9px;">
+                <select class="lp" value="{{ o1_phase }}" onChange="{{ o1_onPhase }}"><option>I do</option><option>We do</option><option>You do</option></select>
+              </div>
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding-top: 4px;">
+              <span style="font-size: 12px; color: #8A8178;">Duration</span>
+              <div style="display: inline-flex; align-items: center; border: 1px solid #DDD4C8; border-radius: 8px; overflow: hidden; background: #fff;">
+                <button onClick="{{ o1_durMinus }}" style="width: 26px; height: 28px; border: none; background: #FBF8F3; color: #8A8178; font-size: 15px; cursor: pointer; border-right: 1px solid #EDE5D9;">−</button>
+                <span style="padding: 0 11px; font-size: 13px; font-weight: 600;">{{ o1_dur }} min</span>
+                <button onClick="{{ o1_durPlus }}" style="width: 26px; height: 28px; border: none; background: #FBF8F3; color: #8A8178; font-size: 15px; cursor: pointer; border-left: 1px solid #EDE5D9;">+</button>
+              </div>
+            </div>
+          </div>
+
+          <sc-if value="{{ o1_guidance }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: var(--rg, 14px); background: #E4F0ED; border: 1px solid #CFE6E0; border-radius: 13px; padding: 15px 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px;"><span style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #186155;">Teaching guidance</span><button onClick="{{ o1_onGuidance }}" style="font-family: inherit; font-size: 12px; color: #1F7A6C; background: none; border: none; cursor: pointer;">Hide ✕</button></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 13px;">
+                <div><div style="font-size: 11.5px; font-weight: 600; color: #1F7A6C;">Purpose</div><div style="font-size: 13px; color: #2A4A44; line-height: 1.5; margin-top: 2px;">Quickly see who has understood before independent practice.</div></div>
+                <div><div style="font-size: 11.5px; font-weight: 600; color: #1F7A6C;">Success looks like</div><div style="font-size: 13px; color: #2A4A44; line-height: 1.5; margin-top: 2px;">Most students show 4–5; you know exactly who to check on next.</div></div>
+                <div style="grid-column: 1 / -1;"><div style="font-size: 11.5px; font-weight: 600; color: #1F7A6C;">Instructions for the teacher</div><div style="font-size: 13px; color: #2A4A44; line-height: 1.5; margin-top: 2px;">Pause. Ask the question. Count to three. Then have all students show at once so no one copies a neighbour.</div></div>
+              </div>
+              <div style="margin-top: 12px; display: inline-flex; align-items: center; gap: 9px; background: #fff; border: 1px solid #CFE6E0; border-radius: 9px; padding: 8px 12px;"><span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: #B62A5C; background: #F7E4EB; padding: 3px 7px; border-radius: 5px;">TLAC</span><span style="font-size: 13px; color: #3A332E;"><b>Cold Call</b> — name a student <i>after</i> asking, so everyone stays ready to answer.</span></div>
+            </div>
+          </sc-if>
+
+          <!-- ACTIVITIES FIRST -->
+          <div style="margin-top: var(--gap, 18px);">
+            <div style="margin-bottom: 11px;">
+              <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #756B64;">Pre-approved activities <span style="font-weight: 500; color: #A79E94; text-transform: none; letter-spacing: 0;">— add one to begin</span></div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+
+              <!-- Fist to Five -->
+              <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 12px 13px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <div style="flex: 1;"><div style="font-size: 14.5px; font-weight: 600;">Fist to Five</div><div style="font-size: 12.5px; color: #756B64; margin-top: 2px;">Students show how well they understood, 0–5.</div></div>
+                  <div style="display: inline-flex; align-items: center; gap: 7px;">
+                    <button onClick="{{ o1_fistToggle }}" title="More detail" style="width: 26px; height: 26px; border-radius: 50%; border: 1px solid #DDD4C8; background: #FBF8F3; color: #8A8178; font-size: 13px; font-weight: 700; cursor: pointer;">?</button>
+                    <sc-if value="{{ o1_fistAdded }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 7px; padding: 5px 10px;">✓ Added</span></sc-if>
+                    <sc-if value="{{ o1_fistNotAdded }}" hint-placeholder-val="{{ true }}"><button onClick="{{ o1_fistAdd }}" style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: #1F7A6C; border: none; border-radius: 7px; padding: 6px 12px; cursor: pointer;">+ Add</button></sc-if>
+                  </div>
+                </div>
+                <sc-if value="{{ o1_fistOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top: 10px; border-top: 1px solid #F0EAE1; padding-top: 10px; display: flex; flex-direction: column; gap: 7px;">
+                    <div style="font-size: 12.5px; color: #5C544E; line-height: 1.5;"><b style="color:#3A332E;">How:</b> Pause, ask the question, count to three, then everyone shows at once so no one copies. Note any pair below 3.</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 9px;">
+                      <div style="background: #F2F8F6; border: 1px solid #D6E8E2; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Literate · writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Write the number, plus one word they still find hard.</div></div>
+                      <div style="background: #FCF1F5; border: 1px solid #F1D8E1; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #B62A5C;">Illiterate · no writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Hold up 0–5 fingers — no writing needed.</div></div>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <!-- Whiteboard / Show Me -->
+              <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 12px 13px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <div style="flex: 1;"><div style="font-size: 14.5px; font-weight: 600;">Whiteboard / Show Me</div><div style="font-size: 12.5px; color: #756B64; margin-top: 2px;">Students show an answer on a mini-whiteboard.</div></div>
+                  <div style="display: inline-flex; align-items: center; gap: 7px;">
+                    <button onClick="{{ o1_wbToggle }}" title="More detail" style="width: 26px; height: 26px; border-radius: 50%; border: 1px solid #DDD4C8; background: #FBF8F3; color: #8A8178; font-size: 13px; font-weight: 700; cursor: pointer;">?</button>
+                    <sc-if value="{{ o1_wbAdded }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 7px; padding: 5px 10px;">✓ Added</span></sc-if>
+                    <sc-if value="{{ o1_wbNotAdded }}" hint-placeholder-val="{{ true }}"><button onClick="{{ o1_wbAdd }}" style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: #1F7A6C; border: none; border-radius: 7px; padding: 6px 12px; cursor: pointer;">+ Add</button></sc-if>
+                  </div>
+                </div>
+                <sc-if value="{{ o1_wbOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top: 10px; border-top: 1px solid #F0EAE1; padding-top: 10px; display: flex; flex-direction: column; gap: 7px;">
+                    <div style="font-size: 12.5px; color: #5C544E; line-height: 1.5;"><b style="color:#3A332E;">How:</b> Pose one clear prompt. Give 20 seconds. Say “show me” so all reveal at once. Note who is unsure.</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 9px;">
+                      <div style="background: #F2F8F6; border: 1px solid #D6E8E2; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Literate · writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Write a word or short sentence.</div></div>
+                      <div style="background: #FCF1F5; border: 1px solid #F1D8E1; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #B62A5C;">Illiterate · no writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Draw or circle a picture on a sticky note.</div></div>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <!-- Think-Pair-Share -->
+              <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 11px; padding: 12px 13px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <div style="flex: 1;"><div style="font-size: 14.5px; font-weight: 600;">Think-Pair-Share</div><div style="font-size: 12.5px; color: #756B64; margin-top: 2px;">Students think, talk in pairs, then share.</div></div>
+                  <div style="display: inline-flex; align-items: center; gap: 7px;">
+                    <button onClick="{{ o1_tpsToggle }}" title="More detail" style="width: 26px; height: 26px; border-radius: 50%; border: 1px solid #DDD4C8; background: #FBF8F3; color: #8A8178; font-size: 13px; font-weight: 700; cursor: pointer;">?</button>
+                    <sc-if value="{{ o1_tpsAdded }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #2E7D5B; background: #E2F0E8; border: 1px solid #C9E4D5; border-radius: 7px; padding: 5px 10px;">✓ Added</span></sc-if>
+                    <sc-if value="{{ o1_tpsNotAdded }}" hint-placeholder-val="{{ true }}"><button onClick="{{ o1_tpsAdd }}" style="font-family: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: #1F7A6C; border: none; border-radius: 7px; padding: 6px 12px; cursor: pointer;">+ Add</button></sc-if>
+                  </div>
+                </div>
+                <sc-if value="{{ o1_tpsOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top: 10px; border-top: 1px solid #F0EAE1; padding-top: 10px; display: flex; flex-direction: column; gap: 7px;">
+                    <div style="font-size: 12.5px; color: #5C544E; line-height: 1.5;"><b style="color:#3A332E;">How:</b> Give 30 seconds silent think time, then one minute pair talk. Cold-call a pair to report back.</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 9px;">
+                      <div style="background: #F2F8F6; border: 1px solid #D6E8E2; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Literate · writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Say it, then write what your partner said.</div></div>
+                      <div style="background: #FCF1F5; border: 1px solid #F1D8E1; border-radius: 8px; padding: 8px 10px;"><div style="font-size: 11px; font-weight: 600; color: #B62A5C;">Illiterate · no writing</div><div style="font-size: 12px; color: #3A332E; margin-top: 2px;">Turn to a partner and say one thing aloud.</div></div>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- EDITING — appears after an activity is added -->
+          <sc-if value="{{ o1_noActivity }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top: var(--gap, 18px); border: 1px dashed #DDD4C8; border-radius: 12px; padding: 18px; text-align: center; color: #A79E94; font-size: 13px; background: #FBFAF7;">Add a pre-approved activity above to open the writing space — <b style="color:#8A8178;">Teacher does</b>, <b style="color:#8A8178;">Students do</b> and <b style="color:#8A8178;">Resources</b>.</div>
+          </sc-if>
+          <sc-if value="{{ o1_hasActivity }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: var(--gap, 18px); border-top: 1px solid #EFE8DD; padding-top: var(--gap, 18px);">
+              <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 13px;"><span style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #186155;">Now editing</span><span style="font-size: 13px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border: 1px solid #CFE6E0; border-radius: 7px; padding: 3px 10px;">{{ o1_addedTitle }}</span></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--rg, 14px);">
+                <div><label style="font-size: 12px; font-weight: 600; color: #756B64;">What the teacher does</label><textarea class="lp" rows="3" style="margin-top: 6px;" value="{{ o1_fTeacher }}" onChange="{{ o1_onTeacher }}"></textarea></div>
+                <div><label style="font-size: 12px; font-weight: 600; color: #756B64;">What students do</label><textarea class="lp" rows="3" style="margin-top: 6px;" value="{{ o1_fStudents }}" onChange="{{ o1_onStudents }}"></textarea></div>
+                <div style="grid-column: 1 / -1;"><label style="font-size: 12px; font-weight: 600; color: #756B64;">Resources</label><textarea class="lp" rows="2" style="margin-top: 6px;" value="{{ o1_fResources }}" onChange="{{ o1_onResources }}"></textarea></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1420,&quot;height&quot;:1100},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Calm&quot;,&quot;Balanced&quot;,&quot;Dense&quot;],&quot;default&quot;:&quot;Balanced&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.ACT = {
+      fist: { title: "Fist to Five",
+        teacher: "Ask the class to show how well they understood today's food words using Fist to Five, all together on a count of three.",
+        students: "Hold up 0–5 fingers, then (if writing) note one word they still find hard.",
+        resources: "Mini-whiteboards (optional) · pens" },
+      wb: { title: "Whiteboard / Show Me",
+        teacher: "Pose one food-word prompt and ask students to show their answer together on 'show me'.",
+        students: "Write or draw the answer on a whiteboard and hold it up together.",
+        resources: "Mini-whiteboards · pens" },
+      tps: { title: "Think-Pair-Share",
+        teacher: "Pose a question, give silent think time, let pairs talk, then call on a pair to share.",
+        students: "Think quietly, tell your partner, then share with the class.",
+        resources: "None needed" },
+    };
+    this.state = {
+      o1: { phase: "We do", guidance: false, added: null, expanded: {}, dur: 5, fields: {} },
+    };
+  }
+
+  addActivity(o, id) {
+    const a = this.ACT[id];
+    this.setState(s => ({ [o]: { ...s[o], added: id, fields: { teacher: a.teacher, students: a.students, resources: a.resources } } }));
+  }
+  toggleGuidance(o) { this.setState(s => ({ [o]: { ...s[o], guidance: !s[o].guidance } })); }
+  toggleCard(o, id) { this.setState(s => { const ex = { ...s[o].expanded }; ex[id] = !ex[id]; return { [o]: { ...s[o], expanded: ex } }; }); }
+  setPhase(o, v) { this.setState(s => ({ [o]: { ...s[o], phase: v } })); }
+  changeDur(o, d) { this.setState(s => ({ [o]: { ...s[o], dur: Math.max(1, s[o].dur + d) } })); }
+  setField(o, k, v) { this.setState(s => ({ [o]: { ...s[o], fields: { ...s[o].fields, [k]: v } } })); }
+
+  buildOpt(o, flat) {
+    const st = this.state[o];
+    const added = st.added ? this.ACT[st.added] : null;
+    const p = o + "_";
+    flat[p + "phase"] = st.phase;
+    flat[p + "guidance"] = st.guidance;
+    flat[p + "dur"] = st.dur;
+    flat[p + "hasActivity"] = !!added;
+    flat[p + "noActivity"] = !added;
+    flat[p + "addedTitle"] = added ? added.title : "";
+    flat[p + "preview"] = added ? added.title : "No activity added yet";
+    flat[p + "previewStyle"] = added
+      ? { fontSize: "12px", color: "#1F7A6C", fontWeight: 600, marginTop: "3px" }
+      : { fontSize: "12px", color: "#C0998A", fontStyle: "italic", marginTop: "3px" };
+    flat[p + "fTeacher"] = st.fields.teacher || "";
+    flat[p + "fStudents"] = st.fields.students || "";
+    flat[p + "fResources"] = st.fields.resources || "";
+    flat[p + "onPhase"] = (e) => this.setPhase(o, e.target.value);
+    flat[p + "onGuidance"] = () => this.toggleGuidance(o);
+    flat[p + "durMinus"] = () => this.changeDur(o, -1);
+    flat[p + "durPlus"] = () => this.changeDur(o, 1);
+    flat[p + "onTeacher"] = (e) => this.setField(o, "teacher", e.target.value);
+    flat[p + "onStudents"] = (e) => this.setField(o, "students", e.target.value);
+    flat[p + "onResources"] = (e) => this.setField(o, "resources", e.target.value);
+    ["fist", "wb", "tps"].forEach(id => {
+      flat[p + id + "Open"] = !!st.expanded[id];
+      flat[p + id + "Added"] = st.added === id;
+      flat[p + id + "NotAdded"] = st.added !== id;
+      flat[p + id + "Toggle"] = () => this.toggleCard(o, id);
+      flat[p + id + "Add"] = () => this.addActivity(o, id);
+    });
+  }
+
+  renderVals() {
+    const flat = { setRoot: (el) => { this.root = el; this.applyDensity(); } };
+    this.buildOpt("o1", flat);
+    return flat;
+  }
+  componentDidMount() { this.applyDensity(); }
+  componentDidUpdate() { this.applyDensity(); }
+  applyDensity() {
+    const el = this.root;
+    if (!el) return;
+    const d = this.props.density || "Balanced";
+    const map = {
+      Calm:     { pad: "28px", gap: "24px", rg: "16px" },
+      Balanced: { pad: "22px", gap: "18px", rg: "14px" },
+      Dense:    { pad: "16px", gap: "13px", rg: "10px" },
+    };
+    const v = map[d] || map.Balanced;
+    el.style.setProperty("--pad", v.pad);
+    el.style.setProperty("--gap", v.gap);
+    el.style.setProperty("--rg", v.rg);
+  }
+}
+</script>
+</body>
+</html>

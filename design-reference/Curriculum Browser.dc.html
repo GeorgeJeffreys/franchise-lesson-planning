@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#DED9D2">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#DED9D2"/>
+    <rect x="380" y="230" width="440" height="320" rx="24" fill="#ffffff" stroke="#E7DECF" stroke-width="4"/>
+    <rect x="380" y="230" width="440" height="58" rx="24" fill="#1F7A6C"/>
+    <rect x="380" y="262" width="440" height="26" fill="#1F7A6C"/>
+    <g>
+      <rect x="404" y="320" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="492" y="320" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="580" y="320" width="76" height="58" rx="9" fill="#1F7A6C"/>
+      <rect x="668" y="320" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="404" y="390" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="492" y="390" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="580" y="390" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="668" y="390" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="404" y="460" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="492" y="460" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="580" y="460" width="76" height="58" rx="9" fill="#EFE8DD"/>
+      <rect x="668" y="460" width="76" height="58" rx="9" fill="#EFE8DD"/>
+    </g>
+    <text x="600" y="640" font-family="Georgia, serif" font-size="46" fill="#B62A5C" text-anchor="middle" font-style="italic">Alsama</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Sacramento&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #DED9D2; }
+</style>
+</helmet>
+
+<div ref="{{ setRoot }}" style="font-family: Sora, sans-serif; color: #2A2422; background: #DED9D2; min-height: 100vh; padding: 40px 40px 90px; -webkit-font-smoothing: antialiased;">
+
+  <!-- Prototype nav -->
+  <div style="max-width: 1320px; margin: 0 auto 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A79E94; margin-right: 4px;">Teacher workflow</span>
+    <a href="weekly-overview.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Weekly Overview</a>
+    <a href="curriculum-browser.html" style="text-decoration: none; font-size: 13px; font-weight: 600; color: #fff; background: #1F7A6C; border: 1px solid #1F7A6C; padding: 7px 13px; border-radius: 9px;">Curriculum Browser</a>
+    <a href="lesson-plan-editor.html" style="text-decoration: none; font-size: 13px; font-weight: 500; color: #3A332E; background: #fff; border: 1px solid #DDD4C8; padding: 7px 13px; border-radius: 9px;">Lesson Plan Editor</a>
+  </div>
+
+  <!-- Canvas heading -->
+  <div style="max-width: 1320px; margin: 0 auto 8px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: Sacramento, cursive; font-size: 40px; line-height: 0.8; color: #B62A5C;">Alsama</span>
+      <span style="width: 1px; height: 26px; background: #C7BFB5;"></span>
+      <span style="font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8178; font-weight: 600;">Lesson Planning</span>
+    </div>
+    <h1 style="margin: 14px 0 4px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">Curriculum Browser — structural explorations</h1>
+    <p style="margin: 0; color: #756B64; font-size: 15px; max-width: 820px;">Read-only reference. The <b style="color:#B0651E;">Monthly Learning Outcome</b> sits up top; each day shows its <b style="color:#1F7A6C;">topic</b> so you can see at a glance where several lessons in a row cover the same thing. Two structures: a clean month calendar with a detail rail, and a week-at-a-glance table.</p>
+  </div>
+
+  <!-- ============================ VERSION 1 — MONTH CALENDAR + RAIL ============================ -->
+  <div style="max-width: 1320px; margin: 38px auto 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; flex-wrap: wrap;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: #1F7A6C; padding: 5px 11px; border-radius: 7px;">VERSION 1</span>
+      <span style="font-size: 17px; font-weight: 600;">Month calendar + detail rail</span>
+      <span style="color: #8A8178; font-size: 14px;">— the whole month on the left, the chosen day's detail on the right. Each cell names its topic, so repeated topics read as a run.</span>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -28px rgba(60,40,30,0.5);">
+      <!-- selectors -->
+      <div style="padding: var(--pad, 20px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #EFE8DD;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #DDD4C8; border-radius: 9px; padding: 8px 12px; font-size: 14px; font-weight: 500;">English <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A79E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #DDD4C8; border-radius: 9px; padding: 8px 12px; font-size: 14px; font-weight: 500;">Year 2 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A79E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-left: 6px;">
+          <button style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+          <span style="font-size: 16px; font-weight: 600;">June 2026</span>
+          <button style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+        </div>
+        <span style="margin-left: auto; font-size: 12px; color: #A79E94; display: inline-flex; align-items: center; gap: 6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg> Read-only reference</span>
+      </div>
+
+      <!-- monthly outcome -->
+      <div style="margin: var(--pad, 20px) var(--pad, 20px) 0; background: #FBF7F0; border: 1px solid #EFE3D2; border-radius: 13px; padding: 14px 18px; display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #B0651E; white-space: nowrap; padding-top: 2px;">Monthly outcome · June</span>
+        <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px;">
+          <div><span style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Knowledge</span><div style="font-size: 14px; color: #3A332E; line-height: 1.45;">Everyday vocabulary for food, drink and shopping.</div></div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #B62A5C;">Skills</span><div style="font-size: 14px; color: #3A332E; line-height: 1.45;">Read, order and write about familiar food and drink.</div></div>
+        </div>
+      </div>
+
+      <!-- calendar (left) + detail rail (right) -->
+      <div style="display: grid; grid-template-columns: 1fr 320px; margin-top: var(--pad, 20px);">
+        <!-- CALENDAR -->
+        <div style="padding: 0 var(--pad, 20px) var(--pad, 20px); display: flex; flex-direction: column; gap: var(--rg, 14px);">
+          <div style="display: grid; grid-template-columns: 84px repeat(5, 1fr); gap: 10px;">
+            <div></div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #A79E94; text-align: center;">MON</div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #A79E94; text-align: center;">TUE</div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #A79E94; text-align: center;">WED</div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #A79E94; text-align: center;">THU</div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: #A79E94; text-align: center;">FRI</div>
+          </div>
+
+          <!-- WEEK 1 -->
+          <div style="display: grid; grid-template-columns: 84px repeat(5, 1fr); gap: 10px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 13px; font-weight: 600;">Week 1</span><span style="font-size: 11px; color: #A79E94;">Greetings</span></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B0651E;">Listening</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Respond to a spoken hello</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Greetings &amp; names</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #1F7A6C;">Reading</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Read name cards</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Greetings &amp; names</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Say hello &amp; my name</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Greetings &amp; names</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #7A6E62;">Writing</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Write my own name</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Introduce</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Introduce a friend</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Introduce</div></div>
+          </div>
+
+          <!-- WEEK 2 -->
+          <div style="display: grid; grid-template-columns: 84px repeat(5, 1fr); gap: 10px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 13px; font-weight: 600;">Week 2</span><span style="font-size: 11px; color: #A79E94;">Family</span></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B0651E;">Listening</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Recognise family words</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Family words</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #1F7A6C;">Reading</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Read a family tree</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Family words</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Talk about my family</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Family words</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #7A6E62;">Writing</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Label my family</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Describe people</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Describe a friend</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Describe people</div></div>
+          </div>
+
+          <!-- WEEK 3 — FOCUS -->
+          <div style="background: #FBFBF8; border: 1px solid #E2EEEA; border-radius: 13px; padding: 11px; margin: -1px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin: 0 2px 8px;"><span style="font-size: 13px; font-weight: 700; color: #186155;">Week 3 · Food &amp; Drink</span><span style="font-size: 11px; color: #8A8178; background: #fff; border: 1px solid #E2EEEA; border-radius: 6px; padding: 2px 8px;">in focus · 16–20 June</span></div>
+            <div style="display: grid; grid-template-columns: 72px repeat(5, 1fr); gap: 10px; align-items: stretch;">
+              <div style="display: flex; align-items: center; font-size: 11px; color: #A79E94;">Tue selected</div>
+              <div style="background: #fff; border: 1px solid #E2EEEA; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B0651E;">Listening · 16</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Listen &amp; point to food</div><div style="font-size: 10.5px; color: #1F7A6C; margin-top: 6px;">Food &amp; drink words</div></div>
+              <div style="background: #fff; border: 1.5px solid #1F7A6C; border-radius: 10px; padding: 9px 10px; box-shadow: 0 0 0 3px rgba(31,122,108,0.10);"><div style="font-size: 10.5px; font-weight: 700; color: #186155;">Reading · 17</div><div style="font-size: 12px; color: #2A2422; font-weight: 500; line-height: 1.3; margin-top: 3px;">Read a café menu</div><div style="font-size: 10.5px; color: #1F7A6C; margin-top: 6px;">Food &amp; drink words</div></div>
+              <div style="background: #fff; border: 1px solid #E2EEEA; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking · 18</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Order: please &amp; thanks</div><div style="font-size: 10.5px; color: #1F7A6C; margin-top: 6px;">Food &amp; drink words</div></div>
+              <div style="background: #fff; border: 1px solid #E2EEEA; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #7A6E62;">Writing · 19</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Write a shopping list</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Café exchange</div></div>
+              <div style="background: #fff; border: 1px solid #E2EEEA; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking · 20</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Café role-play</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Café exchange</div></div>
+            </div>
+          </div>
+
+          <!-- WEEK 4 -->
+          <div style="display: grid; grid-template-columns: 84px repeat(5, 1fr); gap: 10px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 13px; font-weight: 600;">Week 4</span><span style="font-size: 11px; color: #A79E94;">Around Town</span></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B0651E;">Listening</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Name places in town</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Places &amp; directions</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #1F7A6C;">Reading</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Read street signs</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Places &amp; directions</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Ask for directions</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Places &amp; directions</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #7A6E62;">Writing</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Write an address</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Give directions</div></div>
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 10px; padding: 9px 10px;"><div style="font-size: 10.5px; font-weight: 600; color: #B62A5C;">Speaking</div><div style="font-size: 12px; color: #3A332E; line-height: 1.3; margin-top: 3px;">Give simple directions</div><div style="font-size: 10.5px; color: #9A8F82; margin-top: 6px;">Give directions</div></div>
+          </div>
+        </div>
+
+        <!-- DETAIL RAIL -->
+        <div style="padding: 0 var(--pad, 20px) var(--pad, 20px); border-left: 1px solid #EFE8DD; background: #FBF8F3;">
+          <div style="padding-top: var(--pad, 20px);">
+            <div style="font-size: 12px; color: #A79E94; margin-bottom: 8px;">Tue 17 · Week 3</div>
+            <div style="display: flex; gap: 7px; margin-bottom: 11px;">
+              <span style="font-size: 11.5px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border-radius: 7px; padding: 3px 9px;">Reading</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 7px; padding: 3px 9px;">Food &amp; Drink</span>
+            </div>
+            <div style="font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #A79E94;">Daily learning outcome</div>
+            <p style="margin: 5px 0 14px; font-size: 16px; font-weight: 500; line-height: 1.4;">Read a short café menu and identify familiar food and drink words.</p>
+
+            <div style="background: #fff; border: 1px solid #EFE8DD; border-radius: 11px; padding: 11px 12px; margin-bottom: 12px;">
+              <div style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: #756B64; margin-bottom: 6px;">Weekly · Week 3</div>
+              <div style="font-size: 12.5px; line-height: 1.4;"><span style="color:#1F7A6C; font-weight:600;">Know:</span> 15–20 food words &amp; café phrases.</div>
+              <div style="font-size: 12.5px; line-height: 1.4; margin-top: 3px;"><span style="color:#B62A5C; font-weight:600;">Do:</span> read a menu &amp; find specific words.</div>
+            </div>
+
+            <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: #A79E94; margin-bottom: 8px;">Resources</div>
+            <div style="display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px;">
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 8h6M9 12h6"></path></svg> Café menu handout</span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0651E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"></rect><circle cx="9" cy="12" r="2"></circle></svg> Food flashcards</span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B62A5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h4l5 4V6L7 10H3z"></path><path d="M16 9a4 4 0 0 1 0 6"></path></svg> Audio: ordering at a café</span>
+            </div>
+            <a href="lesson-plan-editor.html" style="display:block; text-align:center; text-decoration:none; width: 100%; font-family: inherit; font-size: 14px; font-weight: 600; color: #fff; background: #1F7A6C; border: none; border-radius: 10px; padding: 11px; cursor: pointer;">Plan this lesson →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ VERSION 2 — WEEK TABLE + RAIL ============================ -->
+  <div style="max-width: 1320px; margin: 56px auto 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; flex-wrap: wrap;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: #B62A5C; padding: 5px 11px; border-radius: 7px;">VERSION 2</span>
+      <span style="font-size: 17px; font-weight: 600;">Week table + detail rail</span>
+      <span style="color: #8A8178; font-size: 14px;">— one week as a tall table: outcome, skill, topic and resources in columns. The topic column merges where lessons share it.</span>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #E7DECF; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -28px rgba(60,40,30,0.5);">
+      <!-- selectors + week nav -->
+      <div style="padding: var(--pad, 20px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #EFE8DD;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #DDD4C8; border-radius: 9px; padding: 8px 12px; font-size: 14px; font-weight: 500;">English <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A79E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #DDD4C8; border-radius: 9px; padding: 8px 12px; font-size: 14px; font-weight: 500;">Year 2 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A79E94" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-left: 6px;">
+          <button style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+          <span style="font-size: 16px; font-weight: 600;">Week 3 · 16–20 June</span>
+          <button style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #DDD4C8; background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2A2422" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg></button>
+        </div>
+        <span style="font-size: 12px; color: #B0651E; font-weight: 600; background: #F6ECDA; border-radius: 7px; padding: 5px 10px;">Food &amp; Drink</span>
+        <span style="margin-left: auto; font-size: 12px; color: #A79E94;">Read-only reference</span>
+      </div>
+
+      <!-- monthly + weekly outcomes -->
+      <div style="padding: var(--pad, 20px) var(--pad, 20px) 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div style="background: #FBF7F0; border: 1px solid #EFE3D2; border-radius: 13px; padding: 13px 15px;">
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #B0651E; margin-bottom: 9px;">Monthly outcome · June</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div><span style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Knowledge</span><div style="font-size: 13px; color: #3A332E; line-height: 1.45;">Everyday vocabulary for food, drink and shopping.</div></div>
+            <div><span style="font-size: 11px; font-weight: 600; color: #B62A5C;">Skills</span><div style="font-size: 13px; color: #3A332E; line-height: 1.45;">Read, order and write about familiar food and drink.</div></div>
+          </div>
+        </div>
+        <div style="background: #FBF8F3; border: 1px solid #EFE8DD; border-radius: 13px; padding: 13px 15px;">
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #756B64; margin-bottom: 9px;">Weekly outcome · Week 3</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div><span style="font-size: 11px; font-weight: 600; color: #1F7A6C;">Knowledge</span><div style="font-size: 13px; color: #3A332E; line-height: 1.45;">15–20 food &amp; drink words and common café phrases.</div></div>
+            <div><span style="font-size: 11px; font-weight: 600; color: #B62A5C;">Skills</span><div style="font-size: 13px; color: #3A332E; line-height: 1.45;">Read a short menu, find words, order politely.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 320px; margin-top: var(--pad, 20px); border-top: 1px solid #EFE8DD;">
+        <!-- TABLE -->
+        <div style="padding: var(--pad, 20px); border-right: 1px solid #EFE8DD;">
+          <div style="border: 1px solid #ECE1D1; border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: 92px 1.5fr 110px 160px 1.15fr; grid-template-rows: auto repeat(5, 1fr); grid-template-areas: 'dh oh sh th rh' 'd1 o1 s1 tA r1' 'd2 o2 s2 tA r2' 'd3 o3 s3 tA r3' 'd4 o4 s4 tB r4' 'd5 o5 s5 tB r5'; min-height: 560px;">
+            <!-- header -->
+            <div style="grid-area: dh; background: #F5EDE5; padding: 10px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #8A8178;">Day</div>
+            <div style="grid-area: oh; background: #F5EDE5; padding: 10px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #8A8178; border-left: 1px solid #EAD9C5;">Learning outcome</div>
+            <div style="grid-area: sh; background: #F5EDE5; padding: 10px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #8A8178; border-left: 1px solid #EAD9C5;">Skill</div>
+            <div style="grid-area: th; background: #F5EDE5; padding: 10px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #8A8178; border-left: 1px solid #EAD9C5;">Topic</div>
+            <div style="grid-area: rh; background: #F5EDE5; padding: 10px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #8A8178; border-left: 1px solid #EAD9C5;">Resources</div>
+
+            <!-- MON -->
+            <div style="grid-area: d1; padding: 13px 12px; border-top: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 14px; font-weight: 700;">Mon</span><span style="font-size: 11px; color: #A79E94;">16 Jun</span></div>
+            <div style="grid-area: o1; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 13px; color: #3A332E; line-height: 1.4; display: flex; align-items: center;">Listen and point to food &amp; drink items</div>
+            <div style="grid-area: s1; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; font-weight: 600; color: #B0651E; display: flex; align-items: center;">Listening</div>
+            <div style="grid-area: r1; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; color: #5C544E; line-height: 1.4; display: flex; align-items: center;">Flashcards · audio</div>
+
+            <!-- TUE (focus) -->
+            <div style="grid-area: d2; padding: 13px 12px; border-top: 1px solid #F0EAE1; background: #F4FAF8; border-left: 3px solid #1F7A6C; display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 14px; font-weight: 700; color: #186155;">Tue</span><span style="font-size: 11px; color: #1F7A6C;">17 Jun</span></div>
+            <div style="grid-area: o2; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; background: #F4FAF8; font-size: 13px; color: #2A2422; font-weight: 500; line-height: 1.4; display: flex; align-items: center;">Read a short café menu and identify familiar food and drink words</div>
+            <div style="grid-area: s2; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; background: #F4FAF8; font-size: 12px; font-weight: 600; color: #1F7A6C; display: flex; align-items: center;">Reading</div>
+            <div style="grid-area: r2; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; background: #F4FAF8; font-size: 12px; color: #5C544E; line-height: 1.4; display: flex; align-items: center;">Café menu · flashcards · audio</div>
+
+            <!-- WED -->
+            <div style="grid-area: d3; padding: 13px 12px; border-top: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 14px; font-weight: 700;">Wed</span><span style="font-size: 11px; color: #A79E94;">18 Jun</span></div>
+            <div style="grid-area: o3; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 13px; color: #3A332E; line-height: 1.4; display: flex; align-items: center;">Order food and drink using please &amp; thank you</div>
+            <div style="grid-area: s3; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; font-weight: 600; color: #B62A5C; display: flex; align-items: center;">Speaking</div>
+            <div style="grid-area: r3; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; color: #5C544E; line-height: 1.4; display: flex; align-items: center;">Role-play cards · menu</div>
+
+            <!-- THU -->
+            <div style="grid-area: d4; padding: 13px 12px; border-top: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 14px; font-weight: 700;">Thu</span><span style="font-size: 11px; color: #A79E94;">19 Jun</span></div>
+            <div style="grid-area: o4; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 13px; color: #3A332E; line-height: 1.4; display: flex; align-items: center;">Write a simple shopping list of food and drink</div>
+            <div style="grid-area: s4; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; font-weight: 600; color: #7A6E62; display: flex; align-items: center;">Writing</div>
+            <div style="grid-area: r4; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; color: #5C544E; line-height: 1.4; display: flex; align-items: center;">Word bank · list template</div>
+
+            <!-- FRI -->
+            <div style="grid-area: d5; padding: 13px 12px; border-top: 1px solid #F0EAE1; display: flex; flex-direction: column; justify-content: center;"><span style="font-size: 14px; font-weight: 700;">Fri</span><span style="font-size: 11px; color: #A79E94;">20 Jun</span></div>
+            <div style="grid-area: o5; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 13px; color: #3A332E; line-height: 1.4; display: flex; align-items: center;">Perform a short café role-play in pairs</div>
+            <div style="grid-area: s5; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; font-weight: 600; color: #B62A5C; display: flex; align-items: center;">Speaking</div>
+            <div style="grid-area: r5; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; font-size: 12px; color: #5C544E; line-height: 1.4; display: flex; align-items: center;">Role-play cards · props</div>
+
+            <!-- TOPIC merged cells -->
+            <div style="grid-area: tA; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; background: #F7FBFA; display: flex; flex-direction: column; justify-content: center; gap: 5px;"><span style="font-size: 13px; font-weight: 600; color: #186155; line-height: 1.3;">Food &amp; drink words</span><span style="font-size: 10.5px; color: #8A8178;">Mon–Wed · same topic</span></div>
+            <div style="grid-area: tB; padding: 13px 12px; border-top: 1px solid #F0EAE1; border-left: 1px solid #F0EAE1; background: #FBFAF7; display: flex; flex-direction: column; justify-content: center; gap: 5px;"><span style="font-size: 13px; font-weight: 600; color: #5C544E; line-height: 1.3;">Café writing &amp; talk</span><span style="font-size: 10.5px; color: #A79E94;">Thu–Fri · same topic</span></div>
+          </div>
+        </div>
+
+        <!-- DETAIL RAIL -->
+        <div style="padding: var(--pad, 20px); background: #FBF8F3; border-left: 1px solid #EFE8DD;">
+          <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #A79E94; margin-bottom: 8px;">In focus · Tuesday 17 Jun</div>
+          <div style="background: #fff; border: 1.5px solid #1F7A6C; border-radius: 13px; padding: 14px; box-shadow: 0 10px 26px -20px rgba(31,122,108,0.5);">
+            <div style="display: flex; gap: 6px; margin-bottom: 10px;"><span style="font-size: 11.5px; font-weight: 600; color: #1F7A6C; background: #E4F0ED; border-radius: 7px; padding: 3px 9px;">Reading</span><span style="font-size: 11.5px; font-weight: 600; color: #B0651E; background: #F6ECDA; border-radius: 7px; padding: 3px 9px;">Food &amp; Drink</span></div>
+            <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #A79E94;">Daily learning outcome</div>
+            <p style="margin: 5px 0 14px; font-size: 16px; font-weight: 500; line-height: 1.4;">Read a short café menu and identify familiar food and drink words.</p>
+            <div style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: #A79E94; margin-bottom: 7px;">Resources</div>
+            <div style="display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px;">
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M9 8h6M9 12h6"></path></svg> Café menu handout</span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0651E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"></rect><circle cx="9" cy="12" r="2"></circle></svg> Food flashcards</span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A332E;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B62A5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h4l5 4V6L7 10H3z"></path><path d="M16 9a4 4 0 0 1 0 6"></path></svg> Audio: ordering at a café</span>
+            </div>
+            <a href="lesson-plan-editor.html" style="display:block; text-align:center; text-decoration:none; width: 100%; font-family: inherit; font-size: 14px; font-weight: 600; color: #fff; background: #1F7A6C; border: none; border-radius: 10px; padding: 11px; cursor: pointer;">Plan this lesson →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1400},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Calm&quot;,&quot;Balanced&quot;,&quot;Dense&quot;],&quot;default&quot;:&quot;Balanced&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { setRoot: (el) => { this.root = el; this.applyDensity(); } };
+  }
+  componentDidMount() { this.applyDensity(); }
+  componentDidUpdate() { this.applyDensity(); }
+  applyDensity() {
+    const el = this.root;
+    if (!el) return;
+    const d = this.props.density || "Balanced";
+    const map = {
+      Calm:     { pad: "26px", gap: "24px", rg: "16px" },
+      Balanced: { pad: "20px", gap: "18px", rg: "14px" },
+      Dense:    { pad: "14px", gap: "12px", rg: "9px" },
+    };
+    const v = map[d] || map.Balanced;
+    el.style.setProperty("--pad", v.pad);
+    el.style.setProperty("--gap", v.gap);
+    el.style.setProperty("--rg", v.rg);
+  }
+}
+</script>
+</body>
+</html>
