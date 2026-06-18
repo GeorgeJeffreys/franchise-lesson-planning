@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { SignOutForm } from "@/components/app-shell/SignOutForm";
 import { Wordmark } from "@/components/ui/Wordmark";
 
@@ -28,9 +29,11 @@ export function AppShell({ name, subtitle, children }: AppShellProps) {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-4 px-6 py-4">
-          {/* Brand */}
+          {/* Brand — links home to the Weekly Overview */}
           <div className="flex items-center gap-3">
-            <Wordmark size="md" tone="brand" />
+            <Link href="/" aria-label="Alsama — Weekly Overview" className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal">
+              <Wordmark size="md" tone="brand" />
+            </Link>
             <span className="h-[26px] w-px bg-neutral-300" />
             <span className="text-[13px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
               Lesson Planning

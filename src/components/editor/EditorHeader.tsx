@@ -14,6 +14,7 @@ interface EditorHeaderProps {
   canSubmit: boolean;
   submitting: boolean;
   onSubmit: () => void;
+  onUnsubmit: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -45,12 +46,71 @@ function SaveIndicator({ state }: { state: SaveState }) {
   );
 }
 
-const STATUS_LABEL: Record<PlanStatus, string> = {
-  in_progress: 'In progress',
-  submitted: 'Submitted',
-  needs_review: 'Needs review',
-  approved: 'Approved',
-};
+/**
+ * The single submit control. Its label, style, and behaviour follow the plan's
+ * status, occupying one fixed slot in the header:
+ *  - in_progress / needs_review → "Submit for approval" (submits the plan).
+ *  - submitted → a filled "Submitted · click to keep editing" (reverts to
+ *    in_progress so the teacher can keep editing).
+ *  - approved → a display-only "Approved" badge (not clickable).
+ */
+function SubmitControl({
+  status,
+  canSubmit,
+  submitting,
+  onSubmit,
+  onUnsubmit,
+}: {
+  status: PlanStatus;
+  canSubmit: boolean;
+  submitting: boolean;
+  onSubmit: () => void;
+  onUnsubmit: () => void;
+}) {
+  if (status === 'approved') {
+    return (
+      <span className="inline-flex items-center gap-[7px] rounded-sm border border-status-approved-border bg-status-approved-bg px-4 py-[9px] text-[14px] font-semibold text-status-approved">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12l4 4 10-11" />
+        </svg>
+        Approved
+      </span>
+    );
+  }
+
+  if (status === 'submitted') {
+    return (
+      <button
+        type="button"
+        onClick={onUnsubmit}
+        disabled={submitting}
+        title="Revert to in progress and keep editing"
+        className="inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12l4 4 10-11" />
+        </svg>
+        {submitting ? 'Reverting…' : 'Submitted · click to keep editing'}
+      </button>
+    );
+  }
+
+  // in_progress / needs_review
+  return (
+    <button
+      type="button"
+      onClick={onSubmit}
+      disabled={submitting || !canSubmit}
+      title={!canSubmit ? 'Add a SMARTT objective first' : undefined}
+      className="inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+      </svg>
+      {submitting ? 'Submitting…' : 'Submit for approval'}
+    </button>
+  );
+}
 
 export function EditorHeader({
   classContext,
@@ -61,9 +121,8 @@ export function EditorHeader({
   canSubmit,
   submitting,
   onSubmit,
+  onUnsubmit,
 }: EditorHeaderProps) {
-  const submitted = status === 'submitted' || status === 'approved';
-
   return (
     <div className="px-[22px] pt-[22px]">
       <div className="flex flex-wrap items-start justify-between gap-5">
@@ -106,11 +165,6 @@ export function EditorHeader({
         {/* Status / save + actions */}
         <div className="flex flex-wrap items-center gap-[10px]">
           <SaveIndicator state={saveState} />
-          {submitted ? (
-            <span className="rounded-sm border border-status-submitted-border bg-status-submitted-bg px-3 py-[7px] text-[13px] font-semibold text-teal">
-              {STATUS_LABEL[status]}
-            </span>
-          ) : null}
           <button
             type="button"
             disabled
@@ -123,18 +177,13 @@ export function EditorHeader({
             </svg>
             Export to Word
           </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={submitted || submitting || !canSubmit}
-            title={!canSubmit ? 'Add a SMARTT objective first' : undefined}
-            className="inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-            </svg>
-            {submitting ? 'Submitting…' : submitted ? 'Submitted' : 'Submit for approval'}
-          </button>
+          <SubmitControl
+            status={status}
+            canSubmit={canSubmit}
+            submitting={submitting}
+            onSubmit={onSubmit}
+            onUnsubmit={onUnsubmit}
+          />
         </div>
       </div>
     </div>

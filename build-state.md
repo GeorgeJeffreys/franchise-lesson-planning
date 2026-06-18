@@ -247,6 +247,54 @@ plan-creation flow / curriculum picker, AI features, and Word export.
   apply migrations + seed, provision a teacher (`assign_teacher.sql`), run
   `seed_one_plan.sql`, open `/plan/<printed id>`.
 
+## Phase 4 — Editor refinements + full activity bank ✅ (this phase)
+
+Goal: polish the existing Lesson Plan Editor and seed the complete pre-approved
+activity bank. No new screens, no editor restructure — refinements + data.
+
+### Done
+
+- **Single submit control** — consolidated the three duplicate "submitted"
+  signals into one status-driven control in the submit button's slot
+  (`EditorHeader`'s new `SubmitControl`):
+  - `in_progress` / `needs_review` → "Submit for approval" (submits).
+  - `submitted` → filled "Submitted · click to keep editing" button that reverts
+    to `in_progress` and clears `submitted_at`.
+  - `approved` → display-only "Approved" badge (not clickable).
+  Removed the separate "Submitted" pill and the green "This plan has been
+  submitted…" banner (`LessonPlanEditor`). "✓ Saved" autosave indicator and the
+  (still-stubbed) "Export to Word" button are unchanged. Backed by a new
+  `unsubmitLessonPlan` server action (auth'd client, RLS) that touches only
+  `status` + `submitted_at`.
+- **Interactive block cards** — left-sidebar `BlockRow`s (un-selected) now get a
+  pointer cursor and a teal hover border (`hover:border-teal`, with
+  `transition-colors`); the selected card keeps its highlighted teal border. No
+  layout change.
+- **Header navigation** — the Alsama wordmark in `AppShell` is now a `Link` to
+  `/` (Weekly Overview). New `Breadcrumb` component (`app-shell/Breadcrumb.tsx`)
+  renders "Weekly Overview › <context>"; the editor page shows it with the
+  current context (e.g. "Year 1 · Group A · Mon 15 Jun"). NB: the `/plan/new`
+  picker referenced in the brief does not exist yet (plan-creation is a future
+  slice), so the breadcrumb currently lands only on the editor; the same
+  component is ready to drop into that picker when it's built.
+- **Full activity bank (data)** — migration `0007_activity_bank_unique.sql` adds
+  a `UNIQUE (block_type, name)` constraint; `supabase/seed.sql` now upserts the
+  full **11 CFU + 9 Exit Ticket** activities (insert … on conflict … do update)
+  so ids stay stable across re-seeds, then prunes any stale cfu/exit_ticket rows
+  from the earlier 6-row sample. Columns: block_type, name, summary,
+  illiterate_instructions, literate_instructions, sort_order (listed order).
+
+### Verified
+
+- `npm run build` passes (Next 16.2.9); `npm run lint` clean. Route map
+  unchanged.
+- Not applied to a live DB here (no Docker/Supabase CLI). To apply the new
+  migration + seed: `supabase db reset` (re-runs all migrations then seed.sql),
+  or in the Supabase SQL editor run `0007_activity_bank_unique.sql` once then
+  paste the activity_bank section of `seed.sql` (it is idempotent). The editor
+  already lists activities for the cfu + exit_ticket blocks with their
+  literate/illiterate variants.
+
 ## Next slice (not started)
 
 1. **Bridge** — the plan-creation flow + curriculum picker, wiring the Weekly
@@ -255,6 +303,6 @@ plan-creation flow / curriculum picker, AI features, and Word export.
 3. **AI assistance** — objective check (wire the existing affordance) + activity
    suggestions.
 4. **Word (.docx) export**, **coordinator review UI**.
-5. **Full activity-bank + guidance content** (beyond the current sample).
+5. **Guidance content** (block-guidance beyond the current set).
 6. **Multi-subject curriculum** — populate `subject`, ingestion script (the old
    spreadsheet→JSON generator was never in the repo and must be rebuilt).

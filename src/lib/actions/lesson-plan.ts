@@ -43,6 +43,28 @@ export async function saveLessonPlan(input: SavePlanInput): Promise<ActionResult
 }
 
 /**
+ * Revert a submitted plan back to `in_progress` so the teacher can keep editing,
+ * clearing `submitted_at`. Touches only the workflow columns; RLS still scopes
+ * the write to a plan the teacher owns or is assigned to. (An approved plan is
+ * not reverted from the editor — the control is display-only in that state.)
+ */
+export async function unsubmitLessonPlan(input: { id: string }): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('lesson_plans')
+    .update({ status: 'in_progress', submitted_at: null })
+    .eq('id', input.id)
+    .select('updated_at')
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
+
+  return { ok: true, updated_at: data.updated_at };
+}
+
+/**
  * Submit a plan for coordinator approval: persists the latest objective + blocks,
  * then sets status to `submitted` and stamps `submitted_at`. Guarded by a
  * non-empty objective (beyond the enforced stem).

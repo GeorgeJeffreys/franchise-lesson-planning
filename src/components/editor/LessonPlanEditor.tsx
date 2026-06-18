@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Block, PlanStatus } from '@/types/lesson';
 import type { EditorPlanData } from '@/lib/editor/load-plan';
 import { composeObjective, stripStem } from '@/lib/editor/objective';
-import { saveLessonPlan, submitLessonPlan } from '@/lib/actions/lesson-plan';
+import { saveLessonPlan, submitLessonPlan, unsubmitLessonPlan } from '@/lib/actions/lesson-plan';
 import { EditorHeader, type SaveState } from '@/components/editor/EditorHeader';
 import { SmarttObjectiveBox } from '@/components/editor/SmarttObjectiveBox';
 import { BlockList } from '@/components/editor/BlockList';
@@ -73,6 +73,18 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
     }
   }
 
+  async function handleUnsubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    const res = await unsubmitLessonPlan({ id: plan.id });
+    setSubmitting(false);
+    if (res.ok) {
+      setStatus('in_progress');
+    } else {
+      setSubmitError(res.error ?? 'Could not revert to in progress.');
+    }
+  }
+
   const selectedBlock = blocks[selected];
   const activities = selectedBlock ? activitiesByBlock[selectedBlock.type] ?? [] : [];
 
@@ -87,6 +99,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         canSubmit={canSubmit}
         submitting={submitting}
         onSubmit={handleSubmit}
+        onUnsubmit={handleUnsubmit}
       />
 
       <div className="px-[22px]">
@@ -94,11 +107,6 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         {submitError ? (
           <div className="mt-2 rounded-sm border border-status-review-border bg-status-review-bg px-3 py-2 text-[13px] text-pink">
             {submitError}
-          </div>
-        ) : null}
-        {status === 'submitted' || status === 'approved' ? (
-          <div className="mt-2 rounded-sm border border-status-submitted-border bg-status-submitted-bg px-3 py-2 text-[13px] text-teal">
-            This plan has been submitted for approval. You can keep editing; changes autosave.
           </div>
         ) : null}
       </div>

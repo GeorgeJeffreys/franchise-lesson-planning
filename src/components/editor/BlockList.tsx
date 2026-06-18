@@ -57,7 +57,7 @@ function BlockRow({
         compact ? 'py-2' : 'py-[11px]',
         active
           ? 'border-teal shadow-[0_0_0_4px_rgba(31,122,108,0.10)]'
-          : 'border-border hover:border-border-strong',
+          : 'cursor-pointer border-border transition-colors hover:border-teal',
       )}
     >
       <div className="flex justify-between gap-2">
