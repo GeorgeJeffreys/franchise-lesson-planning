@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/*
+ * Foundation phase: Tailwind v4 only, no design system yet. Brand tokens, fonts
+ * and theming are intentionally deferred to the design-system slice.
+ */
