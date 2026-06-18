@@ -27,14 +27,16 @@ export default async function PlanEditorPage({
 }) {
   const { id } = await params;
 
-  const data = await loadPlanForEditor(id);
+  // The plan load and the shell-chrome identity are independent, so run them in
+  // parallel rather than waterfalling.
+  const supabase = await createClient();
+  const [data, { data: { user } }] = await Promise.all([
+    loadPlanForEditor(id),
+    supabase.auth.getUser(),
+  ]);
   if (!data) notFound();
 
-  // Display name for the shell chrome.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Display name for the shell chrome (depends on the resolved user).
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name')

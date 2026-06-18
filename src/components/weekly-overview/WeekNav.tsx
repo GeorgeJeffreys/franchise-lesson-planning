@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { addDays } from '@/lib/week';
+import { LinkPending } from '@/components/ui/LinkPending';
 
 type View = 'calendar' | 'status';
 
@@ -9,8 +10,10 @@ function href(weekStart: string, view: View): string {
 
 /**
  * Previous / next week controls around the current week's label, plus a "This
- * week" shortcut. Pure links so navigation is server-rendered and shareable; the
- * selected view is carried along so toggling weeks keeps the chosen view.
+ * week" shortcut. Changing the week genuinely needs new data, so these stay
+ * navigations; each shows an inline spinner while its navigation is in flight
+ * (`useLinkStatus` via LinkPending). The selected view is carried along so
+ * toggling weeks keeps the chosen view.
  */
 export function WeekNav({
   weekStart,
@@ -39,9 +42,10 @@ export function WeekNav({
       {!isThisWeek ? (
         <Link
           href={href(thisMonday, view)}
-          className="rounded-sm border border-border-strong bg-surface px-[11px] py-[6px] text-[13px] font-medium text-neutral-900 transition-colors hover:bg-surface-subtle"
+          className="inline-flex items-center gap-2 rounded-sm border border-border-strong bg-surface px-[11px] py-[6px] text-[13px] font-medium text-neutral-900 transition-colors hover:bg-surface-subtle"
         >
           This week
+          <LinkPending size={13} />
         </Link>
       ) : null}
     </div>
@@ -61,8 +65,10 @@ function NavButton({
     <Link
       href={href}
       aria-label={label}
-      className="inline-flex size-8 items-center justify-center rounded-sm border border-border-strong bg-surface transition-colors hover:bg-surface-subtle"
+      className="relative inline-flex size-8 items-center justify-center rounded-sm border border-border-strong bg-surface transition-colors hover:bg-surface-subtle"
     >
+      {/* Spinner overlays the arrow while the week navigation is pending. */}
+      <LinkPending size={15} className="absolute inset-0 items-center justify-center" />
       <svg
         width="16"
         height="16"

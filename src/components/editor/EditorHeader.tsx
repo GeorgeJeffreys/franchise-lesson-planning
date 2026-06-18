@@ -2,6 +2,8 @@
 
 import type { PlanStatus } from '@/types/lesson';
 import type { EditorClassContext, EditorCurriculumContext } from '@/lib/editor/load-plan';
+import { cn } from '@/lib/cn';
+import { Spinner } from '@/components/ui/Spinner';
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -84,12 +86,20 @@ function SubmitControl({
         type="button"
         onClick={onUnsubmit}
         disabled={submitting}
+        aria-busy={submitting || undefined}
         title="Revert to in progress and keep editing"
-        className="inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
+        className={cn(
+          'inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60',
+          submitting && 'opacity-80',
+        )}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12l4 4 10-11" />
-        </svg>
+        {submitting ? (
+          <Spinner size={15} />
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12l4 4 10-11" />
+          </svg>
+        )}
         {submitting ? 'Reverting…' : 'Submitted · click to keep editing'}
       </button>
     );
@@ -101,12 +111,20 @@ function SubmitControl({
       type="button"
       onClick={onSubmit}
       disabled={submitting || !canSubmit}
+      aria-busy={submitting || undefined}
       title={!canSubmit ? 'Add a SMARTT objective first' : undefined}
-      className="inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
+      className={cn(
+        'inline-flex items-center gap-[7px] rounded-sm border border-teal bg-teal px-4 py-[9px] text-[14px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60',
+        submitting && 'opacity-80',
+      )}
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-      </svg>
+      {submitting ? (
+        <Spinner size={15} />
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+        </svg>
+      )}
       {submitting ? 'Submitting…' : 'Submit for approval'}
     </button>
   );

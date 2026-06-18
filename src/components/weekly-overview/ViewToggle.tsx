@@ -1,44 +1,52 @@
-import Link from 'next/link';
+'use client';
+
 import { cn } from '@/lib/cn';
 
 type View = 'calendar' | 'status';
 
 /**
- * The Calendar ⇄ Status segmented toggle. Each segment is a link that swaps the
- * `view` param while keeping the selected week, so the active view is part of
- * the URL and server-rendered.
+ * The Calendar ⇄ Status segmented toggle. Both views are two presentations of the
+ * SAME already-loaded week, so switching is pure client state — instant, with no
+ * server navigation or re-fetch. The parent keeps the URL in sync shallowly.
  */
-export function ViewToggle({ weekStart, view }: { weekStart: string; view: View }) {
+export function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: View;
+  onChange: (next: View) => void;
+}) {
   return (
     <div className="inline-flex rounded-sm border border-border-strong bg-cream p-[2px] text-[13px] font-medium">
-      <Segment weekStart={weekStart} value="calendar" current={view} label="Calendar" />
-      <Segment weekStart={weekStart} value="status" current={view} label="Status" />
+      <Segment value="calendar" current={view} label="Calendar" onChange={onChange} />
+      <Segment value="status" current={view} label="Status" onChange={onChange} />
     </div>
   );
 }
 
 function Segment({
-  weekStart,
   value,
   current,
   label,
+  onChange,
 }: {
-  weekStart: string;
   value: View;
   current: View;
   label: string;
+  onChange: (next: View) => void;
 }) {
   const active = value === current;
   return (
-    <Link
-      href={`/?week=${weekStart}&view=${value}`}
-      aria-current={active ? 'true' : undefined}
+    <button
+      type="button"
+      onClick={() => onChange(value)}
+      aria-pressed={active}
       className={cn(
-        'rounded-[7px] px-[14px] py-[6px] transition-colors',
+        'cursor-pointer rounded-[7px] px-[14px] py-[6px] transition-colors',
         active ? 'bg-teal text-white' : 'text-neutral-600 hover:text-ink',
       )}
     >
       {label}
-    </Link>
+    </button>
   );
 }

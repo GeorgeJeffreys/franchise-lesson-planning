@@ -187,7 +187,8 @@ export function CurriculumPicker({
         <Button
           size="sm"
           onClick={confirm}
-          disabled={!selectedLesson || submitting}
+          disabled={!selectedLesson}
+          pending={submitting}
         >
           {submitting ? 'Creating…' : 'Create plan'}
         </Button>

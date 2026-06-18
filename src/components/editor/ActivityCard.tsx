@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import type { ActivityBankItem, ClassLiteracy } from '@/lib/editor/load-plan';
+import { cn } from '@/lib/cn';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface ActivityCardProps {
   activity: ActivityBankItem;
@@ -48,6 +50,10 @@ function VariantTile({
  */
 export function ActivityCard({ activity, literacy, added, onAdd }: ActivityCardProps) {
   const [open, setOpen] = useState(false);
+  // Wrapping the prefill in a transition gives the "+ Add" click consistent
+  // in-flight feedback (lighter fill + spinner) while React applies the update
+  // and the editor's autosave is kicked off.
+  const [adding, startAdding] = useTransition();
 
   const showLiterate = literacy === 'literate' || literacy === 'mixed';
   const showIlliterate = literacy === 'illiterate' || literacy === 'mixed';
@@ -78,9 +84,15 @@ export function ActivityCard({ activity, literacy, added, onAdd }: ActivityCardP
           ) : (
             <button
               type="button"
-              onClick={onAdd}
-              className="rounded-sm bg-teal px-3 py-[6px] text-[12.5px] font-semibold text-white hover:bg-[#1a6a5d]"
+              onClick={() => startAdding(() => onAdd())}
+              disabled={adding}
+              aria-busy={adding || undefined}
+              className={cn(
+                'inline-flex items-center gap-[6px] rounded-sm bg-teal px-3 py-[6px] text-[12.5px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed',
+                adding && 'opacity-80',
+              )}
             >
+              {adding ? <Spinner size={12} /> : null}
               + Add
             </button>
           )}

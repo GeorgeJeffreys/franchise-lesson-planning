@@ -46,31 +46,33 @@ export default async function NewPlanPage({
 
   const supabase = await createClient();
 
-  // Class context. Reference tables are readable by any authenticated user;
-  // ownership is enforced on insert by RLS, so an unassigned class can be
+  // The class context, the existing-plan check (keyed on class + date from the
+  // URL), and the signed-in user are all independent, so fetch them together
+  // rather than waterfalling. Reference tables are readable by any authenticated
+  // user; ownership is enforced on insert by RLS, so an unassigned class can be
   // browsed but not planned.
-  const { data: classData } = await supabase
-    .from('classes')
-    .select('id, year, group_label, literacy, schools ( name ), subjects ( name )')
-    .eq('id', classId)
-    .maybeSingle();
+  const [{ data: classData }, { data: existing }, { data: { user } }] = await Promise.all([
+    supabase
+      .from('classes')
+      .select('id, year, group_label, literacy, schools ( name ), subjects ( name )')
+      .eq('id', classId)
+      .maybeSingle(),
+    supabase
+      .from('lesson_plans')
+      .select('id')
+      .eq('class_id', classId)
+      .eq('lesson_date', date)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
 
   const classRow = classData as unknown as ClassRow | null;
   if (!classRow) redirect('/');
 
   // If a plan already exists for this class + date, skip the picker.
-  const { data: existing } = await supabase
-    .from('lesson_plans')
-    .select('id')
-    .eq('class_id', classId)
-    .eq('lesson_date', date)
-    .maybeSingle();
   if (existing?.id) redirect(`/plan/${existing.id}`);
 
-  // Display name for the shell chrome.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Display name for the shell chrome (depends on the resolved user).
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name')

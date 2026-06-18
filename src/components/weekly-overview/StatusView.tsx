@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cn } from '@/lib/cn';
+import { LinkPending } from '@/components/ui/LinkPending';
 import { WEEKDAY_LABELS } from '@/lib/week';
 import {
   STATUS_COLUMN_ORDER,
@@ -131,7 +132,12 @@ function StatusCard({ item }: { item: StatusItem }) {
 
   if (item.planId) {
     return (
-      <Link href={`/plan/${item.planId}`} className={cn(base, 'block transition-colors hover:bg-surface-subtle')}>
+      <Link
+        href={`/plan/${item.planId}`}
+        className={cn(base, 'relative block transition-colors hover:bg-surface-subtle')}
+      >
+        {/* Inline pending feedback while the editor loads. */}
+        <LinkPending size={13} className="absolute right-[8px] top-[8px] text-teal" />
         {body}
       </Link>
     );

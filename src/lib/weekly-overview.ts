@@ -82,22 +82,20 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     };
   }
 
-  // Display name from the profile, falling back to the auth email.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .maybeSingle();
-  const teacherName = profile?.full_name ?? user.email ?? 'there';
+  // The profile (display name) and the assigned classes both depend only on the
+  // user id, so fetch them in parallel rather than waterfalling. RLS limits
+  // class_teachers rows to this teacher.
+  const [{ data: profile }, { data: ctRows }] = await Promise.all([
+    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('class_teachers')
+      .select(
+        'classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
+      )
+      .eq('teacher_id', user.id),
+  ]);
 
-  // Assigned classes via class_teachers → classes (+ school, subject). RLS
-  // limits class_teachers rows to this teacher.
-  const { data: ctRows } = await supabase
-    .from('class_teachers')
-    .select(
-      'classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
-    )
-    .eq('teacher_id', user.id);
+  const teacherName = profile?.full_name ?? user.email ?? 'there';
 
   // database.types.ts is still a placeholder (`Database = Record<string, never>`),
   // so the client can't infer the nested select shape — narrow it by hand. The

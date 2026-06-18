@@ -92,20 +92,35 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 export async function loadPlanForEditor(id: string): Promise<EditorPlanData | null> {
   const supabase = await createClient();
 
-  const { data: planRow, error } = await supabase
-    .from('lesson_plans')
-    .select(
-      `id, class_id, curriculum_lesson_id, lesson_date, period, status,
-       smartt_objective, smartt_check, blocks, created_by, submitted_at,
-       reviewed_at, review_note, created_at, updated_at,
-       class:classes (
-         id, year, group_label, literacy,
-         school:schools ( name ),
-         subject:subjects ( name )
-       )`
-    )
-    .eq('id', id)
-    .maybeSingle();
+  // The plan (with its class join) and the activity bank are independent reads,
+  // so issue them together instead of waterfalling. The activity bank is a small
+  // fixed reference set; fetching it up front costs nothing if the plan 404s.
+  const [
+    { data: planRow, error },
+    { data: activityRows },
+  ] = await Promise.all([
+    supabase
+      .from('lesson_plans')
+      .select(
+        `id, class_id, curriculum_lesson_id, lesson_date, period, status,
+         smartt_objective, smartt_check, blocks, created_by, submitted_at,
+         reviewed_at, review_note, created_at, updated_at,
+         class:classes (
+           id, year, group_label, literacy,
+           school:schools ( name ),
+           subject:subjects ( name )
+         )`
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    supabase
+      .from('activity_bank')
+      .select(
+        'id, block_type, name, summary, literate_instructions, illiterate_instructions, sort_order',
+      )
+      .in('block_type', ACTIVITY_BLOCK_TYPES)
+      .order('sort_order', { ascending: true }),
+  ]);
 
   if (error || !planRow) return null;
 
@@ -132,13 +147,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     ? { dailyLO: lesson.dailyLO, focusArea: lesson.linguisticSkill, theme: lesson.theme }
     : null;
 
-  // Activity bank for the blocks that have one.
-  const { data: activityRows } = await supabase
-    .from('activity_bank')
-    .select('id, block_type, name, summary, literate_instructions, illiterate_instructions, sort_order')
-    .in('block_type', ACTIVITY_BLOCK_TYPES)
-    .order('sort_order', { ascending: true });
-
+  // Group the pre-fetched activity bank by block type.
   const activitiesByBlock: Partial<Record<LessonBlockType, ActivityBankItem[]>> = {};
   for (const row of (activityRows ?? []) as ActivityBankItem[]) {
     (activitiesByBlock[row.block_type] ??= []).push(row);

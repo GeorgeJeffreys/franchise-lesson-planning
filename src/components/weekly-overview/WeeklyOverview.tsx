@@ -1,3 +1,6 @@
+'use client';
+
+import { useCallback, useState } from 'react';
 import { CalendarView } from '@/components/weekly-overview/CalendarView';
 import { StatusView } from '@/components/weekly-overview/StatusView';
 import { WeekNav } from '@/components/weekly-overview/WeekNav';
@@ -8,19 +11,36 @@ type View = 'calendar' | 'status';
 
 /**
  * The Weekly Overview card: a header carrying the week context, week navigation
- * and the Calendar ⇄ Status toggle, over whichever view is selected. This is the
- * read view of the teacher's week; creating/editing plans comes in the editor
- * slice. Empty states stay calm and explicit.
+ * and the Calendar ⇄ Status toggle, over whichever view is selected.
+ *
+ * The two views are presentations of the SAME already-loaded `data`, so the
+ * toggle is pure client state — instant, with no server round-trip or re-fetch.
+ * Changing the *week* still navigates (it needs different data), which is why the
+ * week nav stays a set of links. The view is mirrored into the URL via a shallow
+ * `history.replaceState` so it survives a refresh/share and is carried onto the
+ * week-nav links, without re-running the server component.
  */
 export function WeeklyOverview({
   data,
-  view,
+  view: initialView,
   thisMonday,
 }: {
   data: WeeklyOverviewData;
   view: View;
   thisMonday: string;
 }) {
+  const [view, setView] = useState<View>(initialView);
+
+  const changeView = useCallback(
+    (next: View) => {
+      setView(next);
+      // Keep the URL truthful without a navigation: no server component re-run,
+      // no Supabase re-query. The next full navigation (week nav) reads this.
+      window.history.replaceState(null, '', `/?week=${data.weekStart}&view=${next}`);
+    },
+    [data.weekStart],
+  );
+
   const summary = [data.context, `${data.planCount} planned this week`]
     .filter(Boolean)
     .join(' · ');
@@ -40,7 +60,7 @@ export function WeeklyOverview({
             thisMonday={thisMonday}
             view={view}
           />
-          <ViewToggle weekStart={data.weekStart} view={view} />
+          <ViewToggle view={view} onChange={changeView} />
         </div>
       </div>
 

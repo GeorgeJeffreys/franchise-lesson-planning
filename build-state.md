@@ -375,6 +375,90 @@ editor panel restructure beyond what's described.
 
 - `npm run build` passes (Next 16.2.9); `npm run lint` clean. Route map unchanged.
 
+## Phase 6 — Navigation performance + click feedback ✅ (this phase)
+
+Goal: kill the perceived latency on navigation and the Calendar⇄Status toggle
+(it was all round-trips, not data volume) and give every button/link in-flight
+feedback. No data, schema, or behaviour changes beyond performance + this UX.
+
+### Investigation (root causes)
+
+- **The view toggle was a server navigation.** `ViewToggle` and `WeekNav` were
+  plain `<Link>`s that swapped `?view=`/`?week=` search params. With `/`'s
+  `dynamic = 'force-dynamic'`, every click re-ran the `Home` server component and
+  re-queried Supabase via `getWeeklyOverview`. But the two views are just two
+  presentations of the **same already-loaded week**, so the toggle should never
+  hit the server.
+- **The data loaders waterfalled.** `getWeeklyOverview` awaited `profiles` then
+  `class_teachers` sequentially (both only need the user id); `loadPlanForEditor`
+  awaited the plan then the activity bank sequentially (independent); the editor
+  and `/plan/new` pages fetched plan/class, then user, then profile in series.
+  Each cross-region DB hop compounded.
+- **No loading UI existed.** No `loading.tsx`/Suspense anywhere, so every
+  navigation (overview, editor, `/plan/new`) blocked on a frozen page.
+- **The 950 KB curriculum was required + cleaned at import time.**
+  `curriculumUtils` ran `cleanCurriculumData(require('curriculum.json'))` at
+  module load, so the parse+scrub happened on every cold start of any route that
+  imports it — even an empty overview week that resolves no targets.
+- **Supabase region could not be determined from the repo** — every reference is
+  a placeholder (`https://<your-project-ref>.supabase.co` in `SETUP.md`/
+  `.env.example`; `config.toml` is local-only). The Vercel↔Supabase region gap is
+  the likeliest remaining latency source but is a dashboard concern (see below);
+  no `vercel.json regions` hint was added because a wrong region would *worsen* it.
+
+### Done
+
+- **Instant client-side toggle.** `WeeklyOverview`
+  (`src/components/weekly-overview/WeeklyOverview.tsx`) is now a client component
+  holding `view` in `useState`; `ViewToggle` swaps it via `onChange` (buttons, not
+  links). The URL stays truthful via a shallow `window.history.replaceState` — no
+  server re-run, no re-query. Changing the *week* still navigates (needs new
+  data). `CalendarView`/`StatusView` are unchanged read views.
+- **Loading skeletons.** Added `src/app/loading.tsx`,
+  `src/app/plan/[id]/loading.tsx` and `src/app/plan/new/loading.tsx`, each
+  mirroring its page frame via a shared `AppShellSkeleton` + `Skeleton`
+  (`src/components/ui/Skeleton.tsx`). Navigation now shows an instant, prefetched
+  skeleton instead of a frozen page.
+- **Pending feedback** — a consistent, subtle treatment (fill lightens + inline
+  spinner) built on the design tokens:
+  - `Spinner` (`src/components/ui/Spinner.tsx`) — `currentColor`, `animate-spin`.
+  - `LinkPending` (`src/components/ui/LinkPending.tsx`) — Next 16 `useLinkStatus`
+    (verified exported from `next/link`, returns `{ pending }`); fixed-size,
+    opacity-toggled so it never shifts layout.
+  - `Button` (`src/components/ui/Button.tsx`) gained a `pending` prop.
+  - Applied to: the submit/unsubmit control (`EditorHeader`), the activity
+    "+ Add" buttons (`ActivityCard`, via `useTransition`), the week-nav arrows +
+    "This week" (`WeekNav`), the "open plan" links on both overview views
+    (`CalendarView`/`StatusView`), and "Create plan" (`CurriculumPicker`). The
+    "Check my objective" affordance stays disabled — an un-wired later slice with
+    no in-flight action — and will use the same treatment when the AI slice lands.
+- **Parallelized loaders** with `Promise.all`:
+  - `getWeeklyOverview` (`src/lib/weekly-overview.ts`) — `profiles` ‖
+    `class_teachers` (lesson_plans still follows; it needs the class ids).
+  - `loadPlanForEditor` (`src/lib/editor/load-plan.ts`) — plan ‖ activity bank.
+  - editor page (`src/app/plan/[id]/page.tsx`) — plan load ‖ `auth.getUser`.
+  - `/plan/new` page (`src/app/plan/new/page.tsx`) — class ‖ existing-plan check ‖
+    `auth.getUser`.
+- **Deferred the curriculum cost.** `curriculumUtils` now lazy-loads + cleans the
+  JSON on first query (lazy singleton `getRawData`), keeping the 950 KB parse off
+  the cold-start critical path; an empty overview week never touches it.
+
+### Region (maintainer action, not code)
+
+The Supabase region isn't in the repo. Find it from your project URL
+(`NEXT_PUBLIC_SUPABASE_URL` → `https://<ref>.supabase.co`; the region is under
+Supabase → Project Settings → General/Infrastructure, e.g. `eu-west-2`). Then
+**align the Vercel function region to it** (Vercel → Project → Settings →
+Functions → Region) so server components/actions sit next to the DB. Once known,
+a `vercel.json` `{ "regions": ["<id>"] }` hint can pin it.
+
+### Verified
+
+- `npm run build` passes (Next 16.2.9); `npm run lint` clean. Route map unchanged.
+- Toggle switches with no server round-trip (pure state + shallow URL sync);
+  overview/editor/`/plan/new` show instant skeletons; buttons/links show the
+  lighter-fill + spinner pending state; loaders issue independent queries together.
+
 ## Next slice (not started)
 
 1. **Curriculum browser.**

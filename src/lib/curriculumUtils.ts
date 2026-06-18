@@ -57,10 +57,21 @@ function cleanCurriculumData(raw: CurriculumLookup): CurriculumLookup {
   return cleaned;
 }
 
-// Import the JSON with an explicit cast to avoid TypeScript inferring
-// the full shape of ~950 KB of nested data (which slows type-checking).
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const rawData = cleanCurriculumData(require("@/data/curriculum.json") as CurriculumLookup);
+// The curriculum is a ~950 KB baked JSON export. Requiring + cleaning it is the
+// single most expensive bit of work on this module, so defer it to first use
+// (lazy singleton) rather than running it at import time. This keeps it off the
+// critical path for requests that import this module transitively but never
+// query the curriculum — notably an empty Weekly Overview week, which resolves
+// no targets and so never touches it. The explicit cast also avoids TypeScript
+// inferring the full nested shape (which slows type-checking).
+let _rawData: CurriculumLookup | null = null;
+
+function getRawData(): CurriculumLookup {
+  if (_rawData) return _rawData;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  _rawData = cleanCurriculumData(require("@/data/curriculum.json") as CurriculumLookup);
+  return _rawData;
+}
 
 // ── Lazy indexes ──────────────────────────────────────────────────────────────
 // Built once on first use; keyed as `${yearNum}_${week}` and `${yearNum}`.
@@ -75,7 +86,7 @@ function buildIndexes(): void {
   _byWeek = new Map();
   _byYear = new Map();
 
-  for (const entry of Object.values(rawData)) {
+  for (const entry of Object.values(getRawData())) {
     const items: CurriculumLesson[] = Array.isArray(entry) ? entry : [entry];
     for (const lesson of items) {
       const { yearNum, week } = lesson;
@@ -105,7 +116,7 @@ function buildIndexes(): void {
  * Returns `null` when the ID is not found.
  */
 export function getLessonById(id: string): CurriculumLesson | CurriculumLesson[] | null {
-  const entry = rawData[id] ?? null;
+  const entry = getRawData()[id] ?? null;
   if (!entry) return null;
   return Array.isArray(entry) ? entry.map(withCleanLOs) : withCleanLOs(entry);
 }

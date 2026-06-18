@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/cn';
 import { WEEKDAYS, WEEKDAY_LABELS, type Weekday } from '@/lib/week';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
+import { LinkPending } from '@/components/ui/LinkPending';
 import type { ClassWeek, WeekSlot } from '@/types/weekly-overview';
 
 /**
@@ -111,7 +112,9 @@ function SlotCell({
     : `/plan/new?classId=${classId}&date=${slot.date}`;
 
   return (
-    <Link href={href} className={cn(base, 'block transition-colors hover:bg-cream')}>
+    <Link href={href} className={cn(base, 'relative block transition-colors hover:bg-cream')}>
+      {/* Inline pending feedback while the editor / creation flow loads. */}
+      <LinkPending size={13} className="absolute right-[7px] top-[7px] text-teal" />
       {body}
     </Link>
   );

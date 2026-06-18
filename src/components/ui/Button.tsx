@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Variant = "primary" | "secondary";
 type Size = "sm" | "md";
@@ -7,6 +8,8 @@ type Size = "sm" | "md";
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
+  /** While true the button lightens, shows an inline spinner, and is disabled. */
+  pending?: boolean;
 };
 
 const BASE =
@@ -29,20 +32,37 @@ const SIZES: Record<Size, string> = {
 
 /**
  * The single Button primitive for this slice. Variants and sizes mirror what the
- * Login and shell designs use; the set grows per page later.
+ * Login and shell designs use; the set grows per page later. Passing `pending`
+ * gives consistent in-flight feedback: the fill lightens and an inline spinner
+ * appears, and the button is disabled so the action can't be re-fired.
  */
 export function Button({
   variant = "primary",
   size = "md",
+  pending = false,
   className,
   type = "button",
+  disabled,
+  children,
   ...props
 }: ButtonProps) {
   return (
     <button
       type={type}
-      className={cn(BASE, VARIANTS[variant], SIZES[size], className)}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
+      className={cn(
+        BASE,
+        VARIANTS[variant],
+        SIZES[size],
+        // Pending lightens the fill without dropping below the disabled floor.
+        pending && "opacity-80",
+        className,
+      )}
       {...props}
-    />
+    >
+      {pending ? <Spinner /> : null}
+      {children}
+    </button>
   );
 }
