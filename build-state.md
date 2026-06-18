@@ -117,7 +117,73 @@ Weekly Overview content, curriculum browser, lesson editor, AI, and Word export.
 - Full end-to-end Microsoft login still needs the Entra + Supabase config in
   `SETUP.md`; the code wiring and non-auth rendering are correct without it.
 
-## Phase 3 — Lesson Plan Editor ✅ (this phase, editor branch)
+## Phase 3 — Weekly Overview (read view) ✅ (this phase, overview branch)
+
+Goal: the authenticated home screen — the read view of a teacher's Mon–Fri week
+as the approved design's two views (Calendar matrix + Status board) with a
+toggle, week navigation, real RLS-scoped data, and a sample-plan seed to demo
+it. **Stops before creating/editing plans, the curriculum browser, AI, and Word
+export** (next slices).
+
+### Done
+
+- **Data layer** (`src/lib/weekly-overview.ts`, `getWeeklyOverview(weekStart)`) —
+  server-side, via the auth'd cookie client (RLS only, no service-role). Loads
+  the teacher's assigned classes (`class_teachers → classes` + `schools`,
+  `subjects`), then the `lesson_plans` for those classes within the Mon–Fri
+  range. Resolves each plan's curriculum target (daily LO + theme) from
+  `curriculum_lesson_id` via `getLessonById`. Returns a render-ready
+  `WeeklyOverview`: per class, five Mon→Fri `WeekSlot`s, each with the plan (or
+  null), its `SlotStatus`, the curriculum target, and an `isToday` flag.
+- **View-model types** (`src/types/weekly-overview.ts`) — `WeeklyOverview`,
+  `ClassWeek`, `WeekSlot`, `SlotPlan`, `CurriculumTarget`, and
+  `SlotStatus = PlanStatus | 'not_started'` (the empty state is derived, never
+  stored).
+- **Week helpers** (`src/lib/week.ts`) — UTC, string-based Mon–Fri math:
+  `resolveWeekStart` (snaps `?week=` to a Monday, defaults to this week),
+  `currentMonday`, `weekdayDates`, `addDays`, `formatWeekRange`
+  ("15 – 19 June 2026", month-aware), `weekdayOf`, `todayISO`.
+- **Status model + tokens** (`src/components/weekly-overview/status.ts`) — one
+  `STATUS_META` map carries copy ("In progress / Submitted / **Needs Review** /
+  Approved / Not started"), the ●/○ glyph, and the `status-*` colour-token
+  classes from globals.css. `StatusChip` renders the Calendar chips.
+- **Two views + toggle, URL-driven**:
+  - `CalendarView` — sessions (classes) down × weekdays across; the per-class
+    grouping corner is labelled **"Sessions"**; today's column is tinted; each
+    cell shows the daily-LO headline + status chip, or "Not started".
+  - `StatusView` — the same slots grouped into the five status columns with
+    counts; submitted cards read "Awaiting approval", needs-review cards show the
+    coordinator note; "Not started" capped with a "+N more" tail.
+  - `ViewToggle` + `WeekNav` are plain `<Link>`s that set `?view=` /
+    `?week=` (keeping the other), so both the selected week and view live in the
+    URL and are server-rendered/linkable. Prev / next / "This week" controls.
+- **Home route** (`src/app/page.tsx`) — replaces the placeholder; reads
+  `searchParams` (a Promise in Next 16), renders the overview inside `AppShell`.
+  Slots with a plan link to `/plan/{id}` (the editor); empty slots are inert.
+  Calm empty state when the teacher has no classes.
+- **Dev/setup aid** — the auth-uid printout moved to a dedicated **`/whoami`**
+  page (linked quietly from the overview), still needed to run the admin
+  provisioning + seed. Removable once provisioning is in-app.
+- **Sample-plan seed** (`supabase/admin/seed_sample_plans.sql` + README) —
+  parameterized by teacher email/uid; inserts ~5 plans across the current week
+  for the teacher's assigned classes covering all four statuses, `blocks =
+  DEFAULT_BLOCKS`, year-appropriate real curriculum keys. Idempotent
+  (`ON CONFLICT (class_id, lesson_date) DO NOTHING`); guards for un-provisioned
+  teachers.
+
+### Verified
+
+- `npm run build` passes (Next 16.2.9). `npm run lint` clean. Route map: `/`
+  dynamic, `/whoami` dynamic, `/login` static, `/auth/callback` dynamic, Proxy
+  active.
+- Not exercised against a live DB (no Docker/Supabase in this workspace, as in
+  earlier phases): the data function + seed are type-checked and lint-reviewed
+  but the rendered grid needs a seeded DB to view. Apply via the
+  `supabase start` / `db reset` flow, run `assign_teacher.sql` then
+  `seed_sample_plans.sql`, and (re)run `gen:types` so the nested-select casts in
+  `weekly-overview.ts` can later be tightened.
+
+## Phase 4 — Lesson Plan Editor ✅ (this phase, editor branch)
 
 Goal: the editor for an **existing** plan — the core screen where a teacher
 writes a 50-minute lesson. Built in parallel with the Weekly Overview on a
@@ -130,7 +196,8 @@ plan-creation flow / curriculum picker, AI features, and Word export.
 - **Route `app/plan/[id]`** (`src/app/plan/[id]/page.tsx`, force-dynamic) — a
   server component that loads the plan with the auth'd client (RLS), 404s via
   `notFound()` when missing/not permitted, and hands off to the client editor
-  inside the existing `AppShell`.
+  inside the existing `AppShell`. (The overview's `/plan/{id}` links now resolve
+  here.)
 - **Data layer** (`src/lib/editor/load-plan.ts`) — `loadPlanForEditor(id)` joins
   the plan → class (school/subject/year/group/literacy), resolves the locked
   curriculum context (daily LO, focus area = linguistic skill, theme) from
@@ -174,20 +241,20 @@ plan-creation flow / curriculum picker, AI features, and Word export.
 ### Verified
 
 - `npm run build` passes (Next 16.2.9); `npm run lint` clean. Route map adds
-  `/plan/[id]` (dynamic). No globals.css/AppShell/shared-type changes (clean
-  merge with the overview branch expected; only build-state.md / lockfile may
-  conflict).
+  `/plan/[id]` (dynamic). No globals.css/AppShell/shared-type changes — merged
+  cleanly with the overview branch (only build-state.md conflicted).
 - Not applied to a live DB in this workspace (no Docker/Supabase CLI). To test:
   apply migrations + seed, provision a teacher (`assign_teacher.sql`), run
   `seed_one_plan.sql`, open `/plan/<printed id>`.
 
 ## Next slice (not started)
 
-1. **Bridge after merge** — the plan-creation flow + curriculum picker, wiring
-   the Weekly Overview's empty slots to create plans the editor then opens.
-2. **AI assistance** — objective check (wire the existing affordance) + activity
+1. **Bridge** — the plan-creation flow + curriculum picker, wiring the Weekly
+   Overview's empty "Not started" slots to create plans the editor then opens.
+2. **Curriculum browser.**
+3. **AI assistance** — objective check (wire the existing affordance) + activity
    suggestions.
-3. **Word (.docx) export**, **coordinator review UI**.
-4. **Full activity-bank + guidance content** (beyond the current sample).
-5. **Multi-subject curriculum** — populate `subject`, ingestion script (the old
+4. **Word (.docx) export**, **coordinator review UI**.
+5. **Full activity-bank + guidance content** (beyond the current sample).
+6. **Multi-subject curriculum** — populate `subject`, ingestion script (the old
    spreadsheet→JSON generator was never in the repo and must be rebuilt).
