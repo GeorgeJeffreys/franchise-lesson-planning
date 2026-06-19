@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/app-shell/AppShell';
 import { ResourceBank } from '@/components/resources/ResourceBank';
 import { createClient } from '@/lib/supabase/server';
+import { getHeaderProfile } from '@/lib/profile';
 import { getTagVocabulary, listFolders, listResources } from '@/lib/resources';
 import type { Role } from '@/components/resources/types';
 
@@ -13,7 +14,8 @@ export const dynamic = 'force-dynamic';
  * the signed-in user's role, the subject list, the tag vocabulary (scoped to the
  * default subject so subject-specific dimensions adapt), the first page of
  * resources, and the user's folders — then hands them to the client component,
- * which re-queries via Server Actions as the teacher filters and uploads.
+ * which re-queries via Server Actions as the teacher filters and uploads. The
+ * shell header identity comes from the shared `getHeaderProfile` helper.
  */
 export default async function ResourcesPage() {
   const supabase = await createClient();
@@ -25,13 +27,13 @@ export default async function ResourcesPage() {
   // The proxy protects this route, so a session should exist; stay safe anyway.
   const userId = user?.id ?? '';
 
-  const [{ data: profile }, { data: subjectRows }] = await Promise.all([
-    supabase.from('profiles').select('full_name, role').eq('id', userId).maybeSingle(),
+  const [{ name, subtitle }, { data: profile }, { data: subjectRows }] = await Promise.all([
+    getHeaderProfile(),
+    supabase.from('profiles').select('role').eq('id', userId).maybeSingle(),
     supabase.from('subjects').select('id, name, code').order('name', { ascending: true }),
   ]);
 
   const role: Role = profile?.role === 'coordinator' ? 'coordinator' : 'teacher';
-  const teacherName = profile?.full_name ?? user?.email ?? 'there';
 
   const subjects = ((subjectRows ?? []) as Array<{ id: string; name: string; code: string }>).map(
     (s) => ({ id: s.id, name: s.name })
@@ -50,7 +52,7 @@ export default async function ResourcesPage() {
   ]);
 
   return (
-    <AppShell name={teacherName} subtitle="Resource bank">
+    <AppShell name={name} subtitle={subtitle}>
       <ResourceBank
         role={role}
         currentUserId={userId}
