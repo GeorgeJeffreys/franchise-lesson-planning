@@ -1,0 +1,228 @@
+// React-PDF documents for Alsama lesson plans.
+//
+// `LessonPlanPage` renders the body for ONE plan: a branded header (class, year/
+// group, date), the SMARTT objective, and every lesson block in order with its
+// name, teaching phase (I do / We do / You do), allotted minutes, and planned
+// content. It reads only what `lesson_plans` carries today, and renders the
+// reserved attachment/worksheet slots (see ./types) only when present, so those
+// can be added later without touching this component.
+//
+// Two Document wrappers compose it:
+//   • LessonPlanDocument       — a single plan (one page).
+//   • WeekLessonPlansDocument  — many plans, one per page, for batch printing.
+
+import { Document, Page, Text, View } from '@react-pdf/renderer';
+import { inSessionMinutes } from '@/lib/blocks';
+import { formatLongDate } from '@/lib/week';
+import { COLORS, phaseLabel, statusLabel, styles } from './theme';
+import type { PdfAttachment, PlanPdfModel } from './types';
+
+function classHeadline(c: PlanPdfModel['classContext']): string {
+  return `Year ${c.year} · ${c.groupLabel}`;
+}
+
+function Header({ model }: { model: PlanPdfModel }) {
+  const { classContext: c, plan, curriculum } = model;
+  const context = [c.schoolName, c.subjectName].filter(Boolean).join(' · ');
+
+  return (
+    <View style={styles.header}>
+      <Text style={styles.brand}>Alsama · Lesson Plan</Text>
+      <Text style={styles.classTitle}>{classHeadline(c)}</Text>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaItem}>
+          <Text style={styles.metaStrong}>Date: </Text>
+          {formatLongDate(plan.lesson_date)}
+        </Text>
+        {plan.period != null && (
+          <Text style={styles.metaItem}>
+            <Text style={styles.metaStrong}>Period: </Text>
+            {plan.period}
+          </Text>
+        )}
+        {context !== '' && <Text style={styles.metaItem}>{context}</Text>}
+        {curriculum?.focusArea ? (
+          <Text style={styles.metaItem}>
+            <Text style={styles.metaStrong}>Focus: </Text>
+            {curriculum.focusArea}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={styles.statusPill}>{statusLabel(plan.status)}</Text>
+    </View>
+  );
+}
+
+function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionHeading}>{heading}</Text>
+      {children}
+    </View>
+  );
+}
+
+function ObjectiveSection({ model }: { model: PlanPdfModel }) {
+  const objective = model.plan.smartt_objective?.trim();
+  const dailyLO = model.curriculum?.dailyLO?.trim();
+  return (
+    <Section heading="SMARTT Objective">
+      <View style={styles.objectiveBox}>
+        {objective ? (
+          <Text style={styles.objectiveText}>{objective}</Text>
+        ) : (
+          <Text style={styles.empty}>No objective written yet.</Text>
+        )}
+      </View>
+      {dailyLO ? (
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Daily LO</Text>
+          <Text style={styles.detailValue}>{dailyLO}</Text>
+        </View>
+      ) : null}
+    </Section>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  const text = value.trim();
+  if (text === '') return null;
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{text}</Text>
+    </View>
+  );
+}
+
+function BlockRow({ block }: { block: PlanPdfModel['plan']['blocks'][number] }) {
+  const phase = phaseLabel(block.phase);
+  const hasDetail =
+    block.activity_title.trim() !== '' ||
+    block.teacher_does.trim() !== '' ||
+    block.students_do.trim() !== '' ||
+    block.resources.trim() !== '';
+
+  return (
+    <View style={styles.block} wrap={false}>
+      <View style={styles.blockHead}>
+        {phase ? <Text style={styles.phaseTag}>{phase}</Text> : null}
+        <Text style={styles.blockTitle}>{block.title}</Text>
+        <Text style={styles.minutes}>{block.duration_minutes} min</Text>
+      </View>
+      {block.activity_title.trim() !== '' ? (
+        <Text style={styles.activityTitle}>{block.activity_title}</Text>
+      ) : null}
+      <Detail label="Teacher" value={block.teacher_does} />
+      <Detail label="Students" value={block.students_do} />
+      <Detail label="Materials" value={block.resources} />
+      {!hasDetail ? <Text style={styles.empty}>Not planned yet.</Text> : null}
+    </View>
+  );
+}
+
+function AttachmentList({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: PdfAttachment[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <Section heading={heading}>
+      {items.map((item, i) => (
+        <View key={i} style={styles.detailRow}>
+          <Text style={styles.detailValue}>
+            <Text style={styles.metaStrong}>{item.label}</Text>
+            {item.detail ? ` — ${item.detail}` : ''}
+          </Text>
+        </View>
+      ))}
+    </Section>
+  );
+}
+
+/** The printable body for a single plan; reused by both Document wrappers. */
+function LessonPlanPage({ model }: { model: PlanPdfModel }) {
+  const total = inSessionMinutes(model.plan.blocks);
+
+  return (
+    <Page size="A4" style={styles.page} wrap>
+      <Header model={model} />
+      <ObjectiveSection model={model} />
+
+      <View style={styles.section}>
+        <Text style={styles.blocksHeading}>Lesson Blocks</Text>
+        {model.plan.blocks.map((block, i) => (
+          <BlockRow key={`${block.type}-${i}`} block={block} />
+        ))}
+        <View style={styles.totalRow}>
+          <Text style={styles.totalText}>In-session total: {total} min</Text>
+        </View>
+      </View>
+
+      {model.attachments && model.attachments.length > 0 ? (
+        <AttachmentList heading="Resources & Materials" items={model.attachments} />
+      ) : null}
+      {model.worksheet ? (
+        <AttachmentList heading="Worksheet" items={[model.worksheet]} />
+      ) : null}
+
+      <View style={styles.footer} fixed>
+        <Text>
+          {classHeadline(model.classContext)} · {formatLongDate(model.plan.lesson_date)}
+        </Text>
+        <Text
+          render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`}
+        />
+      </View>
+    </Page>
+  );
+}
+
+/** A single lesson plan as a one-page PDF document. */
+export function LessonPlanDocument({ model }: { model: PlanPdfModel }) {
+  const title = `Lesson Plan — ${classHeadline(model.classContext)} — ${model.plan.lesson_date}`;
+  return (
+    <Document title={title} author="Alsama" subject="Lesson plan">
+      <LessonPlanPage model={model} />
+    </Document>
+  );
+}
+
+/** Many lesson plans, one per page, for batch printing a class's week. */
+export function WeekLessonPlansDocument({
+  models,
+  weekLabel,
+}: {
+  models: PlanPdfModel[];
+  weekLabel: string;
+}) {
+  const className = models[0] ? classHeadline(models[0].classContext) : 'Class';
+  const title = `Lesson Plans — ${className} — ${weekLabel}`;
+
+  if (models.length === 0) {
+    return (
+      <Document title={title} author="Alsama" subject="Lesson plans">
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.brand}>Alsama · Lesson Plans</Text>
+            <Text style={styles.classTitle}>{weekLabel}</Text>
+          </View>
+          <Text style={[styles.empty, { color: COLORS.muted }]}>
+            No lesson plans found for this class in the selected week.
+          </Text>
+        </Page>
+      </Document>
+    );
+  }
+
+  return (
+    <Document title={title} author="Alsama" subject="Lesson plans">
+      {models.map((model) => (
+        <LessonPlanPage key={model.plan.id} model={model} />
+      ))}
+    </Document>
+  );
+}
