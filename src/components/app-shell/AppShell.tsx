@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { SignOutForm } from "@/components/app-shell/SignOutForm";
+import { PrimaryNav } from "@/components/app-shell/PrimaryNav";
 import { Wordmark } from "@/components/ui/Wordmark";
 
 type AppShellProps = {
@@ -39,6 +40,9 @@ export function AppShell({ name, subtitle, children }: AppShellProps) {
               Lesson Planning
             </span>
           </div>
+
+          {/* Primary navigation */}
+          <PrimaryNav />
 
           {/* Signed-in user + sign-out */}
           <div className="flex items-center gap-4">
