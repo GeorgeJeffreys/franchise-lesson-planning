@@ -17,6 +17,12 @@ export interface SavePlanInput {
   smartt_check?: unknown;
   /** Required-materials chips. Optional; persisted to `required_materials`. */
   required_materials?: string[];
+  /**
+   * The student worksheet as a tiptap JSON document. Optional: only sent once
+   * the teacher has edited the worksheet. Stored verbatim in the unenforced
+   * `worksheet` JSONB column.
+   */
+  worksheet?: unknown;
 }
 
 /** Build the column patch, including the optional JSONB columns only when sent. */
@@ -27,6 +33,7 @@ function buildPatch(input: SavePlanInput): Record<string, unknown> {
   };
   if (input.smartt_check !== undefined) patch.smartt_check = input.smartt_check;
   if (input.required_materials !== undefined) patch.required_materials = input.required_materials;
+  if (input.worksheet !== undefined) patch.worksheet = input.worksheet;
   return patch;
 }
 

@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { getLessonById } from '@/lib/curriculumUtils';
 import { DEFAULT_BLOCKS } from '@/lib/blocks';
+import { getTagVocabulary, listFolders, getResourcesByIds } from '@/lib/resources';
 import type { Block, LessonBlockType, LessonPlan } from '@/types/lesson';
+import type { Folder, ResourceWithTags, TagsByDimension } from '@/types/resource';
 
 /** Block types that have a pre-approved activity bank today. */
 export const ACTIVITY_BLOCK_TYPES: LessonBlockType[] = ['cfu', 'exit_ticket'];
@@ -27,6 +29,23 @@ export interface EditorClassContext {
   literacy: ClassLiteracy;
   schoolName: string;
   subjectName: string;
+  /** The class's subject id — scopes the embedded Resource Bank panel. */
+  subjectId: string | null;
+}
+
+/**
+ * The context the embedded Resource Bank panel (steps 2 & 3) needs on first
+ * paint: the subject/tag vocabulary for the Search tab, the user's folders for
+ * the Folders tab, and the resources already attached to this plan's blocks (so
+ * each section can show ✓ Added and its "Attached from the bank" list without a
+ * round-trip). Everything is loaded through the auth'd, RLS-scoped client.
+ */
+export interface EditorResourceBank {
+  subjectId: string | null;
+  vocabulary: TagsByDimension;
+  folders: Folder[];
+  /** Resources already attached to any block, resolved with their tags. */
+  attached: ResourceWithTags[];
 }
 
 /** The locked curriculum context resolved from `curriculum_lesson_id`. */
@@ -46,6 +65,8 @@ export interface EditorPlanData {
   curriculum: EditorCurriculumContext | null;
   /** Pre-approved activities grouped by block type (cfu, exit_ticket today). */
   activitiesByBlock: Partial<Record<LessonBlockType, ActivityBankItem[]>>;
+  /** Context for the embedded Resource Bank panel on steps 2 & 3. */
+  resourceBank: EditorResourceBank;
 }
 
 // The Supabase client is intentionally untyped in this project (the generated
@@ -56,7 +77,7 @@ interface RawClassJoin {
   group_label: string;
   literacy: ClassLiteracy;
   school: { name: string } | { name: string }[] | null;
-  subject: { name: string } | { name: string }[] | null;
+  subject: { id: string; name: string } | { id: string; name: string }[] | null;
 }
 
 interface RawPlanRow {
@@ -69,6 +90,7 @@ interface RawPlanRow {
   smartt_objective: string | null;
   smartt_check: LessonPlan['smartt_check'];
   blocks: unknown;
+  worksheet: unknown;
   required_materials: unknown;
   created_by: string;
   submitted_at: string | null;
@@ -106,12 +128,12 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
       .from('lesson_plans')
       .select(
         `id, class_id, curriculum_lesson_id, lesson_date, period, status,
-         smartt_objective, smartt_check, blocks, required_materials, created_by,
+         smartt_objective, smartt_check, blocks, worksheet, required_materials, created_by,
          submitted_at, reviewed_at, review_note, created_at, updated_at,
          class:classes (
            id, year, group_label, literacy,
            school:schools ( name ),
-           subject:subjects ( name )
+           subject:subjects ( id, name )
          )`
       )
       .eq('id', id)
@@ -141,6 +163,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     literacy: rawClass.literacy,
     schoolName: school?.name ?? '',
     subjectName: subject?.name ?? '',
+    subjectId: subject?.id ?? null,
   };
 
   // Resolve the locked curriculum context from the flat-file curriculum.
@@ -173,6 +196,25 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     ? (row.required_materials as unknown[])
     : undefined;
 
+  // Resource-bank context for the embedded panel (steps 2 & 3). The vocabulary
+  // is scoped to the class's subject (so subject-specific dimensions adapt); the
+  // folders are the user's; the attached set resolves every resourceId already
+  // written onto a block. These three reads are independent, so batch them.
+  const attachedIds = [
+    ...new Set(blocks.flatMap((b) => b.resourceIds ?? [])),
+  ];
+  const [vocabulary, folders, attached] = await Promise.all([
+    getTagVocabulary(classContext.subjectId ?? undefined),
+    listFolders(),
+    getResourcesByIds(attachedIds),
+  ]);
+  const resourceBank: EditorResourceBank = {
+    subjectId: classContext.subjectId,
+    vocabulary,
+    folders,
+    attached,
+  };
+
   const plan: LessonPlan = {
     id: row.id,
     class_id: row.class_id,
@@ -189,8 +231,9 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     review_note: row.review_note,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    worksheet: row.worksheet ?? undefined,
     requiredMaterials,
   };
 
-  return { plan, classContext, curriculum, activitiesByBlock };
+  return { plan, classContext, curriculum, activitiesByBlock, resourceBank };
 }
