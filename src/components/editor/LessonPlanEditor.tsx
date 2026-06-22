@@ -26,7 +26,6 @@ import { WritingStep } from '@/components/editor/WritingStep';
 import { WorksheetBuilder } from '@/components/editor/WorksheetBuilder';
 import { LinkItStep } from '@/components/editor/LinkItStep';
 import { ReviewStep } from '@/components/editor/ReviewStep';
-import { Spinner } from '@/components/ui/Spinner';
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -245,27 +244,12 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
   const exitBlock = getBlock(blocks, 'exit_ticket');
 
   return (
-    <div className="-mx-6 -my-8 lg:-mx-10">
+    <div className="mx-auto -my-8 max-w-[1340px]">
       <EditorSubHeader
         classContext={classContext}
         lessonDate={plan.lesson_date}
         total={total}
-        actions={
-          <>
-            <SaveIndicator state={saveState} />
-            <a
-              href={`/api/pdf/plan/${plan.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-[7px] rounded-[9px] border border-border-strong bg-surface px-[13px] py-2 text-[13px] font-medium text-ink hover:bg-surface-subtle"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" />
-              </svg>
-              Download
-            </a>
-          </>
-        }
+        actions={<SaveIndicator state={saveState} />}
       />
 
       <Stepper
@@ -278,7 +262,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
       />
 
       <div className="px-[22px] pb-10 pt-[22px] lg:px-[30px]">
-        <CurriculumBand curriculum={curriculum} />
+        {step === 1 ? <CurriculumBand curriculum={curriculum} /> : null}
 
         {step > 1 ? (
           <div className="mt-[18px]">
@@ -349,6 +333,8 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
 
         {step === 5 ? (
           <ReviewStep
+            planId={plan.id}
+            status={status}
             blocks={blocks}
             total={total}
             materials={materials}
@@ -362,36 +348,6 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
             {submitError}
           </div>
         ) : null}
-
-        {/* Bottom step navigation (mirrors the stepper's group). */}
-        <div className="mt-[22px] flex items-center justify-between gap-4 border-t border-[#EFE8DD] pt-[18px]">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={() => goStep(step - 1)}
-              className="rounded-[10px] border border-border-strong bg-surface px-[18px] py-2.5 text-[14px] font-medium text-ink hover:bg-surface-subtle"
-            >
-              ← Back
-            </button>
-          ) : (
-            <span className="text-[13px] text-neutral-400">Step 1 of 5 — start here</span>
-          )}
-          <div className="text-[13px] text-neutral-600">
-            Step <b className="text-ink">{step}</b> of {STEP_COUNT}
-          </div>
-          {step < STEP_COUNT ? (
-            <button
-              type="button"
-              onClick={() => goStep(step + 1)}
-              className="inline-flex items-center gap-2 rounded-[10px] border-none bg-teal px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-[#1a6a5d]"
-            >
-              {submitting ? <Spinner size={14} /> : null}
-              {step === 4 ? 'Review lesson →' : 'Next →'}
-            </button>
-          ) : (
-            submitControl
-          )}
-        </div>
       </div>
     </div>
   );

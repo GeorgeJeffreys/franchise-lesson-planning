@@ -23,6 +23,17 @@
   --color-teal-tint-border: #cfe6e0;
   --color-cream: #f5ede5;
 
+  /* ── Editor "colour = meaning" roles ──────────────────────────────────── */
+  /* Read-only curriculum context → one cream surface. */
+  --color-given: #fbf8f3;
+  --color-given-border: #ece4d7;
+  --color-given-label: #a6917a;
+  /* Teacher-editable ("yours") → pink block holding a white field. */
+  --color-mine: #fbf2f5;
+  --color-mine-border: #f1d8e1;
+  --color-mine-field: #ecd3de; /* white field border inside the pink block */
+  --color-stem: #a88792; /* baked-in, non-editable objective stem prefix */
+
   /* ── Neutral ramp (warm, sampled from the design) ──────────────────────── */
   --color-ink: #2a2422; /* primary text */
   --color-neutral-900: #3a332e;
