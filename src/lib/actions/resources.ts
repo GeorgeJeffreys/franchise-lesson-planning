@@ -16,6 +16,7 @@ import {
   deleteResource,
   getMostUsed,
   getResourceDownloadUrl,
+  getResourcesByIds,
   listFolderResources,
   listResources,
   moveResourceBetweenFolders,
@@ -58,6 +59,13 @@ export async function listFolderResourcesAction(
 /** A short-lived signed URL for a file-backed resource (null for links). */
 export async function getDownloadUrlAction(filePath: string): Promise<string | null> {
   return getResourceDownloadUrl(filePath);
+}
+
+/** Resolve a set of resources by id (with their tags) — e.g. a section's attachments. */
+export async function getResourcesByIdsAction(
+  ids: string[]
+): Promise<ResourceWithTags[]> {
+  return getResourcesByIds(ids);
 }
 
 // ── folders ────────────────────────────────────────────────────────────────────
@@ -105,9 +113,16 @@ export async function moveResourceBetweenFoldersAction(
 
 // ── usage ────────────────────────────────────────────────────────────────────
 
-/** Record a use of a resource (bumps its popularity + the user's "Most used"). */
-export async function recordUsageAction(resourceId: string): Promise<ResourceResult> {
-  return recordUsage(resourceId);
+/**
+ * Record a use of a resource (bumps its popularity + the user's "Most used"),
+ * optionally in the context of a lesson plan — the editor passes the plan id when
+ * a teacher attaches a resource to a section.
+ */
+export async function recordUsageAction(
+  resourceId: string,
+  lessonPlanId?: string
+): Promise<ResourceResult> {
+  return recordUsage(resourceId, lessonPlanId);
 }
 
 // ── create / edit / delete ─────────────────────────────────────────────────────

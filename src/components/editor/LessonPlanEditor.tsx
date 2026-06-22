@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Block, LessonBlockType, PlanStatus, TeachingPhase } from '@/types/lesson';
+import type { Block, LessonBlockType, PlanStatus } from '@/types/lesson';
+import type { ResourceWithTags } from '@/types/resource';
 import type { EditorPlanData } from '@/lib/editor/load-plan';
-import { blockMinutes, inSessionMinutes } from '@/lib/blocks';
+import { inSessionMinutes } from '@/lib/blocks';
 import { composeObjective, stripStem } from '@/lib/editor/objective';
 import { deriveMaterials, getBlock, patchBlock } from '@/lib/editor/plan-blocks';
+import { STAGE_KEYWORDS, type SuggestContext } from '@/lib/editor/resource-suggest';
 import {
   isObjectiveCheckResult,
   requestObjectiveCheck,
@@ -13,13 +15,15 @@ import {
   type ObjectiveCheckResult,
 } from '@/lib/editor/objective-check';
 import { saveLessonPlan, submitLessonPlan, unsubmitLessonPlan } from '@/lib/actions/lesson-plan';
+import { recordUsageAction } from '@/lib/actions/resources';
 import { EditorSubHeader } from '@/components/editor/EditorSubHeader';
 import { Stepper, STEP_COUNT } from '@/components/editor/Stepper';
 import { SubmitControl } from '@/components/editor/SubmitControl';
 import { CurriculumBand } from '@/components/editor/CurriculumBand';
 import { ObjectiveStep } from '@/components/editor/ObjectiveStep';
 import { ObjectiveBanner } from '@/components/editor/ObjectiveBanner';
-import { PlaceholderStep } from '@/components/editor/PlaceholderStep';
+import { WritingStep } from '@/components/editor/WritingStep';
+import { WorksheetBuilder } from '@/components/editor/WorksheetBuilder';
 import { LinkItStep } from '@/components/editor/LinkItStep';
 import { ReviewStep } from '@/components/editor/ReviewStep';
 import { Spinner } from '@/components/ui/Spinner';
@@ -50,15 +54,23 @@ function SaveIndicator({ state }: { state: SaveState }) {
 }
 
 export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
-  const { plan, classContext, curriculum, activitiesByBlock } = data;
+  const { plan, classContext, curriculum, activitiesByBlock, resourceBank } = data;
 
   const [step, setStep] = useState(1);
   const [remainder, setRemainder] = useState(() => stripStem(plan.smartt_objective));
   const [blocks, setBlocks] = useState<Block[]>(() => normalizeBlocks(plan.blocks));
+  const [worksheet, setWorksheet] = useState<unknown>(() => plan.worksheet);
   const [materials, setMaterials] = useState<string[]>(() =>
     Array.isArray(plan.requiredMaterials) && plan.requiredMaterials.length > 0
       ? (plan.requiredMaterials as string[])
       : deriveMaterials(plan.blocks),
+  );
+
+  // A client-side cache of resources attached to any section, seeded from the
+  // loader and grown as the teacher attaches more — so the "Attached from the
+  // bank" lists and ✓ Added state resolve without a round-trip.
+  const [resourceCache, setResourceCache] = useState<Record<string, ResourceWithTags>>(() =>
+    Object.fromEntries(resourceBank.attached.map((r) => [r.id, r])),
   );
   const [checkResult, setCheckResult] = useState<ObjectiveCheckResult | null>(() =>
     isObjectiveCheckResult(plan.smartt_check) ? plan.smartt_check : null,
@@ -91,6 +103,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         blocks,
         required_materials: materials,
         smartt_check: checkResult ?? undefined,
+        worksheet,
       });
       setSaveState(res.ok ? 'saved' : 'error');
     }, AUTOSAVE_DELAY_MS);
@@ -98,7 +111,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [remainder, blocks, materials, checkResult, plan.id]);
+  }, [remainder, blocks, materials, checkResult, worksheet, plan.id]);
 
   const goStep = useCallback((n: number) => {
     setStep(Math.max(1, Math.min(STEP_COUNT, n)));
@@ -111,6 +124,56 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
   const setBlockMinutes = useCallback(
     (type: LessonBlockType, next: number) => patchType(type, { minutes: Math.max(0, next) }),
     [patchType],
+  );
+
+  // Attach a resource to a section: cache it, write its id onto the block (the
+  // blocks change is what autosave persists), and record a use against this plan.
+  const attachResource = useCallback(
+    (type: LessonBlockType, resource: ResourceWithTags) => {
+      setResourceCache((prev) => ({ ...prev, [resource.id]: resource }));
+      setBlocks((bs) => {
+        const block = getBlock(bs, type);
+        const ids = block?.resourceIds ?? [];
+        if (ids.includes(resource.id)) return bs;
+        return patchBlock(bs, type, { resourceIds: [...ids, resource.id] });
+      });
+      // Fire-and-forget: a usage row feeds popularity + the user's "Most used".
+      void recordUsageAction(resource.id, plan.id);
+    },
+    [plan.id],
+  );
+
+  const detachResource = useCallback((type: LessonBlockType, resourceId: string) => {
+    setBlocks((bs) => {
+      const block = getBlock(bs, type);
+      const ids = (block?.resourceIds ?? []).filter((id) => id !== resourceId);
+      return patchBlock(bs, type, { resourceIds: ids });
+    });
+  }, []);
+
+  /** Resolve a block's attached resource ids to full resources via the cache. */
+  const attachedFor = useCallback(
+    (block: Block | undefined): ResourceWithTags[] =>
+      (block?.resourceIds ?? [])
+        .map((id) => resourceCache[id])
+        .filter((r): r is ResourceWithTags => !!r),
+    [resourceCache],
+  );
+
+  const teachContext = useMemo<SuggestContext>(
+    () => ({
+      subjectId: classContext.subjectId,
+      year: classContext.year,
+      themeLabel: curriculum?.theme ?? null,
+      skillLabel: curriculum?.focusArea ?? null,
+      stageKeywords: STAGE_KEYWORDS.teach,
+    }),
+    [classContext.subjectId, classContext.year, curriculum?.theme, curriculum?.focusArea],
+  );
+
+  const practiseContext = useMemo<SuggestContext>(
+    () => ({ ...teachContext, stageKeywords: STAGE_KEYWORDS.practise }),
+    [teachContext],
   );
 
   const canSubmit = remainder.trim().length > 0;
@@ -146,6 +209,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
       blocks,
       required_materials: materials,
       smartt_check: checkResult ?? undefined,
+      worksheet,
     });
     setSubmitting(false);
     if (res.ok) {
@@ -234,30 +298,40 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         ) : null}
 
         {step === 2 && newContentBlock ? (
-          <PlaceholderStep
+          <WritingStep
             title="Teach the new content"
             subtitle="Model the reading, then guide the class through it."
-            phase={newContentBlock.phase}
-            onPhaseChange={(phase) =>
-              patchType('new_content', { phase: phase as TeachingPhase | null })
-            }
-            minutes={blockMinutes(newContentBlock)}
-            onMinutesChange={(next) => setBlockMinutes('new_content', next)}
-            body="The two-pane writing area (What the teacher does / What students do) and the embedded resource bank arrive in Part 2. Phase and time are live now and feed the running total and Review."
+            block={newContentBlock}
+            onPatch={(patch) => patchType('new_content', patch)}
+            subjectId={resourceBank.subjectId}
+            vocabulary={resourceBank.vocabulary}
+            folders={resourceBank.folders}
+            suggestContext={teachContext}
+            attachedResources={attachedFor(newContentBlock)}
+            onAttach={(resource) => attachResource('new_content', resource)}
+            onRemove={(resourceId) => detachResource('new_content', resourceId)}
           />
         ) : null}
 
         {step === 3 && practiceBlock ? (
-          <PlaceholderStep
+          <WritingStep
             title="Practise"
             subtitle="Plan the practice, then build the worksheet students use."
-            phase={practiceBlock.phase}
-            onPhaseChange={(phase) =>
-              patchType('independent_practice', { phase: phase as TeachingPhase | null })
+            block={practiceBlock}
+            onPatch={(patch) => patchType('independent_practice', patch)}
+            subjectId={resourceBank.subjectId}
+            vocabulary={resourceBank.vocabulary}
+            folders={resourceBank.folders}
+            suggestContext={practiseContext}
+            attachedResources={attachedFor(practiceBlock)}
+            onAttach={(resource) => attachResource('independent_practice', resource)}
+            onRemove={(resourceId) => detachResource('independent_practice', resourceId)}
+            worksheetSlot={
+              <WorksheetBuilder
+                value={worksheet as Parameters<typeof WorksheetBuilder>[0]['value']}
+                onChange={setWorksheet}
+              />
             }
-            minutes={blockMinutes(practiceBlock)}
-            onMinutesChange={(next) => setBlockMinutes('independent_practice', next)}
-            body="The practice writing area, the student-worksheet builder, and the embedded resource bank arrive in Part 2. Phase and time are live now and feed the running total and Review."
           />
         ) : null}
 
