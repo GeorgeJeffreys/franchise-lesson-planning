@@ -2,6 +2,49 @@
 
 Living record of what each phase delivered and what comes next. Update as you go.
 
+## Auth: Supabase email + password on the Alsama email ✅ (this slice)
+
+Goal: switch sign-in from Microsoft Entra/Azure SSO to Supabase Auth on each
+teacher's **Alsama email**, so `auth.users.email` holds exactly that address —
+the bridge key the future schedule matcher joins on.
+
+### Done
+
+- **Removed Microsoft SSO** from the app: deleted `MicrosoftSignInButton`,
+  dropped the Azure provider from `supabase/config.toml` and the Azure env vars
+  from `.env.example`. No Microsoft sign-in path remains.
+- **Email + password** (`@supabase/ssr`, App Router):
+  - `/login` — email + password → `signIn` server action → `signInWithPassword`.
+  - `/login/reset` — request a reset link (`resetPasswordForEmail`), neutral
+    "check your email" response (no account enumeration).
+  - `/login/update-password` — set a new password (`updateUser`) after an
+    invite/recovery link establishes a session; dead-link guard when signed out.
+  - `/auth/callback` — verifies both `token_hash`+`type` (`verifyOtp`) and `code`
+    (`exchangeCodeForSession`); forwards invite/recovery to set-password.
+  - Shared `AuthShell`/`AuthField`/`SubmitButton` keep the three screens on the
+    approved Login design.
+- **Account creation = admin invite** (Supabase dashboard); public sign-up off
+  (`enable_signup = false`). No self-serve registration.
+- **Route protection + sign-out** unchanged in `src/proxy.ts` / `signOut`; the
+  public surface (`/login`, `/login/**`, `/auth/**`) still resolves.
+- **Bridge foundation:** `handle_new_user` left **unchanged**; the Alsama email
+  is read from `auth.users.email` (1:1 with `profiles` via the id FK — no
+  `profiles.email` column). `supabase/admin/verify_profile_email.sql` confirms an
+  invited teacher's stored email matches exactly. `SETUP.md` rewritten as the
+  dashboard checklist (providers, URLs, SMTP/test-only, invite, verify).
+
+### Dashboard steps George applies (see SETUP.md)
+
+Disable Azure + enable Email/password; turn off public sign-up; set Site URL +
+redirect allow-list (prod + preview); configure custom SMTP (or accept built-in
+mailer as test-only); invite a test Alsama email and run the verify query.
+
+### Next / out of scope
+
+`schedule_slot`, the n8n sync, `resolve_schedule()`, and any email **matching**
+logic are separate slices. A denormalised `profiles.email` column, if ever
+needed for the join, is a deliberate future schema change.
+
 ## Lesson Plan editor rebuild — Part 1 ✅ (this phase)
 
 Goal: rebuild `/plan/[id]` to the approved 5-step wizard design. This phase

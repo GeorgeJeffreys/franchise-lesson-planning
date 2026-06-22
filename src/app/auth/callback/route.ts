@@ -1,29 +1,46 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * OAuth callback. Microsoft redirects here with a `code`; we exchange it for a
- * session via the @supabase/ssr server client (PKCE — it reads the verifier
- * cookie set when the flow started), then land the user on the authed shell.
+ * Auth callback for email links — invite, password recovery, and any future
+ * email-based flow. Supabase sends the user here with EITHER:
+ *   - `token_hash` + `type`  → verified with verifyOtp (the email-template flow), or
+ *   - `code`                 → exchanged via exchangeCodeForSession (PKCE).
+ * Both establish the session cookies through the @supabase/ssr server client.
  *
- * Public route (see src/lib/supabase/proxy.ts). On any failure we send the user
- * back to /login rather than into a protected page with no session.
+ * Invite and recovery links require the user to set a password, so they are sent
+ * on to /login/update-password. Public route (see src/lib/supabase/proxy.ts); on
+ * any failure we return to /login rather than into a protected page.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type") as EmailOtpType | null;
+
   // Only honour same-origin relative paths to avoid an open-redirect.
   const nextParam = searchParams.get("next");
-  const next = nextParam && nextParam.startsWith("/") ? nextParam : "/";
+  let next = nextParam && nextParam.startsWith("/") ? nextParam : "/";
 
-  if (!code) {
+  const supabase = await createClient();
+
+  let authFailed = false;
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    authFailed = Boolean(error);
+    // Invite and recovery have no usable password yet → force the set-password step.
+    if (!error && (type === "invite" || type === "recovery") && next === "/") {
+      next = "/login/update-password";
+    }
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    authFailed = Boolean(error);
+  } else {
     return NextResponse.redirect(`${origin}/login?error=missing_code`);
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-  if (error) {
+  if (authFailed) {
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
   }
 

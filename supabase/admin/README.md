@@ -39,6 +39,14 @@ psql "$DATABASE_URL" -v teacher_uid="'00000000-0000-0000-0000-000000000000'" \
 In the **Supabase SQL editor** (no `-v` support): open the file, replace
 `:'teacher_email'` with a literal `'teacher@example.org'`, and run.
 
+## `verify_profile_email.sql`
+
+Read-only check for the **bridge foundation**: after inviting a teacher, confirms
+the email stored for their account (`auth.users.email`, reached 1:1 from
+`profiles` via the id FK) **exactly** equals the Alsama address they were invited
+with. The future schedule matcher joins on this email. Edit the literal email at
+the top and run it in the SQL editor; expect one row with `matches_exactly = true`.
+
 ## `seed_sample_plans.sql`
 
 Inserts ~5 sample `lesson_plans` across the **current** week (Mon–Fri) for a

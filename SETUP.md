@@ -1,11 +1,13 @@
-# Setup — Supabase + Microsoft SSO
+# Setup — Supabase Auth (email + password)
 
-How to stand up the database and wire **Sign in with Microsoft** for the Alsama
-Lesson Planner. Steps that require the Supabase dashboard or the Azure portal are
-documented here rather than scripted, because they can't be done from the repo.
+How to stand up the database and wire **email + password sign-in** on each
+teacher's **Alsama email** for the Alsama Lesson Planner. Microsoft Entra / Azure
+SSO has been removed. Steps that require the Supabase dashboard are documented
+here because they can't be scripted from the repo.
 
-Order: **(A) database → (B) Entra app → (C) Supabase Azure provider → (D) Supabase
-URLs → (E) env vars → (F) run → (G) provision a test teacher.**
+Order: **(A) database → (B) Supabase Auth providers → (C) Supabase URLs →
+(D) email / SMTP → (E) env vars → (F) run → (G) invite a teacher →
+(H) verify the bridge email.**
 
 ---
 
@@ -15,7 +17,7 @@ URLs → (E) env vars → (F) run → (G) provision a test teacher.**
 
 ```bash
 supabase start            # boot the local stack
-supabase db reset         # apply migrations 0001–0006, then supabase/seed.sql
+supabase db reset         # apply migrations 0001–0008, then supabase/seed.sql
 npm run gen:types         # regenerate src/types/database.types.ts from the DB
 ```
 
@@ -37,61 +39,58 @@ auth users (see step **G**).
 
 ---
 
-## B. Register an app in Microsoft Entra ID
+## B. Supabase Auth providers
 
-In the [Azure portal](https://portal.azure.com) → **Microsoft Entra ID** → **App
-registrations** → **New registration**:
+Supabase dashboard → **Authentication → Providers**:
 
-1. **Name:** e.g. `Alsama Lesson Planner`.
-2. **Supported account types:** choose to match who signs in:
-   - Single Alsama tenant → *Accounts in this organizational directory only*.
-   - Any work/school account → *Accounts in any organizational directory*.
-3. **Redirect URI:** platform **Web**, value =
-   **`https://<your-project-ref>.supabase.co/auth/v1/callback`**
-   (Supabase's callback, **not** the app's `/auth/callback`). For local Supabase
-   use `http://localhost:54321/auth/v1/callback`.
-4. Register, then note the **Application (client) ID** and **Directory (tenant)
-   ID**.
-5. **Certificates & secrets → New client secret** → copy the secret **Value**
-   (shown once).
-6. **API permissions:** Microsoft Graph delegated `openid`, `profile`, `email`
-   (add `User.Read` if you want richer profile data). Grant admin consent if your
-   tenant requires it.
+1. **Email** — *enable*. Turn on **email + password** (the "Enable Email
+   provider" toggle, with the password method on). Leave **magic link** off if
+   you want password-only.
+2. **Azure** — *disable* (this app no longer uses Microsoft SSO). If it was never
+   enabled on this project, there's nothing to do.
+
+Supabase dashboard → **Authentication → Sign In / Providers → (sign-up
+settings)** (or **Authentication → Settings**):
+
+3. **Disable public sign-ups** — turn **"Allow new users to sign up"** OFF.
+   Accounts are created by invite only (step **G**). The local stack mirrors this
+   via `enable_signup = false` in `supabase/config.toml`.
 
 ---
 
-## C. Enable the Azure provider in Supabase
+## C. Supabase Auth Site URL + redirect URLs
 
-Supabase dashboard → **Authentication → Providers → Azure**:
+Supabase dashboard → **Authentication → URL Configuration**. Invite and
+password-reset emails link back to the app, so these must be set:
 
-- **Enable** the provider.
-- **Client ID** = Entra Application (client) ID.
-- **Secret** = the Entra client secret **Value**.
-- **Azure Tenant URL** =
-  `https://login.microsoftonline.com/<tenant-id>` (use your Directory/tenant ID;
-  for multi-tenant use `organizations` or `common`).
-- Confirm the **Callback URL** shown matches the redirect URI you registered in
-  step **B.3**.
+- **Site URL:** the primary production origin, e.g. `https://<app>.vercel.app`.
+- **Redirect URLs (allow-list):** add every origin that may receive the email
+  link's redirect (`redirectTo` must be allow-listed or Supabase rejects it):
+  - `http://localhost:3000/**`            (local dev)
+  - `https://<app>.vercel.app/**`         (production)
+  - `https://<app>-*.vercel.app/**`       (Vercel preview deploys)
 
-The app requests the `azure` provider with scopes `openid profile email` and
-`redirectTo = <origin>/auth/callback` (see
-`src/components/auth/MicrosoftSignInButton.tsx`).
+The app's email links return to **`/auth/callback`** (which then forwards invite
+and recovery links to `/login/update-password`). The `/**` wildcard covers it.
 
 ---
 
-## D. Supabase Auth Site URL + redirect URLs
+## D. Email delivery / custom SMTP
 
-Supabase dashboard → **Authentication → URL Configuration**:
+The **built-in Supabase mailer is rate-limited (~a few emails/hour) and is not
+production-grade** — it is fine only for a quick test.
 
-- **Site URL:** your primary app origin (e.g. `https://<app>.vercel.app`, or
-  `http://localhost:3000` for local dev).
-- **Redirect URLs (allow-list):** add every app origin's callback, since
-  `redirectTo` must be allow-listed:
-  - `http://localhost:3000/**`
-  - `https://<app>.vercel.app/**`
-  - your Vercel preview pattern if used, e.g. `https://<app>-*.vercel.app/**`
+For real use, configure **custom SMTP** in Supabase dashboard →
+**Authentication → Emails → SMTP Settings** (e.g. Resend or SendGrid): sender
+name/address, host, port, username, password. Until that's done, treat invites
+and resets as **test-only** and expect throttling.
 
-Without these, Supabase rejects the post-login redirect back to `/auth/callback`.
+Optionally review the **Invite user** and **Reset password** email templates
+(same screen). The defaults work with `/auth/callback`; no template edits are
+required for this slice.
+
+> ⚠️ **Test-only flag:** if you ship before configuring SMTP, only a handful of
+> invite/reset emails will send per hour. Configure SMTP before onboarding teachers.
 
 ---
 
@@ -106,6 +105,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 
 Both are public (browser-exposed) and honour RLS. The **service-role key** is for
 admin/seed scripts only — never put it in `NEXT_PUBLIC_*` or a user request.
+There are **no SSO provider secrets** to set anymore.
 
 On **Vercel**, set the same two vars in the project's Environment Variables.
 
@@ -118,32 +118,74 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-Visiting `/` while signed out redirects to `/login`. The flow:
+Visiting `/` while signed out redirects to `/login`. The flows:
 
 ```
-/login → "Sign in with Microsoft" → Microsoft → Supabase callback
-       → /auth/callback (code exchange) → / (authed shell)
+Sign in:  /login → email + password → / (authed shell)
+Invite:   invite email → /auth/callback (verify) → /login/update-password → /
+Reset:    /login/reset → email → /auth/callback (verify) → /login/update-password → /
+Sign out: shell "Sign out" → /login
 ```
 
-`/login` and `/auth/callback` are public; everything else is protected by
+`/login`, `/login/**`, and `/auth/**` are public; everything else is protected by
 `src/proxy.ts`.
 
 ---
 
-## G. Provision a test teacher
+## G. Invite a teacher (account creation, v1)
 
-After signing in once (which creates your `profiles` row via the
-`handle_new_user` trigger), assign yourself a school, subject and classes so the
-upcoming Weekly Overview has data:
+Accounts are provisioned by **admin invite** — there is no self-serve sign-up.
 
-1. Grab your auth uid — the landing page prints it, or use the dashboard
-   (**Authentication → Users**).
-2. Run `supabase/admin/assign_teacher.sql` (see `supabase/admin/README.md`):
+Supabase dashboard → **Authentication → Users → Invite user** (or **Add user →
+Send invitation**):
 
-   ```bash
-   psql "$DATABASE_URL" -v teacher_email="'you@example.org'" \
-     -f supabase/admin/assign_teacher.sql
-   ```
+1. Enter the teacher's **exact Alsama email** (the same address PowerSchool
+   stores and they used for Chalk). This becomes their sign-in identity **and**
+   the bridge key the future schedule matcher joins on — type it precisely.
+2. Supabase sends an invite email. The teacher clicks the link → lands on
+   **Set your password** (`/login/update-password`) → chooses a password → is
+   signed in and dropped into the app.
+3. The `handle_new_user` trigger creates their `public.profiles` row
+   automatically on user creation (role `teacher`). No manual profile step.
 
-This is an admin/service-role script — it bypasses RLS and must not run from the
-app.
+To give the teacher classes/data for the Weekly Overview, then run
+`supabase/admin/assign_teacher.sql` (see `supabase/admin/README.md`).
+
+---
+
+## H. Verify the bridge email (do this for the test invite)
+
+The schedule matcher (a later slice) joins teachers to their PowerSchool
+schedule **on the Alsama email**. The canonical store for that email is
+**`auth.users.email`**, reached 1:1 from `public.profiles` via
+`profiles.id = auth.users.id` (there is intentionally **no** `profiles.email`
+column — see "Bridge-email note" below). After inviting the test teacher,
+confirm the stored email matches the invited address **exactly**.
+
+Run `supabase/admin/verify_profile_email.sql` in the Supabase SQL editor (edit
+the literal email at the top), or inline:
+
+```sql
+select
+  p.id,
+  u.email                                   as auth_email,
+  (u.email = 'teacher@alsama.org') as matches_exactly,  -- ← put the invited email here
+  p.full_name,
+  p.role
+from public.profiles p
+join auth.users u on u.id = p.id
+where u.email = 'teacher@alsama.org';                   -- ← and here
+```
+
+Expect exactly one row with `matches_exactly = true`. That is the bridge
+foundation this slice guarantees.
+
+### Bridge-email note (why no `profiles.email` column)
+
+The locked schema stores the email only in `auth.users.email`; `handle_new_user`
+copies `id`, `full_name`, `role` into `profiles` and is intentionally left
+unchanged. Because `profiles.id` is a 1:1 FK to `auth.users.id`, the Alsama email
+is always reachable by joining the two (as `assign_teacher.sql` already does),
+with no copy that could drift. If a later slice needs a denormalised
+`profiles.email` for the join, that is a deliberate schema change (new column +
+trigger update) to design then — not part of this auth slice.

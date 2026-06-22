@@ -22,13 +22,14 @@ enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/callback"]
 jwt_expiry = 3600
-enable_signup = true
+# Accounts are created by admin invite only — no public/self-serve sign-ups.
+enable_signup = false
 
-# Microsoft SSO via the Azure provider. Secrets come from the environment;
-# never commit real values. See .env.example.
-[auth.external.azure]
-enabled = true
-client_id = "env(SUPABASE_AUTH_EXTERNAL_AZURE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_EXTERNAL_AZURE_SECRET)"
-# Optional tenant URL, e.g. https://login.microsoftonline.com/<tenant-id>/v2.0
-url = ""
+# Email + password is the only sign-in method. Teachers sign in with their Alsama
+# email; accounts are provisioned via Supabase invite (which sets the password).
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+secure_password_change = true
+
+# Microsoft (Entra/Azure) SSO has been removed — sign-in is email + password.

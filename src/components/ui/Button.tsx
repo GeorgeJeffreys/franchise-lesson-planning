@@ -18,7 +18,7 @@ const BASE =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 focus-visible:ring-offset-2";
 
 const VARIANTS: Record<Variant, string> = {
-  // Teal CTA — the login "Sign in with Microsoft" action.
+  // Teal CTA — the primary action (e.g. the login "Sign in" button).
   primary: "bg-teal text-white border border-teal hover:bg-[#1a6a5d]",
   // White surface with a warm border — the shell's quieter actions.
   secondary:
