@@ -25,6 +25,10 @@ export function CardShell({
   return (
     <Link
       href={`/plan/${planId}`}
+      // The Status board makes this card a @dnd-kit draggable. Disabling the
+      // browser's native link drag-and-drop keeps that pointer drag clean; a
+      // plain click still navigates to the editor (Change 1).
+      draggable={false}
       className={cn(BASE, 'relative transition-colors hover:bg-surface-subtle')}
     >
       <LinkPending size={13} className="absolute right-[8px] top-[8px] text-teal" />
