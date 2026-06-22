@@ -56,6 +56,10 @@ export interface EditorCurriculumContext {
   theme: string;
   /** Combined grammar + vocabulary focus shown in the cream context cell. */
   grammarVocab: string;
+  /** The week-level knowledge objective ("This week ·" context under the daily outcome). */
+  weekLO: string;
+  /** The broader skill objective ("This month ·" context under the daily outcome). */
+  monthLO: string;
 }
 
 /** Everything the client editor needs, fully serializable. */
@@ -178,6 +182,11 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
         focusArea: lesson.linguisticSkill,
         theme: lesson.theme,
         grammarVocab,
+        // The knowledge objective is the finer-grained (≈ weekly) target; the
+        // skill objective is the broader (≈ monthly) one. Both are already
+        // stem-cleaned by getLessonById.
+        weekLO: lesson.knowledgeLO,
+        monthLO: lesson.skillLO,
       }
     : null;
 

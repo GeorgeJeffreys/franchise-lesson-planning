@@ -5,8 +5,16 @@ import {
   SMARTT_LETTERS,
   type ObjectiveCheckResult,
 } from '@/lib/editor/objective-check';
-import { Textarea } from '@/components/editor/fields';
 import { Spinner } from '@/components/ui/Spinner';
+
+/** The four-point Aya sparkle, reused for the hint button and the check button. */
+function SparkIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z" />
+    </svg>
+  );
+}
 
 function SmarttPill({
   label,
@@ -59,12 +67,11 @@ export function ObjectiveStep({
   checkError: string | null;
   onCheck: () => void;
 }) {
+  const checkDisabled = checking || remainder.trim().length === 0;
+
   return (
     <div className="mt-[22px]">
       <div className="text-[22px] font-semibold">Write the lesson objective</div>
-      <div className="mt-1 text-[14px] text-neutral-600">
-        One clear target for these 50 minutes. Begin with the stem — the rest is yours.
-      </div>
 
       <div className="mt-[18px] flex flex-wrap gap-1.5">
         {SMARTT_LETTERS.map((l) => (
@@ -72,34 +79,41 @@ export function ObjectiveStep({
         ))}
       </div>
 
-      <div className="mt-4 rounded-[14px] border border-[#F1D8E1] bg-[#FBF2F5] p-[17px]">
-        <div className="text-[13px] font-medium text-[#A88792]">{OBJECTIVE_STEM}…</div>
-        <Textarea
-          rows={2}
-          value={remainder}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label="SMARTT objective"
-          placeholder="read five short sentences about a family and identify the family words."
-          className="mt-2 border-[#ECD3DE] bg-surface text-[16px]"
-        />
-        <div className="mt-[11px] flex flex-wrap items-center justify-between gap-3">
-          <span className="text-[12px] text-[#B89AA4]">
-            Tip: lead with a measurable verb — <i>read, identify, match, name</i>.
-          </span>
+      {/* "Yours" — a pink block holding a white field. The stem is baked in and
+          non-editable; the teacher writes only the remainder. */}
+      <div className="mt-4 rounded-[14px] border border-mine-border bg-mine p-[15px]">
+        <div className="relative rounded-[11px] border border-mine-field bg-surface px-[15px] py-[14px]">
           <button
             type="button"
             onClick={onCheck}
-            disabled={checking || remainder.trim().length === 0}
-            aria-busy={checking || undefined}
-            className="inline-flex shrink-0 items-center gap-[7px] rounded-[9px] border border-[#CFE6E0] bg-[#E4F0ED] px-[13px] py-2 text-[13px] font-semibold text-teal hover:bg-[#d8ebe6] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={checkDisabled}
+            aria-label="Ask Aya about your objective"
+            title="Ask Aya for help with your objective"
+            className="absolute right-[11px] top-[11px] inline-flex size-[30px] items-center justify-center rounded-full bg-teal text-white shadow-[0_1px_3px_rgba(31,122,108,0.35)] hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {checking ? (
-              <Spinner size={14} />
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z" />
-              </svg>
-            )}
+            <SparkIcon size={15} />
+          </button>
+          <div className="pr-[34px] text-[16px] leading-[1.55]">
+            <span className="text-stem">{OBJECTIVE_STEM} </span>
+            <textarea
+              rows={2}
+              value={remainder}
+              onChange={(e) => onChange(e.target.value)}
+              aria-label="SMARTT objective"
+              placeholder="read five short sentences about a family and identify the family words."
+              className="mt-[6px] block w-full resize-y border-0 bg-transparent p-0 font-sans text-[16px] leading-[1.5] text-neutral-900 outline-none placeholder:text-neutral-400"
+            />
+          </div>
+        </div>
+        <div className="mt-[13px] flex justify-end">
+          <button
+            type="button"
+            onClick={onCheck}
+            disabled={checkDisabled}
+            aria-busy={checking || undefined}
+            className="inline-flex shrink-0 items-center gap-[7px] rounded-[9px] bg-teal px-[15px] py-[9px] text-[13px] font-semibold text-white hover:bg-[#1a6a5d] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {checking ? <Spinner size={14} /> : <SparkIcon size={14} />}
             {checking ? 'Checking…' : 'Check my objective'}
           </button>
         </div>
