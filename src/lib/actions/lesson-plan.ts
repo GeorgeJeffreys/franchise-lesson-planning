@@ -1,8 +1,9 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { hasObjectiveContent } from '@/lib/editor/objective';
-import type { Block } from '@/types/lesson';
+import type { Block, PlanStatus } from '@/types/lesson';
 
 export interface SavePlanInput {
   id: string;
@@ -62,6 +63,34 @@ export async function saveLessonPlan(input: SavePlanInput): Promise<ActionResult
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
 
+  return { ok: true, updated_at: data.updated_at };
+}
+
+/**
+ * Set a plan's workflow status directly — the write behind the Weekly Overview's
+ * Status (kanban) board, where dragging a card between columns moves the plan to
+ * the target column's status. Touches only `status`; RLS scopes the write to a
+ * plan the teacher created or is assigned to. Revalidates the overview so a
+ * refresh reflects the persisted status (the board also moves the card
+ * optimistically and reverts on `{ ok: false }`).
+ */
+export async function setPlanStatus(
+  planId: string,
+  status: PlanStatus,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('lesson_plans')
+    .update({ status })
+    .eq('id', planId)
+    .select('updated_at')
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
+
+  revalidatePath('/');
   return { ok: true, updated_at: data.updated_at };
 }
 
