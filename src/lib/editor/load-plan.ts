@@ -170,8 +170,8 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     subjectId: subject?.id ?? null,
   };
 
-  // Resolve the locked curriculum context from the flat-file curriculum.
-  const lookup = getLessonById(row.curriculum_lesson_id);
+  // Resolve the locked curriculum context from the Supabase-backed curriculum.
+  const lookup = await getLessonById(row.curriculum_lesson_id);
   const lesson = Array.isArray(lookup) ? lookup[0] : lookup;
   const grammarVocab = lesson
     ? [lesson.vocabFocus, lesson.grammarFocus].filter((s) => s && s.trim()).join(' · ')

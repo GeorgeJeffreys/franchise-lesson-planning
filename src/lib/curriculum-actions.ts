@@ -19,7 +19,7 @@ export async function fetchLessonsForWeek(
 }
 
 export async function fetchLessonById(id: string): Promise<CurriculumLesson | null> {
-  const raw = getLessonById(id);
+  const raw = await getLessonById(id);
   if (!raw) return null;
   return Array.isArray(raw) ? raw[0] : raw;
 }
@@ -35,11 +35,11 @@ export interface CurriculumYearData {
 
 export async function fetchCurriculumYearData(yearNum: number): Promise<CurriculumYearData> {
   const [months, themes, skillBreakdown, skillLOs, lessons] = await Promise.all([
-    Promise.resolve(getMonthsWithWeeks(yearNum)),
-    Promise.resolve(getThemesForYear(yearNum)),
-    Promise.resolve(getSkillBreakdown(yearNum)),
-    Promise.resolve(getSkillLOs(yearNum)),
-    Promise.resolve(getLessonsByYear(yearNum)),
+    getMonthsWithWeeks(yearNum),
+    getThemesForYear(yearNum),
+    getSkillBreakdown(yearNum),
+    getSkillLOs(yearNum),
+    getLessonsByYear(yearNum),
   ]);
   return {
     months,

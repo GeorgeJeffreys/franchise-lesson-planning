@@ -93,7 +93,11 @@ export type SmarttCheck = Partial<Record<SmarttComponent, SmarttComponentResult>
 export interface LessonPlan {
   id: string;
   class_id: string;
-  /** A curriculum.json key, e.g. "0.S1.K1.H3" (no FK — curriculum is a flat file). */
+  /**
+   * Reference into the curriculum (Supabase `curriculum_lesson`). Stays `text`
+   * with no FK: resolved by `curriculum_lesson.lesson_key` first, then best-effort
+   * legacy `taxonomy_id` (e.g. "0.S1.K1.H3"). See @/lib/curriculumUtils#getLessonById.
+   */
   curriculum_lesson_id: string;
   lesson_date: string;
   period: number | null;

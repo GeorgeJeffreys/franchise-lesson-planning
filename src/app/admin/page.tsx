@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/app-shell/AppShell';
 import { getHeaderProfile } from '@/lib/profile';
+import { CurriculumImport } from '@/components/admin/CurriculumImport';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,8 @@ export default async function AdminPage() {
         <p className="mt-2 text-[13px] text-text-faint">
           You can see this page because your account has the <code>admin</code> role.
         </p>
+
+        <CurriculumImport />
       </div>
     </AppShell>
   );

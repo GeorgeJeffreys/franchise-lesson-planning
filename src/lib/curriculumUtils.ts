@@ -1,223 +1,199 @@
-import type { CurriculumLesson, CurriculumLookup } from "@/types/curriculum";
+import 'server-only';
 
-/** Strip the leading ". " prefix that curriculum.json uses on all LO fields. */
+import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { CurriculumLesson } from '@/types/curriculum';
+import type { CurriculumLessonRow } from '@/lib/curriculum/types';
+
+// ── Supabase-backed curriculum (was: committed curriculum.json) ──────────────────
+//
+// Curriculum now lives in the `curriculum_lesson` Supabase table, populated from
+// the curriculum Excel via /api/curriculum/import (n8n folder-watch + in-app
+// upload). This module preserves the PUBLIC SURFACE of the old flat-file utils so
+// consumers change minimally — but the old source was synchronous and the database
+// is async, so every query function now returns a Promise. The three live consumers
+// (editor load-plan, weekly-overview, pdf/load) and the orphaned curriculum-actions
+// were updated to await.
+//
+// Reads are cached cross-request (`unstable_cache`) under CURRICULUM_CACHE_TAG; the
+// import endpoint calls revalidateTag(CURRICULUM_CACHE_TAG) so edits appear without
+// a redeploy. The fetch uses the service-role client because the cache scope cannot
+// touch the cookie-bound auth'd client — and curriculum is global reference data,
+// identical for every authenticated user (see @/lib/supabase/admin).
+
+/** Cache tag the import endpoint invalidates after a successful sync. */
+export const CURRICULUM_CACHE_TAG = 'curriculum';
+
+/** Strip the leading ". " stem some LO fields carry (legacy curriculum.json artefact). */
 export function cleanLO(raw: string): string {
   if (!raw) return '';
   return raw.replace(/^(\.\s*)+/, '').trim();
 }
 
-function withCleanLOs(lesson: CurriculumLesson): CurriculumLesson {
+// ── DB fetch (cached) ───────────────────────────────────────────────────────────
+
+const COLUMNS =
+  'subject_code, year, month, week, period, lesson_key, daily_outcome, focus_area, ' +
+  'linguistic_skill, theme, resources, taxonomy_id, monthly_knowledge_lo, ' +
+  'monthly_skills_lo, weekly_knowledge_lo, weekly_skills_lo';
+
+const fetchActiveRows = unstable_cache(
+  async (): Promise<CurriculumLessonRow[]> => {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('curriculum_lesson')
+      .select(COLUMNS)
+      .eq('is_active', true);
+    if (error) throw new Error(`Curriculum read failed: ${error.message}`);
+    return (data ?? []) as unknown as CurriculumLessonRow[];
+  },
+  ['curriculum-active-rows'],
+  { tags: [CURRICULUM_CACHE_TAG] },
+);
+
+// ── Row → legacy CurriculumLesson mapping ───────────────────────────────────────
+//
+// The legacy presentational shape is preserved so consumers (and their hand-narrow
+// types) don't change. The S/K refs are best-effort parsed from the taxonomy id
+// (format `n.Sx.Kx.Hx`); the new natural key is (subject, year, month, week, period).
+
+function parseTaxonomy(id: string | null): { skillRef: string; knowledgeRef: string } {
+  const parts = (id ?? '').split('.');
   return {
-    ...lesson,
-    dailyLO: cleanLO(lesson.dailyLO),
-    skillLO: cleanLO(lesson.skillLO),
-    knowledgeLO: cleanLO(lesson.knowledgeLO),
+    skillRef: parts.find((p) => /^S\d+$/i.test(p)) ?? '',
+    knowledgeRef: parts.find((p) => /^K\d+$/i.test(p)) ?? '',
   };
 }
 
-// ── Boundary data cleaning ──────────────────────────────────────────────────────
-// The raw spreadsheet export carries two kinds of junk that must never reach a
-// consumer (indexes, lookups, server actions, the AI layer or any document):
-//   1. 18 field values that are the literal string "#N/A".
-//   2. 22 empty "L.*" placeholder rows (spreadsheet stubs with no lesson content).
-// We scrub both exactly once here, at the JSON boundary, so the public API below
-// is otherwise identical to before and every downstream caller sees clean data.
-
-const NA_PLACEHOLDER = '#N/A';
-
-/** Replace any "#N/A" string field with an empty string. */
-function sanitizeNa(lesson: CurriculumLesson): CurriculumLesson {
-  const out = { ...lesson } as Record<string, unknown>;
-  for (const [key, value] of Object.entries(out)) {
-    if (typeof value === 'string' && value.trim() === NA_PLACEHOLDER) {
-      out[key] = '';
-    }
-  }
-  return out as unknown as CurriculumLesson;
+function rowToLesson(row: CurriculumLessonRow): CurriculumLesson {
+  const { skillRef, knowledgeRef } = parseTaxonomy(row.taxonomy_id);
+  return {
+    id: row.taxonomy_id ?? row.lesson_key,
+    year: `Year ${row.year}`,
+    yearNum: row.year,
+    month: row.month,
+    week: row.week,
+    period: `Period ${row.period}`,
+    periodNum: row.period,
+    dailyLO: cleanLO(row.daily_outcome ?? ''),
+    linguisticSkill: row.linguistic_skill ?? row.focus_area ?? '',
+    skillLORef: skillRef,
+    skillLO: cleanLO(row.monthly_skills_lo ?? ''),
+    knowledgeLORef: knowledgeRef,
+    knowledgeLO: cleanLO(row.weekly_knowledge_lo ?? ''),
+    // The legacy `resources` was a single string; join the structured labels so the
+    // shape is unchanged. Structured resources stay available on the DB row itself.
+    resources: row.resources.map((r) => r.label).filter(Boolean).join(', '),
+    vocabFocus: row.focus_area ?? '',
+    grammarFocus: '',
+    theme: row.theme ?? '',
+    subject: row.subject_code,
+  };
 }
 
-/** Empty "L.*" rows are spreadsheet placeholders with no real lesson. */
-function isPlaceholderRow(lesson: CurriculumLesson): boolean {
-  return lesson.id.startsWith('L.');
+/** Every active lesson, mapped to the legacy shape. Backed by the cached fetch. */
+async function allLessons(): Promise<CurriculumLesson[]> {
+  const rows = await fetchActiveRows();
+  return rows.map(rowToLesson);
 }
 
-/** Scrub "#N/A" values and drop "L.*" placeholder rows, preserving the lookup shape. */
-function cleanCurriculumData(raw: CurriculumLookup): CurriculumLookup {
-  const cleaned: CurriculumLookup = {};
-  for (const [key, entry] of Object.entries(raw)) {
-    if (Array.isArray(entry)) {
-      // Every row in an array shares the key's id, so placeholder filtering is
-      // all-or-nothing per key; the array shape is preserved for kept keys.
-      const kept = entry.filter((l) => !isPlaceholderRow(l)).map(sanitizeNa);
-      if (kept.length > 0) cleaned[key] = kept;
-    } else if (!isPlaceholderRow(entry)) {
-      cleaned[key] = sanitizeNa(entry);
-    }
-  }
-  return cleaned;
-}
-
-// The curriculum is a ~950 KB baked JSON export. Requiring + cleaning it is the
-// single most expensive bit of work on this module, so defer it to first use
-// (lazy singleton) rather than running it at import time. This keeps it off the
-// critical path for requests that import this module transitively but never
-// query the curriculum — notably an empty Weekly Overview week, which resolves
-// no targets and so never touches it. The explicit cast also avoids TypeScript
-// inferring the full nested shape (which slows type-checking).
-let _rawData: CurriculumLookup | null = null;
-
-function getRawData(): CurriculumLookup {
-  if (_rawData) return _rawData;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  _rawData = cleanCurriculumData(require("@/data/curriculum.json") as CurriculumLookup);
-  return _rawData;
-}
-
-// ── Lazy indexes ──────────────────────────────────────────────────────────────
-// Built once on first use; keyed as `${yearNum}_${week}` and `${yearNum}`.
-
-type WeekKey = `${number}_${number}`;
-
-let _byWeek: Map<WeekKey, CurriculumLesson[]> | null = null;
-let _byYear: Map<number, CurriculumLesson[]> | null = null;
-
-function buildIndexes(): void {
-  if (_byWeek) return;
-  _byWeek = new Map();
-  _byYear = new Map();
-
-  for (const entry of Object.values(getRawData())) {
-    const items: CurriculumLesson[] = Array.isArray(entry) ? entry : [entry];
-    for (const lesson of items) {
-      const { yearNum, week } = lesson;
-      if (yearNum !== null && week !== null) {
-        const wKey = `${yearNum}_${week}` as WeekKey;
-        const wList = _byWeek.get(wKey) ?? [];
-        wList.push(lesson);
-        _byWeek.set(wKey, wList);
-      }
-      if (yearNum !== null) {
-        const yList = _byYear!.get(yearNum) ?? [];
-        yList.push(lesson);
-        _byYear!.set(yearNum, yList);
-      }
-    }
-  }
-}
-
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public API (preserved surface; now async) ────────────────────────────────────
 
 /**
- * Look up a lesson by its identifier (e.g. `"0.S1.K1.H3"`).
+ * Resolve a stored `lesson_plans.curriculum_lesson_id` to its lesson(s).
  *
- * Returns a single `CurriculumLesson` for IDs that are unique across years.
- * Returns a `CurriculumLesson[]` for IDs that appear in multiple years
- * (exam-slot rows such as `"E.S0.K0.H1"`).
- * Returns `null` when the ID is not found.
+ * Resolution order: exact `lesson_key` (the value new pickers write) first, then a
+ * best-effort match on legacy `taxonomy_id`. A taxonomy id can match multiple year
+ * rows, so that path may return an array (matching the old exam-slot behaviour).
+ * Returns null when nothing matches.
  */
-export function getLessonById(id: string): CurriculumLesson | CurriculumLesson[] | null {
-  const entry = getRawData()[id] ?? null;
-  if (!entry) return null;
-  return Array.isArray(entry) ? entry.map(withCleanLOs) : withCleanLOs(entry);
+export async function getLessonById(
+  id: string,
+): Promise<CurriculumLesson | CurriculumLesson[] | null> {
+  if (!id) return null;
+  const rows = await fetchActiveRows();
+
+  const keyHit = rows.find((r) => r.lesson_key === id);
+  if (keyHit) return rowToLesson(keyHit);
+
+  const taxonomyHits = rows.filter((r) => r.taxonomy_id === id);
+  if (taxonomyHits.length === 0) return null;
+  if (taxonomyHits.length === 1) return rowToLesson(taxonomyHits[0]);
+  return taxonomyHits.map(rowToLesson);
 }
 
-/**
- * Return every lesson scheduled for a specific year and week, sorted by
- * period number ascending.
- *
- * `year` can be a number (0–6) or the label string `"Year 0"` … `"Year 6"`.
- */
-export function getLessonsByWeek(
+/** Every lesson for a year+week, sorted by period. */
+export async function getLessonsByWeek(
   year: number | string,
-  week: number
-): CurriculumLesson[] {
-  buildIndexes();
+  week: number,
+): Promise<CurriculumLesson[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const key = `${yn}_${week}` as WeekKey;
-  const lessons = _byWeek!.get(key) ?? [];
-  return [...lessons].sort(byPeriod).map(withCleanLOs);
+  const lessons = await allLessons();
+  return lessons.filter((l) => l.yearNum === yn && l.week === week).sort(byPeriod);
 }
 
-/**
- * Return a sorted list of all week numbers that have at least one lesson in
- * the given year.
- *
- * `year` can be a number (0–6) or the label string `"Year 0"` … `"Year 6"`.
- */
-export function getAllWeeks(year: number | string): number[] {
-  buildIndexes();
+/** Sorted week numbers that have at least one lesson in the year. */
+export async function getAllWeeks(year: number | string): Promise<number[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-
+  const lessons = await allLessons();
   const weeks = new Set<number>();
-  for (const key of _byWeek!.keys()) {
-    const [keyYear] = key.split("_").map(Number);
-    if (keyYear === yn) weeks.add(Number(key.split("_")[1]));
+  for (const l of lessons) {
+    if (l.yearNum === yn && l.week !== null) weeks.add(l.week);
   }
   return [...weeks].sort((a, b) => a - b);
 }
 
-/**
- * Return every lesson for the given year, sorted by week then period number.
- *
- * `year` can be a number (0–6) or the label string `"Year 0"` … `"Year 6"`.
- */
-export function getLessonsByYear(year: number | string): CurriculumLesson[] {
-  buildIndexes();
+/** Every lesson for a year, sorted by week then period. */
+export async function getLessonsByYear(year: number | string): Promise<CurriculumLesson[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = _byYear!.get(yn) ?? [];
-  return [...lessons].sort(byWeekThenPeriod).map(withCleanLOs);
+  const lessons = await allLessons();
+  return lessons.filter((l) => l.yearNum === yn).sort(byWeekThenPeriod);
 }
 
-/** Alias for getAllWeeks — returns sorted week numbers for a year. */
-export function getWeeksForYear(year: number | string): number[] {
+/** Alias for getAllWeeks. */
+export function getWeeksForYear(year: number | string): Promise<number[]> {
   return getAllWeeks(year);
 }
 
 /** Alias for getLessonsByWeek. */
-export function getLessonsForWeek(year: number | string, week: number): CurriculumLesson[] {
+export function getLessonsForWeek(year: number | string, week: number): Promise<CurriculumLesson[]> {
   return getLessonsByWeek(year, week);
 }
 
-/**
- * Return months (in order) with their week numbers for the given year.
- * E.g. [{ month: 'February', weeks: [1,2,3,4] }, ...]
- */
-export function getMonthsWithWeeks(year: number | string): { month: string; weeks: number[] }[] {
-  buildIndexes();
+/** Months (in calendar order) with their week numbers for the year. */
+export async function getMonthsWithWeeks(
+  year: number | string,
+): Promise<{ month: string; weeks: number[] }[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = _byYear!.get(yn) ?? [];
+  const lessons = (await allLessons()).filter((l) => l.yearNum === yn).sort(byWeekThenPeriod);
 
-  const monthOrder: string[] = [];
-  const monthWeeks: Map<string, Set<number>> = new Map();
-
+  const order: string[] = [];
+  const monthWeeks = new Map<string, Set<number>>();
   for (const l of lessons) {
     if (!l.month || l.week === null) continue;
     if (!monthWeeks.has(l.month)) {
       monthWeeks.set(l.month, new Set());
-      monthOrder.push(l.month);
+      order.push(l.month);
     }
     monthWeeks.get(l.month)!.add(l.week);
   }
-
-  return monthOrder.map(month => ({
+  return order.map((month) => ({
     month,
     weeks: [...monthWeeks.get(month)!].sort((a, b) => a - b),
   }));
 }
 
-/**
- * Return unique themes for a year with lesson counts, sorted by count desc.
- */
-export function getThemesForYear(year: number | string): { theme: string; count: number }[] {
-  buildIndexes();
+/** Unique themes for a year with lesson counts, sorted by count desc. */
+export async function getThemesForYear(
+  year: number | string,
+): Promise<{ theme: string; count: number }[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = _byYear!.get(yn) ?? [];
-
+  const lessons = (await allLessons()).filter((l) => l.yearNum === yn);
   const counts = new Map<string, number>();
   for (const l of lessons) {
     if (!l.theme) continue;
@@ -228,44 +204,48 @@ export function getThemesForYear(year: number | string): { theme: string; count:
     .sort((a, b) => b.count - a.count);
 }
 
-/** Return all lessons for a given year+theme. */
-export function getLessonsByTheme(year: number | string, theme: string): CurriculumLesson[] {
-  buildIndexes();
+/** All lessons for a year+theme. */
+export async function getLessonsByTheme(
+  year: number | string,
+  theme: string,
+): Promise<CurriculumLesson[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = _byYear!.get(yn) ?? [];
-  return lessons.filter(l => l.theme === theme).sort(byWeekThenPeriod).map(withCleanLOs);
+  const lessons = await allLessons();
+  return lessons.filter((l) => l.yearNum === yn && l.theme === theme).sort(byWeekThenPeriod);
 }
 
-/**
- * Return skill (linguistic skill) breakdown for a year.
- * skillKey is a normalised key: 'read'|'write'|'listen'|'speak'|'basic'.
- */
-export function getSkillBreakdown(year: number | string): { skill: string; skillKey: string; count: number; pct: number }[] {
-  buildIndexes();
+/** Linguistic-skill breakdown for a year. */
+export async function getSkillBreakdown(
+  year: number | string,
+): Promise<{ skill: string; skillKey: string; count: number; pct: number }[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = (_byYear!.get(yn) ?? []).filter(l => l.linguisticSkill && l.linguisticSkill.length > 1);
+  const lessons = (await allLessons()).filter(
+    (l) => l.yearNum === yn && l.linguisticSkill && l.linguisticSkill.length > 1,
+  );
   const total = lessons.length || 1;
-
   const counts = new Map<string, number>();
   for (const l of lessons) {
     counts.set(l.linguisticSkill, (counts.get(l.linguisticSkill) ?? 0) + 1);
   }
   return [...counts.entries()]
-    .map(([skill, count]) => ({ skill, skillKey: skillToKey(skill), count, pct: Math.round((count / total) * 100) }))
+    .map(([skill, count]) => ({
+      skill,
+      skillKey: skillToKey(skill),
+      count,
+      pct: Math.round((count / total) * 100),
+    }))
     .sort((a, b) => b.count - a.count);
 }
 
-/**
- * Return skill LOs (skillLORef → skillLO text) with lesson counts, sorted by ref.
- */
-export function getSkillLOs(year: number | string): { ref: string; lo: string; skill: string; count: number }[] {
-  buildIndexes();
+/** Skill LOs (skillLORef → text) for a year, with lesson counts, sorted by ref. */
+export async function getSkillLOs(
+  year: number | string,
+): Promise<{ ref: string; lo: string; skill: string; count: number }[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = _byYear!.get(yn) ?? [];
-
+  const lessons = (await allLessons()).filter((l) => l.yearNum === yn);
   const map = new Map<string, { lo: string; skill: string; count: number }>();
   for (const l of lessons) {
     if (!l.skillLORef) continue;
@@ -279,18 +259,14 @@ export function getSkillLOs(year: number | string): { ref: string; lo: string; s
     .sort((a, b) => a.ref.localeCompare(b.ref, undefined, { numeric: true }));
 }
 
-/**
- * Return knowledge LOs under a given skillLORef, with lesson counts and week lists.
- */
-export function getKnowledgeLOsForSkill(
+/** Knowledge LOs under a skillLORef for a year, with counts and week lists. */
+export async function getKnowledgeLOsForSkill(
   year: number | string,
   skillRef: string,
-): { ref: string; lo: string; count: number; weeks: number[] }[] {
-  buildIndexes();
+): Promise<{ ref: string; lo: string; count: number; weeks: number[] }[]> {
   const yn = resolveYearNum(year);
   if (yn === null) return [];
-  const lessons = (_byYear!.get(yn) ?? []).filter(l => l.skillLORef === skillRef);
-
+  const lessons = (await allLessons()).filter((l) => l.yearNum === yn && l.skillLORef === skillRef);
   const map = new Map<string, { lo: string; weeks: Set<number>; count: number }>();
   for (const l of lessons) {
     if (!l.knowledgeLORef) continue;
@@ -309,7 +285,7 @@ export function getKnowledgeLOsForSkill(
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 function resolveYearNum(year: number | string): number | null {
-  if (typeof year === "number") return year;
+  if (typeof year === 'number') return year;
   const m = year.match(/\d+/);
   return m ? parseInt(m[0], 10) : null;
 }

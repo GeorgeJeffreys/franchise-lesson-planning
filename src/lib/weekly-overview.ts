@@ -45,8 +45,8 @@ interface PlanRow {
 }
 
 /** Resolve a curriculum key to its daily LO + theme, or null if unknown. */
-function resolveTarget(curriculumLessonId: string): CurriculumTarget | null {
-  const lesson = getLessonById(curriculumLessonId);
+async function resolveTarget(curriculumLessonId: string): Promise<CurriculumTarget | null> {
+  const lesson = await getLessonById(curriculumLessonId);
   if (!lesson) return null;
   // Some keys (exam slots) map to multiple year rows; the first carries the
   // headline we need for the slot.
@@ -138,6 +138,15 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     planByCell.set(`${plan.class_id}:${weekday}`, plan);
   }
 
+  // Resolve curriculum targets up front (the slot map below is synchronous). The
+  // curriculum read is cached and deduped per id, so this is a handful of lookups.
+  const targetByKey = new Map<string, CurriculumTarget | null>();
+  await Promise.all(
+    [...new Set(planRows.map((p) => p.curriculum_lesson_id))].map(async (id) => {
+      targetByKey.set(id, await resolveTarget(id));
+    }),
+  );
+
   const classes: ClassWeek[] = classRows.map((c) => {
     const slots: WeekSlot[] = WEEKDAYS.map((weekday) => {
       const date = dates[weekday];
@@ -156,7 +165,7 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
         isToday: date === today,
         plan: slotPlan,
         status: plan ? plan.status : 'not_started',
-        target: plan ? resolveTarget(plan.curriculum_lesson_id) : null,
+        target: plan ? targetByKey.get(plan.curriculum_lesson_id) ?? null : null,
       };
     });
 

@@ -69,8 +69,8 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? v[0] ?? null : v ?? null;
 }
 
-function resolveCurriculum(curriculumLessonId: string): PdfCurriculumContext | null {
-  const lookup = getLessonById(curriculumLessonId);
+async function resolveCurriculum(curriculumLessonId: string): Promise<PdfCurriculumContext | null> {
+  const lookup = await getLessonById(curriculumLessonId);
   const lesson = Array.isArray(lookup) ? lookup[0] : lookup;
   if (!lesson) return null;
   return { dailyLO: lesson.dailyLO, focusArea: lesson.linguisticSkill, theme: lesson.theme };
@@ -111,6 +111,15 @@ export async function loadWeekPdfModels(
 
   const rows = data as unknown as RawWeekPlanRow[];
 
+  // Resolve curriculum context for every plan up front (the build below is
+  // synchronous). Reads are cached and deduped per curriculum id.
+  const curriculumByKey = new Map<string, PdfCurriculumContext | null>();
+  await Promise.all(
+    [...new Set(rows.map((r) => r.curriculum_lesson_id))].map(async (id) => {
+      curriculumByKey.set(id, await resolveCurriculum(id));
+    }),
+  );
+
   return rows.flatMap((row): PlanPdfModel[] => {
     const rawClass = one(row.class);
     if (!rawClass) return [];
@@ -150,7 +159,7 @@ export async function loadWeekPdfModels(
           schoolName: school?.name ?? '',
           subjectName: subject?.name ?? '',
         },
-        curriculum: resolveCurriculum(row.curriculum_lesson_id),
+        curriculum: curriculumByKey.get(row.curriculum_lesson_id) ?? null,
       },
     ];
   });
