@@ -21,16 +21,21 @@ const ITEMS: NavItem[] = [
   { label: 'Resources', href: '/resources', isActive: (p) => p.startsWith('/resources') },
 ];
 
-/** The org-admin entry, shown only to admins (gated route at `/admin`). */
-const ADMIN_ITEM: NavItem = {
-  label: 'Admin',
-  href: '/admin',
-  isActive: (p) => p.startsWith('/admin'),
+/**
+ * The settings/console entry, shown to admins and coordinators (the people who
+ * have console tabs beyond Profile). The route itself is role-aware at
+ * `/settings`; this is presentation only. Everyone can still reach Settings via
+ * the avatar menu.
+ */
+const SETTINGS_ITEM: NavItem = {
+  label: 'Settings',
+  href: '/settings',
+  isActive: (p) => p.startsWith('/settings'),
 };
 
-export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
+export function TopNav({ showSettings = false }: { showSettings?: boolean }) {
   const pathname = usePathname();
-  const items = isAdmin ? [...ITEMS, ADMIN_ITEM] : ITEMS;
+  const items = showSettings ? [...ITEMS, SETTINGS_ITEM] : ITEMS;
 
   return (
     <nav className="flex items-center gap-1">

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { TopNav } from '@/components/app-shell/TopNav';
 import { UserMenu } from '@/components/app-shell/UserMenu';
-import { isAdmin } from '@/lib/auth';
+import { isAdmin, getMyMemberships } from '@/lib/auth';
 
 type AppShellProps = {
   /** The signed-in user's display name (full_name, falling back to email). */
@@ -20,9 +20,11 @@ type AppShellProps = {
  * on white. Search and bell are presentational for now (no backend wired).
  */
 export async function AppShell({ name, subtitle, children }: AppShellProps) {
-  // The "Admin" nav link is shown only to global admins; the /admin route is
-  // independently gated by its layout, so this is presentation only.
-  const admin = await isAdmin();
+  // The "Settings" nav link is shown to admins and coordinators (anyone with
+  // console tabs beyond Profile); `/settings` is role-aware, so this is
+  // presentation only. Everyone reaches Settings via the avatar menu too.
+  const [admin, memberships] = await Promise.all([isAdmin(), getMyMemberships()]);
+  const showSettings = admin || memberships.some((m) => m.role === 'coordinator');
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -40,7 +42,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
           </span>
         </Link>
 
-        <TopNav isAdmin={admin} />
+        <TopNav showSettings={showSettings} />
 
         {/* Right cluster: search · bell · user */}
         <div className="ml-auto flex items-center gap-[10px]">
