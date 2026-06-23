@@ -4,25 +4,90 @@ import { getHeaderProfile } from '@/lib/profile';
 import { getMyMemberships } from '@/lib/auth';
 import { getOnboardingData, getMyClasses } from '@/lib/onboarding';
 import { SettingsForm } from '@/components/settings/SettingsForm';
+import { SettingsConsole } from '@/components/settings/SettingsConsole';
+import {
+  getAdminMembers,
+  getCentres,
+  getConsoleAccess,
+  getConsoleClasses,
+  getCoordinatorMembers,
+  getCurriculumStatus,
+  getSubjects,
+  type AdminMembersData,
+  type CentreRow,
+  type ConsoleClassesData,
+  type CoordSpaceMembers,
+  type CurriculumSubjectStatus,
+  type SubjectRow,
+} from '@/lib/console';
 
-// Per-request: reflects the live session, memberships and classes.
+// Per-request: reflects the live session, memberships and org structure.
 export const dynamic = 'force-dynamic';
 
 /**
- * Account settings — name, centre, the user's subject spaces and classes. Reached
- * from the shell's avatar menu. Not gated (any signed-in member can open it).
+ * The settings console — a role-aware tabbed surface. Everyone gets the personal
+ * "Profile" tab (the existing settings content). Admins additionally get Centres ·
+ * Subjects · Classes · Members & roles · Curriculum; coordinators get Members &
+ * roles (their spaces) + Curriculum (their subjects). This replaces the retired
+ * standalone `/admin` route. Reached from the shell nav (admins/coordinators) and
+ * the avatar menu (everyone).
  */
 export default async function SettingsPage() {
   const { name, subtitle } = await getHeaderProfile();
-  const [data, memberships, myClasses] = await Promise.all([
+  const [access, data, memberships, myClasses] = await Promise.all([
+    getConsoleAccess(),
     getOnboardingData(),
     getMyMemberships(),
     getMyClasses(),
   ]);
 
+  // The Profile tab is the existing personal-settings form, unchanged.
+  const profileTab = (
+    <SettingsForm
+      fullName={data.fullName}
+      centres={data.centres}
+      subjects={data.subjects}
+      classes={data.classes}
+      teacherCounts={data.teacherCounts}
+      classCounts={data.classCounts}
+      memberships={memberships.map((m) => ({
+        id: m.id,
+        schoolId: m.schoolId,
+        subjectId: m.subjectId,
+        schoolName: m.schoolName,
+        subjectName: m.subjectName,
+      }))}
+      myClasses={myClasses}
+    />
+  );
+
+  // Load the admin/coordinator datasets only for the roles that render them.
+  let centres: CentreRow[] | undefined;
+  let subjects: SubjectRow[] | undefined;
+  let classesData: ConsoleClassesData | undefined;
+  let adminMembers: AdminMembersData | undefined;
+  let coordSpaces: CoordSpaceMembers[] | undefined;
+  let curriculum: CurriculumSubjectStatus[] | undefined;
+
+  if (access.isAdmin) {
+    [centres, subjects, classesData, adminMembers, curriculum] = await Promise.all([
+      getCentres(),
+      getSubjects(),
+      getConsoleClasses(),
+      getAdminMembers(),
+      getCurriculumStatus(),
+    ]);
+  } else if (access.isCoordinator) {
+    const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
+    [coordSpaces, curriculum] = await Promise.all([
+      getCoordinatorMembers(),
+      getCurriculumStatus(subjectIds),
+    ]);
+  }
+
   return (
     <AppShell name={name} subtitle={subtitle}>
-      <div className="mx-auto max-w-[720px]">
+      <div className="mx-auto max-w-[1080px]">
         <Link
           href="/"
           className="mb-[14px] inline-flex items-center gap-[6px] text-[12.5px] font-medium text-neutral-600 hover:text-text-muted"
@@ -32,23 +97,16 @@ export default async function SettingsPage() {
           </svg>
           Back to planning
         </Link>
-        <h1 className="mb-[26px] text-[25px] font-semibold tracking-[-0.01em]">Settings</h1>
 
-        <SettingsForm
-          fullName={data.fullName}
-          centres={data.centres}
-          subjects={data.subjects}
-          classes={data.classes}
-          teacherCounts={data.teacherCounts}
-          classCounts={data.classCounts}
-          memberships={memberships.map((m) => ({
-            id: m.id,
-            schoolId: m.schoolId,
-            subjectId: m.subjectId,
-            schoolName: m.schoolName,
-            subjectName: m.subjectName,
-          }))}
-          myClasses={myClasses}
+        <SettingsConsole
+          access={access}
+          profileTab={profileTab}
+          centres={centres}
+          subjects={subjects}
+          classesData={classesData}
+          adminMembers={adminMembers}
+          coordSpaces={coordSpaces}
+          curriculum={curriculum}
         />
       </div>
     </AppShell>

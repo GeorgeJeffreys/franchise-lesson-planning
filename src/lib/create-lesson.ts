@@ -31,9 +31,11 @@ export async function getCreatableClasses(): Promise<CreateSpaceGroup[]> {
 
   const supabase = await createClient();
   // RLS lets any authenticated user read classes; scope to the caller's spaces.
+  // Archived classes are excluded — they can't be planned against.
   const { data } = await supabase
     .from('classes')
-    .select('id, year, group_label, school_id, subject_id, subjects ( code )');
+    .select('id, year, group_label, school_id, subject_id, subjects ( code )')
+    .is('archived_at', null);
 
   const rows = (data ?? []) as unknown as ClassRow[];
 

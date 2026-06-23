@@ -82,11 +82,13 @@ export async function getOnboardingData(): Promise<OnboardingData> {
   const [{ data: profile }, { data: schools }, { data: subjects }, { data: classes }, { data: members }] =
     await Promise.all([
       supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
-      supabase.from('schools').select('id, name').order('name'),
-      supabase.from('subjects').select('id, name').order('name'),
+      // Planning surfaces exclude archived centres/subjects/classes.
+      supabase.from('schools').select('id, name').is('archived_at', null).order('name'),
+      supabase.from('subjects').select('id, name').is('archived_at', null).order('name'),
       supabase
         .from('classes')
         .select('id, school_id, subject_id, year, group_label, literacy, subjects ( name )')
+        .is('archived_at', null)
         .order('year'),
       supabase.from('subject_membership').select('school_id, subject_id'),
     ]);
@@ -145,14 +147,14 @@ export async function getMyClasses(): Promise<MyClass[]> {
   const { data } = await supabase
     .from('class_teachers')
     .select(
-      'class_id, classes ( id, school_id, subject_id, year, group_label, literacy, subjects ( name ) )',
+      'class_id, classes ( id, school_id, subject_id, year, group_label, literacy, archived_at, subjects ( name ) )',
     )
     .eq('teacher_id', user.id);
 
-  const rows = (data ?? []) as unknown as Array<{ classes: ClassRow | null }>;
+  const rows = (data ?? []) as unknown as Array<{ classes: (ClassRow & { archived_at: string | null }) | null }>;
   return rows
     .map((r) => r.classes)
-    .filter((c): c is ClassRow => c !== null)
+    .filter((c): c is ClassRow & { archived_at: string | null } => c !== null && !c.archived_at)
     .map((c) => ({
       id: c.id,
       schoolId: c.school_id,

@@ -32,6 +32,7 @@ interface ClassRow {
   id: string;
   year: number;
   group_label: string;
+  archived_at: string | null;
   schools: { name: string } | null;
   subjects: { name: string } | null;
 }
@@ -109,13 +110,13 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     supabase
       .from('class_teachers')
       .select(
-        'classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
+        'classes ( id, year, group_label, archived_at, schools ( name ), subjects ( name ) )',
       )
       .eq('teacher_id', user.id),
     supabase
       .from('lesson_plans')
       .select(
-        'id, class_id, curriculum_lesson_id, lesson_date, period, status, review_note, created_by, classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
+        'id, class_id, curriculum_lesson_id, lesson_date, period, status, review_note, created_by, classes ( id, year, group_label, archived_at, schools ( name ), subjects ( name ) )',
       )
       .gte('lesson_date', dates.mon)
       .lte('lesson_date', dates.fri),
@@ -134,12 +135,14 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
   // referenced by the plans they can see this week — so empty (unplanned) classes
   // still show as "Not started" columns, while plans on classes the caller
   // doesn't teach (admin / coordinator views) appear too. Dedup by class id.
+  // Archived classes are removed from planning, so they never become grid rows
+  // (even if a kept plan still references one).
   const classById = new Map<string, ClassRow>();
   for (const row of ctNarrowed) {
-    if (row.classes) classById.set(row.classes.id, row.classes);
+    if (row.classes && !row.classes.archived_at) classById.set(row.classes.id, row.classes);
   }
   for (const plan of planRowsWithClass) {
-    if (plan.classes) classById.set(plan.classes.id, plan.classes);
+    if (plan.classes && !plan.classes.archived_at) classById.set(plan.classes.id, plan.classes);
   }
   const classRows: ClassRow[] = [...classById.values()];
 
