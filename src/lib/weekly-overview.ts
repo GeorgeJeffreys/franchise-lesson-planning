@@ -44,6 +44,14 @@ interface PlanRow {
   review_note: string | null;
 }
 
+// A plan row with its class embedded — the shape of the week's `lesson_plans`
+// query below. The class embed lets the grid show plans for classes the caller
+// can see via RLS (e.g. an admin, or a subject coordinator) even when they are
+// not enrolled in `class_teachers` for them.
+interface PlanRowWithClass extends PlanRow {
+  classes: ClassRow | null;
+}
+
 /** Resolve a curriculum key to its daily LO + theme, or null if unknown. */
 async function resolveTarget(curriculumLessonId: string): Promise<CurriculumTarget | null> {
   const lesson = await getLessonById(curriculumLessonId);
@@ -83,10 +91,17 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     };
   }
 
-  // The profile (display name) and the assigned classes both depend only on the
-  // user id, so fetch them in parallel rather than waterfalling. RLS limits
-  // class_teachers rows to this teacher.
-  const [{ data: profile }, { data: ctRows }] = await Promise.all([
+  // Three independent reads — the profile (display name), the caller's own
+  // assigned classes (`class_teachers`), and every plan they may see this week —
+  // depend only on the user id and week, so fetch them in parallel. RLS scopes
+  // each: own `class_teachers` rows, and the `lesson_plans` they can read.
+  //
+  // The plan query is NOT pre-filtered to `class_teachers` classes: visibility is
+  // RLS's job, and the access model now grants it via subject membership / admin,
+  // not just `class_teachers`. Pre-filtering here would hide plans an admin or
+  // subject coordinator can legitimately see. The class is embedded so those
+  // plans' classes can join the grid even when the caller doesn't teach them.
+  const [{ data: profile }, { data: ctRows }, { data: plans }] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
     supabase
       .from('class_teachers')
@@ -94,6 +109,13 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
         'classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
       )
       .eq('teacher_id', user.id),
+    supabase
+      .from('lesson_plans')
+      .select(
+        'id, class_id, curriculum_lesson_id, lesson_date, period, status, review_note, classes ( id, year, group_label, schools ( name ), subjects ( name ) )',
+      )
+      .gte('lesson_date', dates.mon)
+      .lte('lesson_date', dates.fri),
   ]);
 
   const teacherName = profile?.full_name ?? user.email ?? 'there';
@@ -102,9 +124,21 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
   // so the client can't infer the nested select shape — narrow it by hand. The
   // embeds are all many-to-one, so each resolves to a single object at runtime.
   const ctNarrowed = (ctRows ?? []) as unknown as Array<{ classes: ClassRow | null }>;
-  const classRows: ClassRow[] = ctNarrowed
-    .map((row) => row.classes)
-    .filter((c): c is ClassRow => c != null);
+  const planRowsWithClass = (plans ?? []) as unknown as PlanRowWithClass[];
+  const planRows: PlanRow[] = planRowsWithClass;
+
+  // The grid's class set is the union of the caller's own classes and the classes
+  // referenced by the plans they can see this week — so empty (unplanned) classes
+  // still show as "Not started" columns, while plans on classes the caller
+  // doesn't teach (admin / coordinator views) appear too. Dedup by class id.
+  const classById = new Map<string, ClassRow>();
+  for (const row of ctNarrowed) {
+    if (row.classes) classById.set(row.classes.id, row.classes);
+  }
+  for (const plan of planRowsWithClass) {
+    if (plan.classes) classById.set(plan.classes.id, plan.classes);
+  }
+  const classRows: ClassRow[] = [...classById.values()];
 
   // Stable, readable order: by year then group label.
   classRows.sort((a, b) => a.year - b.year || a.group_label.localeCompare(b.group_label));
@@ -116,19 +150,6 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     if (school && subject) return `${school} · ${subject}`;
     return school ?? subject ?? null;
   })();
-
-  // Plans for those classes within the week. RLS already restricts visibility,
-  // but we scope by class + date range to keep the query tight.
-  let planRows: PlanRow[] = [];
-  if (classRows.length > 0) {
-    const { data: plans } = await supabase
-      .from('lesson_plans')
-      .select('id, class_id, curriculum_lesson_id, lesson_date, period, status, review_note')
-      .in('class_id', classRows.map((c) => c.id))
-      .gte('lesson_date', dates.mon)
-      .lte('lesson_date', dates.fri);
-    planRows = (plans ?? []) as unknown as PlanRow[];
-  }
 
   // Index plans by `${classId}:${weekday}` for O(1) slot lookup.
   const planByCell = new Map<string, PlanRow>();
