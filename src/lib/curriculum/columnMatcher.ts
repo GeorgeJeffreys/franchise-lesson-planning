@@ -29,6 +29,7 @@ export type CanonicalField =
   | 'resources'
   | 'topic'
   | 'focusArea'
+  | 'grammarVocabulary'
   | 'lessonIdentifier'
   | 'linguisticSkill'
   | 'theme'
@@ -84,8 +85,20 @@ export const ALIASES: Record<CanonicalField, string[]> = {
   period: ['period #', 'period', 'رقم الحصة'],
   dailyLearningOutcome: ['daily lo', 'daily learning outcome', 'daily', 'اليومي', 'نتائج التعلم اليومية'],
   resources: ['resources', 'resource', 'الموارد'],
-  topic: ['topic', 'content', 'المحتوى', 'الموضوع الاسبوعي'],
+  // NOTE: no bare 'content' alias — English col X "Content covered within linguistic
+  // skill" must NOT land here (it is intentionally dropped → unmappedHeaders). Maths/IT
+  // use a literal "Topic" column, and Arabic uses المحتوى, for this same display slot.
+  topic: ['topic', 'المحتوى', 'الموضوع الاسبوعي'],
   focusArea: ['focus area', 'مجال التركيز', 'التركيز الموضوعي', 'المحور'],
+  // English col Y. Exact alias wins over the generic 'content covered within …' shape so
+  // col X (linguistic skill) is left unmapped rather than captured here.
+  grammarVocabulary: [
+    'content covered within grammar',
+    'grammar and vocabulary',
+    'grammar & vocabulary',
+    'grammar vocabulary',
+    'grammar',
+  ],
   lessonIdentifier: ['lesson identifier', 'lesson id', 'معرِّف الدرس'],
   // Legacy → existing columns.
   linguisticSkill: ['linguistic skill', 'linguistic'],
