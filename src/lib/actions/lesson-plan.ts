@@ -64,6 +64,9 @@ export async function saveLessonPlan(input: SavePlanInput): Promise<ActionResult
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
 
+  // Keep the board fresh so a returning teacher sees the card in the right place
+  // (a new plan is created `in_progress`, so it has already left "Not started").
+  revalidatePath('/');
   return { ok: true, updated_at: data.updated_at };
 }
 
@@ -88,17 +91,28 @@ export async function setPlanStatus(
   // teacher transitions (`in_progress` / `submitted`) are unrestricted here (RLS
   // still scopes them to a plan in a space the caller belongs to).
   if (status === 'approved' || status === 'needs_review') {
+    // The plan's (centre, subject) come from its own scope columns now; fall back
+    // to the class join for older rows. A class/centre plan resolves a school, so
+    // a coordinator of that space (or an admin) may approve. An org plan has no
+    // single centre, so only an admin may approve it.
     const { data: planRow } = await supabase
       .from('lesson_plans')
-      .select('classes ( school_id, subject_id )')
+      .select('school_id, subject_id, classes ( school_id, subject_id )')
       .eq('id', planId)
       .maybeSingle();
 
-    const cls = (planRow as { classes: { school_id: string; subject_id: string } | null } | null)
-      ?.classes;
-    if (!cls) return { ok: false, error: 'Plan not found or not permitted.' };
+    const row = planRow as {
+      school_id: string | null;
+      subject_id: string | null;
+      classes: { school_id: string; subject_id: string } | null;
+    } | null;
+    if (!row) return { ok: false, error: 'Plan not found or not permitted.' };
 
-    const allowed = (await isCoordinatorOf(cls.school_id, cls.subject_id)) || (await isAdmin());
+    const schoolId = row.school_id ?? row.classes?.school_id ?? null;
+    const subjectId = row.subject_id ?? row.classes?.subject_id ?? null;
+
+    const allowed =
+      (schoolId && subjectId && (await isCoordinatorOf(schoolId, subjectId))) || (await isAdmin());
     if (!allowed) {
       return { ok: false, error: 'Only a coordinator of this subject can change approval status.' };
     }
@@ -166,5 +180,6 @@ export async function submitLessonPlan(input: SavePlanInput): Promise<ActionResu
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
 
+  revalidatePath('/');
   return { ok: true, updated_at: data.updated_at };
 }

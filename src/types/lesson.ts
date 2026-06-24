@@ -26,6 +26,15 @@ export type TeachingPhase = 'i_do' | 'we_do' | 'you_do';
 export type PlanStatus = 'in_progress' | 'submitted' | 'needs_review' | 'approved';
 
 /**
+ * How widely a plan applies (migration 0012_lesson_plan_scope):
+ *  - `class` — one class group (`class_id` + `school_id` set).
+ *  - `centre` — a whole centre's Year-N subject (`school_id` set, `class_id` null).
+ *  - `org` — every centre for a curriculum slot (`school_id` + `class_id` null).
+ * The three coexist on the same curriculum slot.
+ */
+export type PlanScope = 'class' | 'centre' | 'org';
+
+/**
  * One timed block within a lesson. Stored as an ordered element of the
  * `lesson_plans.blocks` JSONB array.
  */
@@ -92,14 +101,32 @@ export type SmarttCheck = Partial<Record<SmarttComponent, SmarttComponentResult>
  */
 export interface LessonPlan {
   id: string;
-  class_id: string;
+  /**
+   * The class this plan is for. `null` for `centre`/`org` scope plans, which are
+   * not tied to a single class group (migration 0012_lesson_plan_scope made the
+   * column nullable).
+   */
+  class_id: string | null;
+  /** Plan scope — class / centre / org. See {@link PlanScope}. */
+  scope: PlanScope;
+  /** The plan's subject (mirrors the class's subject for class scope). */
+  subject_id: string | null;
+  /** The plan's centre. Null for `org` scope (spans every centre). */
+  school_id: string | null;
+  /** Curriculum year the plan targets (0–6). */
+  year: number | null;
   /**
    * Reference into the curriculum (Supabase `curriculum_lesson`). Stays `text`
    * with no FK: resolved by `curriculum_lesson.lesson_key` first, then best-effort
    * legacy `taxonomy_id` (e.g. "0.S1.K1.H3"). See @/lib/curriculumUtils#getLessonById.
    */
   curriculum_lesson_id: string;
-  lesson_date: string;
+  /**
+   * Calendar date the lesson sits on. `null` now that the board places cards by
+   * curriculum coordinate (month/week/period), not by date
+   * (migration 0012_lesson_plan_scope made the column nullable).
+   */
+  lesson_date: string | null;
   period: number | null;
   status: PlanStatus;
   smartt_objective: string | null;

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import type { EditorClassContext } from '@/lib/editor/load-plan';
 import { IN_SESSION_TARGET_MINUTES } from '@/lib/blocks';
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return '';
   const d = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat('en-GB', {
@@ -30,7 +31,7 @@ export function EditorSubHeader({
   showTotal = true,
 }: {
   classContext: EditorClassContext;
-  lessonDate: string;
+  lessonDate: string | null;
   total: number;
   /** Optional controls (save state, Download) rendered before the time total. */
   actions?: ReactNode;
@@ -40,6 +41,21 @@ export function EditorSubHeader({
   const onTarget = total === IN_SESSION_TARGET_MINUTES;
   const totalColor = onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]';
   const totalStroke = onTarget ? '#2E7D5B' : '#B0651E';
+
+  // Scope-aware title suffix: a class plan names its group; centre/org plans name
+  // their reach instead (no single class group exists).
+  const scopeSuffix =
+    classContext.scope === 'centre'
+      ? 'Whole centre'
+      : classContext.scope === 'org'
+        ? 'All centres'
+        : classContext.groupLabel
+          ? `Group ${classContext.groupLabel}`
+          : null;
+
+  const dateLabel = formatDate(lessonDate);
+  // The trailing line shows the date (when set) and centre, joined cleanly.
+  const metaLine = [dateLabel, classContext.schoolName].filter(Boolean).join(' · ');
 
   return (
     <div className="border-b border-[#EFE8DD] px-[22px] py-4 lg:px-[30px]">
@@ -55,17 +71,20 @@ export function EditorSubHeader({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-[10px]">
           <span className="text-[19px] font-semibold">
-            Year {classContext.year} · Group {classContext.groupLabel}
+            Year {classContext.year}
+            {scopeSuffix ? ` · ${scopeSuffix}` : ''}
           </span>
           {classContext.subjectName ? (
             <span className="rounded-badge bg-[#F3ECE2] px-[9px] py-[3px] text-[12px] text-neutral-700">
               {classContext.subjectName}
             </span>
           ) : null}
-          <span className="text-neutral-300">·</span>
-          <span className="text-[13px] text-neutral-600">
-            {formatDate(lessonDate)} · {classContext.schoolName}
-          </span>
+          {metaLine ? (
+            <>
+              <span className="text-neutral-300">·</span>
+              <span className="text-[13px] text-neutral-600">{metaLine}</span>
+            </>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-4">
           {actions}

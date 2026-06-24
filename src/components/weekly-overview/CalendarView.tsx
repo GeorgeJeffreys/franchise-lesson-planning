@@ -1,101 +1,122 @@
 'use client';
 
 import { cn } from '@/lib/cn';
-import { WEEKDAYS, WEEKDAY_LABELS } from '@/lib/week';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
+import { ScopeChip } from '@/components/weekly-overview/ScopeChip';
 import { CardShell } from '@/components/weekly-overview/CardShell';
 import { OwnerAvatar } from '@/components/weekly-overview/OwnerAvatar';
-import { cardsForWeekday, timeLabel, type LessonCard } from '@/components/weekly-overview/cards';
-import { useCreateLesson } from '@/components/create-lesson/CreateLessonContext';
-import type { ClassWeek } from '@/types/weekly-overview';
+import { periodLabel } from '@/components/weekly-overview/cards';
+import { useScopeChooser } from '@/components/weekly-overview/ScopeChooser';
+import type { BoardSlot, BoardYear, SlotPlan } from '@/types/weekly-overview';
+
+// P1..P5 map onto the school week Mon–Fri (the period proxy the old design used).
+const PERIOD_WEEKDAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 /**
- * Calendar view — a column per weekday (Mon–Fri). Each column has a day + date
- * header (today marked with a teal "TODAY" pill and a teal underline) and the
- * day's planned lesson cards, stacked by time of day. A card carries its time
- * line, class, status badge and the owner's avatar; it opens the editor.
- *
- * A fully-unplanned day shows a single dashed "+ Plan" card that opens the create
- * dialog pre-seeded with that date. A day that already has plans shows only those
- * (no per-class blanks — those gaps surface in the Status "Not started" column).
+ * Calendar view — one band per year the teacher teaches, each a row of curriculum
+ * period columns (P1..P5). Every plan covering a slot renders as a card (status +
+ * scope chip + owner); a slot with no plan of any scope shows a single "+ Plan"
+ * card that opens the scope chooser. A covered slot also offers "+ make your own"
+ * so a teacher can add a class plan alongside a shared centre/org one.
  */
-export function CalendarView({ classes }: { classes: ClassWeek[] }) {
-  const { openCreate } = useCreateLesson();
-
-  // The five weekdays carry the same date for every class, so read each day's
-  // date/today flag off the first class's slot.
-  const sample = classes[0];
-
-  const days = WEEKDAYS.map((weekday) => {
-    const slot = sample.slots.find((s) => s.weekday === weekday);
-    // Only planned cards show in Calendar; "not started" gaps live in Status.
-    const planned = cardsForWeekday(classes, weekday).filter((c) => c.planId);
-    return {
-      weekday,
-      dayName: WEEKDAY_LABELS[weekday],
-      date: slot?.date ?? null,
-      dateNum: slot ? Number(slot.date.slice(8, 10)) : null,
-      isToday: slot?.isToday ?? false,
-      cards: planned,
-    };
-  });
-
+export function CalendarView({
+  years,
+  ownerId,
+}: {
+  years: BoardYear[];
+  ownerId: string | null;
+}) {
   return (
-    <div>
-      <div className="grid grid-cols-5 items-start gap-[14px]">
-        {days.map((day) => (
-          <div key={day.weekday} className="flex flex-col gap-[11px]">
-            <div
-              className={cn(
-                'flex items-baseline gap-[7px] border-b-2 px-[2px] pb-[10px]',
-                day.isToday ? 'border-teal' : 'border-neutral-200',
-              )}
-            >
-              <span
-                className={cn(
-                  'text-[14px] font-bold',
-                  day.isToday ? 'text-status-submitted' : 'text-ink',
-                )}
-              >
-                {day.dayName} {day.dateNum}
-              </span>
-              {day.isToday ? (
-                <span className="rounded-[5px] bg-status-submitted-bg px-[7px] py-[2px] text-[10px] font-bold uppercase tracking-[0.04em] text-teal">
-                  Today
-                </span>
-              ) : null}
+    <div className="flex flex-col gap-[26px]">
+      {years.map((band) => (
+        <div key={band.year}>
+          <h2 className="mb-[12px] text-[15px] font-bold text-ink">Year {band.year}</h2>
+          {band.slots.length === 0 ? (
+            <div className="rounded-[12px] border border-dashed border-border-strong px-[14px] py-[14px] text-[12.5px] text-text-muted">
+              No curriculum lessons for Year {band.year} this week.
             </div>
-
-            {day.cards.length === 0 ? (
-              <button
-                type="button"
-                onClick={() => day.date && openCreate({ date: day.date })}
-                className="flex items-center justify-center gap-[6px] rounded-[13px] border-[1.5px] border-dashed border-border-strong px-[14px] py-[16px] text-[12.5px] font-semibold text-teal transition-colors hover:bg-surface-subtle"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Plan
-              </button>
-            ) : (
-              day.cards.map((card) => <CalendarCard key={card.key} card={card} />)
-            )}
-          </div>
-        ))}
-      </div>
+          ) : (
+            <div
+              className="grid items-start gap-[14px]"
+              style={{ gridTemplateColumns: `repeat(${band.slots.length}, minmax(0, 1fr))` }}
+            >
+              {band.slots.map((slot) => (
+                <PeriodColumn key={slot.lessonKey} slot={slot} ownerId={ownerId} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
-function CalendarCard({ card }: { card: LessonCard }) {
+function PeriodColumn({ slot, ownerId }: { slot: BoardSlot; ownerId: string | null }) {
+  const { openChooser } = useScopeChooser();
+  const visible = ownerId ? slot.plans.filter((p) => p.owner?.id === ownerId) : slot.plans;
+  const covered = slot.plans.length > 0;
+  const weekday = PERIOD_WEEKDAY[slot.period - 1] ?? '';
+
+  const open = () =>
+    openChooser({ lessonKey: slot.lessonKey, year: slot.year, dailyOutcome: slot.dailyOutcome });
+
   return (
-    <CardShell planId={card.planId}>
-      <div className="text-[11.5px] font-semibold text-text-faint">{timeLabel(card.period)}</div>
-      <div className="mb-[9px] mt-[3px] text-[14px] font-semibold">{card.classLabel}</div>
-      <div className="flex items-center justify-between gap-2">
-        <StatusChip status={card.status} />
-        {card.owner ? <OwnerAvatar owner={card.owner} /> : null}
+    <div className="flex flex-col gap-[11px]">
+      <div className="flex items-baseline gap-[7px] border-b-2 border-neutral-200 px-[2px] pb-[10px]">
+        <span className="text-[14px] font-bold text-ink">Period {slot.period}</span>
+        {weekday ? <span className="text-[11.5px] text-text-faint">{weekday}</span> : null}
+      </div>
+
+      {slot.dailyOutcome ? (
+        <p className="line-clamp-2 px-[2px] text-[11.5px] leading-[1.45] text-text-muted">
+          {slot.dailyOutcome}
+        </p>
+      ) : null}
+
+      {!covered ? (
+        <PlanAffordance onClick={open} variant="empty" />
+      ) : (
+        <>
+          {visible.map((plan) => (
+            <CalendarCard key={plan.id} plan={plan} period={slot.period} />
+          ))}
+          <PlanAffordance onClick={open} variant="add" />
+        </>
+      )}
+    </div>
+  );
+}
+
+function CalendarCard({ plan, period }: { plan: SlotPlan; period: number }) {
+  return (
+    <CardShell planId={plan.id} canEdit={plan.canEdit}>
+      <div className="text-[11.5px] font-semibold text-text-faint">{periodLabel(period)}</div>
+      <div className="mb-[9px] mt-[5px] flex flex-wrap items-center gap-[6px]">
+        <StatusChip status={plan.status} />
+        <ScopeChip scope={plan.scope} />
+      </div>
+      <div className="flex items-center justify-end">
+        {plan.owner ? <OwnerAvatar owner={plan.owner} /> : null}
       </div>
     </CardShell>
+  );
+}
+
+/** The "+ Plan" (empty slot) and "+ make your own" (covered slot) affordances. */
+function PlanAffordance({ onClick, variant }: { onClick: () => void; variant: 'empty' | 'add' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex items-center justify-center gap-[6px] rounded-[13px] border-[1.5px] border-dashed border-border-strong text-[12.5px] font-semibold text-teal transition-colors hover:bg-surface-subtle',
+        variant === 'empty' ? 'px-[14px] py-[16px]' : 'px-[10px] py-[9px]',
+      )}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {variant === 'empty' ? 'Plan' : 'Make your own'}
+    </button>
   );
 }

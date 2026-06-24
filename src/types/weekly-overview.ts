@@ -1,23 +1,19 @@
-// View-model types for the Weekly Overview. These describe the shape the data
-// layer (src/lib/weekly-overview.ts) returns and the page renders directly —
-// the read view of one teacher's Monday–Friday week.
+// View-model types for the curriculum-driven planning board. These describe the
+// shape the data layer (src/lib/weekly-overview.ts) returns and the Calendar /
+// Status views render.
+//
+// The board is anchored on CURRICULUM coordinates (month · week · period), not on
+// calendar dates. For each year the signed-in teacher teaches, every curriculum
+// period (P1..P5) of the selected (month, week) is a slot; the plans covering a
+// slot — at any scope the teacher can see — render as cards over it.
 
-import type { PlanStatus } from '@/types/lesson';
-import type { Weekday } from '@/lib/week';
+import type { PlanScope, PlanStatus } from '@/types/lesson';
 
 /**
- * What a slot shows as its status. The four stored `PlanStatus` values plus the
- * derived `not_started` (no plan row exists for that class/day yet).
+ * What a slot/column shows as its status. The four stored `PlanStatus` values
+ * plus the derived `not_started` (no plan of any scope covers the slot yet).
  */
 export type SlotStatus = PlanStatus | 'not_started';
-
-/** The curriculum target resolved from a plan's `curriculum_lesson_id`. */
-export interface CurriculumTarget {
-  /** Daily learning outcome (cleaned). The slot headline. */
-  dailyLO: string;
-  /** Thematic context, e.g. "Food and Drink". May be empty. */
-  theme: string;
-}
 
 /** The owner of a plan — for the "whose plan" avatar and the people filter. */
 export interface PlanOwner {
@@ -26,62 +22,90 @@ export interface PlanOwner {
   initials: string;
 }
 
-/** The plan occupying a slot, trimmed to what the overview needs. */
+/**
+ * One plan covering a curriculum slot, trimmed to what the board needs. Several
+ * plans (at different scopes / owners) can cover the same slot.
+ */
 export interface SlotPlan {
   id: string;
   status: PlanStatus;
-  /** Who created the plan (avatar + "Everyone" filter). Null on legacy rows. */
+  /** Plan scope — drives the Class / Centre / All centres chip. */
+  scope: PlanScope;
+  /** Who created the plan (avatar + people filter). Null on legacy rows. */
   owner: PlanOwner | null;
   /**
-   * Day-of-week period (1–5) the lesson sits in. Used to order cards within a
-   * day and shown as the card's "time" line — the schema has no clock time yet.
-   * May be null on older rows.
+   * Whether the signed-in user may edit this plan (its creator, a coordinator of
+   * its space, or an admin). Drives editable-wizard vs read-only-view routing.
    */
-  period: number | null;
+  canEdit: boolean;
   /** Coordinator note when returned (`needs_review`); null otherwise. */
   reviewNote: string | null;
 }
 
-/** One weekday cell for one class. */
-export interface WeekSlot {
-  weekday: Weekday;
-  /** The cell's calendar date, `YYYY-MM-DD`. */
-  date: string;
-  /** Whether this date is today (drives the highlighted column). */
-  isToday: boolean;
-  /** The plan for this class/day, or null when none exists. */
-  plan: SlotPlan | null;
-  /** `plan.status`, or `not_started` when `plan` is null. */
-  status: SlotStatus;
-  /** Curriculum target for the plan, or null when there is no plan. */
-  target: CurriculumTarget | null;
-}
-
-/** One class row: its identity plus a Mon–Fri slot for each weekday. */
-export interface ClassWeek {
-  classId: string;
+/** One curriculum period slot (P1..P5) for a given year + (month, week). */
+export interface BoardSlot {
+  /** The `curriculum_lesson.lesson_key` for this (subject, year, month, week, period). */
+  lessonKey: string;
+  /** Curriculum year (0–6) this slot belongs to. */
   year: number;
-  groupLabel: string;
-  schoolName: string;
-  subjectName: string;
-  /** Display label, e.g. "Year 2 · A". */
-  label: string;
-  /** Exactly five slots, Monday→Friday. */
-  slots: WeekSlot[];
+  /** Day-of-week period (1–5). P1 = Mon … P5 = Fri. */
+  period: number;
+  /** Daily learning outcome (stem-cleaned). The slot headline. */
+  dailyOutcome: string;
+  /** Focus area / linguistic skill, e.g. "Reading". May be empty. */
+  focusArea: string;
+  /** Every plan (any scope) covering this slot. Empty → "Not started". */
+  plans: SlotPlan[];
 }
 
-/** Everything the Weekly Overview page renders for the selected week. */
-export interface WeeklyOverview {
-  /** The Monday of the selected week, `YYYY-MM-DD`. */
-  weekStart: string;
-  /** Human label for the Mon–Fri span. */
-  weekLabel: string;
+/** One year section: the years a teacher teaches each get their own band. */
+export interface BoardYear {
+  year: number;
+  /** The curriculum period slots (P1..P5) for the selected (month, week). */
+  slots: BoardSlot[];
+}
+
+/** A curriculum (month, week) position the prev/next arrows step through. */
+export interface BoardCoordinate {
+  month: string;
+  week: number;
+}
+
+/** Everything the planning board renders for the selected curriculum week. */
+export interface BoardData {
   /** The signed-in teacher's display name. */
   teacherName: string;
-  /** "School · Subject" context line, derived from the teacher's classes. */
+  /** "Centre · Subject" context line, derived from the teacher's classes. */
   context: string | null;
-  /** Total plans (any status) across the week — for the summary line. */
+  /** The subject the board is showing (English first). */
+  subjectName: string;
+  /** The selected curriculum coordinate. */
+  coordinate: BoardCoordinate;
+  /** Human label for the coordinate, e.g. "March · Week 2". */
+  coordinateLabel: string;
+  /** The previous coordinate (or null at the start of the scheme of work). */
+  prev: BoardCoordinate | null;
+  /** The next coordinate (or null at the end of the scheme of work). */
+  next: BoardCoordinate | null;
+  /** One band per year the teacher teaches, in ascending year order. */
+  years: BoardYear[];
+  /** Distinct plan owners across the visible plans — the people-filter options. */
+  owners: PlanOwner[];
+  /** Total plans (any status/scope) visible for this coordinate. */
   planCount: number;
-  /** One row per assigned class. Empty when the teacher has no classes. */
-  classes: ClassWeek[];
+  /** False when the teacher teaches no classes yet (calm empty state). */
+  hasClasses: boolean;
+  /**
+   * The teacher's own classes (via `class_teachers`) in the board subject, keyed
+   * by year — drives the "My class" choice in the scope chooser. A year with more
+   * than one entry lets the teacher pick which class.
+   */
+  myClassesByYear: Record<number, BoardClass[]>;
+}
+
+/** A class the teacher teaches, for the scope chooser's "My class" option. */
+export interface BoardClass {
+  id: string;
+  /** Display label, e.g. "Year 2 · A". */
+  label: string;
 }

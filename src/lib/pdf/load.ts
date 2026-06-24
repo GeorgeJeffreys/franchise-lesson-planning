@@ -48,9 +48,13 @@ interface RawClassJoin {
 
 interface RawWeekPlanRow {
   id: string;
-  class_id: string;
+  class_id: string | null;
+  scope: LessonPlan['scope'];
+  school_id: string | null;
+  subject_id: string | null;
+  year: number | null;
   curriculum_lesson_id: string;
-  lesson_date: string;
+  lesson_date: string | null;
   period: number | null;
   status: LessonPlan['status'];
   smartt_objective: string | null;
@@ -92,7 +96,8 @@ export async function loadWeekPdfModels(
   const { data, error } = await supabase
     .from('lesson_plans')
     .select(
-      `id, class_id, curriculum_lesson_id, lesson_date, period, status,
+      `id, class_id, scope, school_id, subject_id, year,
+       curriculum_lesson_id, lesson_date, period, status,
        smartt_objective, smartt_check, blocks, created_by, submitted_at,
        reviewed_at, review_note, created_at, updated_at,
        class:classes (
@@ -135,6 +140,10 @@ export async function loadWeekPdfModels(
     const plan: LessonPlan = {
       id: row.id,
       class_id: row.class_id,
+      scope: row.scope,
+      subject_id: row.subject_id,
+      school_id: row.school_id,
+      year: row.year,
       curriculum_lesson_id: row.curriculum_lesson_id,
       lesson_date: row.lesson_date,
       period: row.period,

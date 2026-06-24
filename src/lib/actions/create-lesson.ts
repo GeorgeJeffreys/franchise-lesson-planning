@@ -1,220 +1,139 @@
 'use server';
 
-// Server actions behind the "+ Lesson" create dialog: loading the curriculum
-// week grid for a class, and creating the plan (with the one-plan-per-(class,date)
-// guard). All writes go through the auth'd, RLS-scoped client.
+// Server action behind the board's scope chooser: create a lesson plan at a
+// chosen scope (class / centre / org) for a curriculum slot, then route into the
+// 5-step wizard. Replaces the old "+ Lesson" picker + its (class, date) creation.
+//
+// All writes go through the auth'd, RLS-scoped client. The plan's subject/year are
+// derived server-side from the slot's `lesson_key` (the locked curriculum key), so
+// client input can't widen what gets written; membership is verified as defence in
+// depth on top of RLS.
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { isAdmin, isMemberOf } from '@/lib/auth';
-import {
-  getCurriculumNav,
-  getCurriculumWeekCells,
-  getLessonById,
-} from '@/lib/curriculumUtils';
+import { isAdmin, isMemberOf, getMyMemberships } from '@/lib/auth';
+import { getCurriculumKeyCoords } from '@/lib/curriculumUtils';
 import { DEFAULT_BLOCKS } from '@/lib/blocks';
-import { addDays } from '@/lib/week';
-import type { MonthNav, PickerCell } from '@/components/create-lesson/types';
-import type { PlanStatus } from '@/types/lesson';
+import type { PlanScope } from '@/types/lesson';
 
-interface ResolvedClass {
-  id: string;
-  year: number;
-  schoolId: string;
-  subjectId: string;
-  subjectCode: string;
-  subjectName: string;
-  label: string;
+export interface CreateScopedPlanInput {
+  /** The curriculum slot's `lesson_key` (written into `curriculum_lesson_id`). */
+  lessonKey: string;
+  /** Which scope to create the plan at. */
+  scope: PlanScope;
+  /** Required for `class` scope — the class group the plan is for. */
+  classId?: string;
 }
 
-/** Resolve a class to the fields the picker/creator need, or null if unreadable. */
-async function resolveClass(classId: string): Promise<ResolvedClass | null> {
+export type CreateScopedPlanResult =
+  | { ok: true; planId: string }
+  | { ok: false; error: string };
+
+/** Resolve the subject's uuid from its code (subjects are read-only reference data). */
+async function resolveSubjectId(subjectCode: string): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from('classes')
-    .select('id, year, group_label, school_id, subject_id, subjects ( code, name )')
-    .eq('id', classId)
+    .from('subjects')
+    .select('id')
+    .eq('code', subjectCode)
     .maybeSingle();
-
-  const row = data as unknown as {
-    id: string;
-    year: number;
-    group_label: string;
-    school_id: string;
-    subject_id: string;
-    subjects: { code: string; name: string } | null;
-  } | null;
-  if (!row) return null;
-
-  return {
-    id: row.id,
-    year: row.year,
-    schoolId: row.school_id,
-    subjectId: row.subject_id,
-    subjectCode: row.subjects?.code ?? '',
-    subjectName: row.subjects?.name ?? '',
-    label: `Year ${row.year} · ${row.group_label}`,
-  };
-}
-
-export interface PickerWeekResult {
-  ok: boolean;
-  error?: string;
-  subjectName: string;
-  classLabel: string;
-  year: number;
-  nav: MonthNav[];
-  /** The month/week the grid is currently showing. */
-  month: string;
-  week: number;
-  cells: PickerCell[];
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 /**
- * Load the curriculum week grid for a class. When `month`/`week` are omitted it
- * defaults to the first synced month + its first week. Returns `cells: []` for an
- * unsynced week (the dialog renders its empty state, never an error).
+ * Create a plan for a curriculum slot at the chosen scope. Enforces "open, don't
+ * duplicate": if a plan already exists at the same scope for this slot, its id is
+ * returned (the caller routes to it) rather than inserting a second one. A racing
+ * unique violation is caught as a backstop and resolved to the existing row.
  */
-export async function loadPickerWeek(input: {
-  classId: string;
-  month?: string;
-  week?: number;
-}): Promise<PickerWeekResult> {
-  const cls = await resolveClass(input.classId);
-  if (!cls) {
-    return {
-      ok: false,
-      error: 'Class not found.',
-      subjectName: '',
-      classLabel: '',
-      year: 0,
-      nav: [],
-      month: '',
-      week: 1,
-      cells: [],
-    };
-  }
-
-  const nav = await getCurriculumNav(cls.subjectCode, cls.year);
-
-  // Default to the first synced month + week; fall back to a sensible breadcrumb
-  // when nothing is synced (the empty state handles the rest).
-  const month = input.month ?? nav[0]?.month ?? '';
-  const week = input.week ?? nav.find((m) => m.month === month)?.weeks[0] ?? 1;
-
-  const cells =
-    month === '' ? [] : await getCurriculumWeekCells(cls.subjectCode, cls.year, month, week);
-
-  return {
-    ok: true,
-    subjectName: cls.subjectName,
-    classLabel: cls.label,
-    year: cls.year,
-    nav,
-    month,
-    week,
-    cells,
-  };
-}
-
-export type CreateLessonResult =
-  | { status: 'created'; planId: string }
-  | {
-      status: 'already_planned';
-      existing: {
-        planId: string;
-        title: string;
-        planStatus: PlanStatus;
-        ownerName: string;
-      };
-    }
-  | { status: 'error'; error: string };
-
-/** Build the "already planned" payload for an existing plan row. */
-async function describeExisting(existing: {
-  id: string;
-  status: PlanStatus;
-  curriculum_lesson_id: string;
-  created_by: string;
-}): Promise<CreateLessonResult> {
-  const supabase = await createClient();
-  const [lookup, { data: owner }] = await Promise.all([
-    getLessonById(existing.curriculum_lesson_id),
-    supabase.from('profiles').select('full_name').eq('id', existing.created_by).maybeSingle(),
-  ]);
-  const lesson = Array.isArray(lookup) ? lookup[0] : lookup;
-  return {
-    status: 'already_planned',
-    existing: {
-      planId: existing.id,
-      title: lesson?.dailyLO || 'Untitled lesson',
-      planStatus: existing.status,
-      ownerName: (owner?.full_name as string | undefined) ?? 'A teammate',
-    },
-  };
-}
-
-/**
- * Create a lesson plan for a class on a chosen curriculum period.
- *
- * `anchorMonday` is the Monday of the calendar week the new plan lands in (the
- * home's shown week, or the Monday of a pre-seeded date). The plan's `lesson_date`
- * is that Monday + (period − 1) days. Curriculum weeks are a scheme-of-work
- * numbering independent of the calendar, so the date comes from the anchor week,
- * not the curriculum week number.
- *
- * Enforces one plan per (class, date): an existing plan short-circuits to the
- * "already planned" result (no insert), and a racing unique-violation is mapped
- * to the same result rather than surfaced as an error.
- */
-export async function createLessonForClass(input: {
-  classId: string;
-  lessonKey: string;
-  period: number;
-  anchorMonday: string;
-}): Promise<CreateLessonResult> {
+export async function createScopedPlan(
+  input: CreateScopedPlanInput,
+): Promise<CreateScopedPlanResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { status: 'error', error: 'Not signed in.' };
+  if (!user) return { ok: false, error: 'Not signed in.' };
 
-  const cls = await resolveClass(input.classId);
-  if (!cls) return { status: 'error', error: 'Class not found.' };
+  const coords = await getCurriculumKeyCoords(input.lessonKey);
+  if (!coords) return { ok: false, error: 'That curriculum lesson no longer exists.' };
 
-  // Defence in depth: RLS would accept any insert where created_by = me, so verify
-  // the caller actually belongs to this class's space before writing.
-  const allowed = (await isMemberOf(cls.schoolId, cls.subjectId)) || (await isAdmin());
-  if (!allowed) return { status: 'error', error: 'You are not a member of this class.' };
+  // Scope columns resolved per scope. subject_id/year come from the curriculum key
+  // (the locked source of truth); school_id/class_id depend on the scope.
+  let classId: string | null = null;
+  let schoolId: string | null = null;
+  let subjectId: string | null = null;
+  const year = coords.year;
+  const period = coords.period;
 
-  const lessonDate = addDays(input.anchorMonday, input.period - 1);
+  if (input.scope === 'class') {
+    if (!input.classId) return { ok: false, error: 'Pick a class to plan for.' };
+    const { data: cls } = await supabase
+      .from('classes')
+      .select('id, school_id, subject_id')
+      .eq('id', input.classId)
+      .maybeSingle();
+    const row = cls as { id: string; school_id: string; subject_id: string } | null;
+    if (!row) return { ok: false, error: 'Class not found.' };
 
-  // One plan per (class, date): if one exists, route to it instead of inserting.
-  const { data: existingRow } = await supabase
-    .from('lesson_plans')
-    .select('id, status, curriculum_lesson_id, created_by')
-    .eq('class_id', input.classId)
-    .eq('lesson_date', lessonDate)
-    .maybeSingle();
+    const allowed = (await isMemberOf(row.school_id, row.subject_id)) || (await isAdmin());
+    if (!allowed) return { ok: false, error: 'You are not a member of this class.' };
 
-  if (existingRow) {
-    return describeExisting(
-      existingRow as unknown as {
-        id: string;
-        status: PlanStatus;
-        curriculum_lesson_id: string;
-        created_by: string;
-      },
-    );
+    classId = row.id;
+    schoolId = row.school_id;
+    subjectId = row.subject_id;
+  } else {
+    // centre / org both need the subject; centre additionally pins a school.
+    subjectId = await resolveSubjectId(coords.subjectCode);
+    if (!subjectId) return { ok: false, error: 'Subject not found for this lesson.' };
+
+    if (input.scope === 'centre') {
+      // The teacher's centre for this subject is their membership's school.
+      const memberships = await getMyMemberships();
+      const space = memberships.find((m) => m.subjectId === subjectId);
+      if (!space) {
+        return { ok: false, error: 'You are not a member of a centre for this subject.' };
+      }
+      schoolId = space.schoolId;
+      const allowed = (await isMemberOf(schoolId, subjectId)) || (await isAdmin());
+      if (!allowed) return { ok: false, error: 'You are not a member of this centre.' };
+    } else {
+      // org: spans every centre — any member of the subject (or an admin) may create.
+      const memberships = await getMyMemberships();
+      const isMember = memberships.some((m) => m.subjectId === subjectId);
+      if (!isMember && !(await isAdmin())) {
+        return { ok: false, error: 'You are not a member of this subject.' };
+      }
+    }
   }
+
+  // Open, don't duplicate: an existing plan at the SAME scope for this slot is
+  // opened instead of inserting a second one. Done in app code because the
+  // class-scope unique index may be deferred (not guaranteed to exist).
+  const dupQuery = supabase
+    .from('lesson_plans')
+    .select('id')
+    .eq('curriculum_lesson_id', input.lessonKey)
+    .eq('scope', input.scope);
+  if (input.scope === 'class' && classId) dupQuery.eq('class_id', classId);
+  if (input.scope === 'centre' && schoolId) dupQuery.eq('school_id', schoolId);
+  // limit(1), not maybeSingle(): the class-scope unique index is deferred, so a
+  // (rare) pre-existing duplicate must open the first match, not throw.
+  const { data: existing } = await dupQuery.limit(1);
+  const existingId = (existing as { id: string }[] | null)?.[0]?.id;
+  if (existingId) return { ok: true, planId: existingId };
 
   const { data: inserted, error } = await supabase
     .from('lesson_plans')
     .insert({
-      class_id: input.classId,
       curriculum_lesson_id: input.lessonKey,
-      lesson_date: lessonDate,
-      period: input.period,
+      scope: input.scope,
+      class_id: classId,
+      school_id: schoolId,
+      subject_id: subjectId,
+      year,
+      period,
+      lesson_date: null,
       status: 'in_progress',
       blocks: DEFAULT_BLOCKS,
       created_by: user.id,
@@ -223,31 +142,26 @@ export async function createLessonForClass(input: {
     .maybeSingle();
 
   if (error) {
-    // Lost a race on the unique (class_id, lesson_date) constraint — resolve the
-    // now-existing plan and route to it rather than erroring.
+    // Lost a race on a unique constraint — resolve the now-existing row and open it.
     if (error.code === '23505') {
-      const { data: raced } = await supabase
+      const raceQuery = supabase
         .from('lesson_plans')
-        .select('id, status, curriculum_lesson_id, created_by')
-        .eq('class_id', input.classId)
-        .eq('lesson_date', lessonDate)
-        .maybeSingle();
-      if (raced) {
-        return describeExisting(
-          raced as unknown as {
-            id: string;
-            status: PlanStatus;
-            curriculum_lesson_id: string;
-            created_by: string;
-          },
-        );
-      }
+        .select('id')
+        .eq('curriculum_lesson_id', input.lessonKey)
+        .eq('scope', input.scope);
+      if (input.scope === 'class' && classId) raceQuery.eq('class_id', classId);
+      if (input.scope === 'centre' && schoolId) raceQuery.eq('school_id', schoolId);
+      const { data: raced } = await raceQuery.limit(1);
+      const racedId = (raced as { id: string }[] | null)?.[0]?.id;
+      if (racedId) return { ok: true, planId: racedId };
     }
-    return { status: 'error', error: error.message };
+    return { ok: false, error: error.message };
   }
 
-  if (!inserted) return { status: 'error', error: 'Could not create the plan.' };
+  if (!inserted) return { ok: false, error: 'Could not create the plan.' };
 
+  // The board reads plans server-side; revalidate so the new card appears (and
+  // leaves "Not started") on return without a manual refresh.
   revalidatePath('/');
-  return { status: 'created', planId: (inserted as { id: string }).id };
+  return { ok: true, planId: (inserted as { id: string }).id };
 }

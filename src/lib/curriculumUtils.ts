@@ -351,6 +351,37 @@ export async function getCurriculumWeekCells(
     }));
 }
 
+/** A curriculum row's natural coordinates, resolved from its `lesson_key`. */
+export interface CurriculumKeyCoords {
+  subjectCode: string;
+  year: number;
+  month: string;
+  week: number;
+  period: number;
+}
+
+/**
+ * Resolve a `curriculum_lesson.lesson_key` to its natural coordinates (subject,
+ * year, month, week, period). Used by the scope-aware create action to derive a
+ * plan's subject/year server-side rather than trusting client input. Returns null
+ * when the key matches no active row.
+ */
+export async function getCurriculumKeyCoords(
+  lessonKey: string,
+): Promise<CurriculumKeyCoords | null> {
+  if (!lessonKey) return null;
+  const rows = await fetchActiveRows();
+  const row = rows.find((r) => r.lesson_key === lessonKey);
+  if (!row) return null;
+  return {
+    subjectCode: row.subject_code,
+    year: row.year,
+    month: row.month,
+    week: row.week,
+    period: row.period,
+  };
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 function resolveYearNum(year: number | string): number | null {

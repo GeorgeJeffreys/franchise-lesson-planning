@@ -1,42 +1,37 @@
 import Link from 'next/link';
 import { AppShell } from '@/components/app-shell/AppShell';
 import { WeeklyOverview } from '@/components/weekly-overview/WeeklyOverview';
-import { getWeeklyOverview } from '@/lib/weekly-overview';
-import { getCreatableClasses } from '@/lib/create-lesson';
-import { currentMonday, resolveWeekStart } from '@/lib/week';
+import { getBoardData } from '@/lib/weekly-overview';
 
-// Rendered per-request so it reflects the live session and selected week.
+// Rendered per-request so it reflects the live session and selected coordinate.
 export const dynamic = 'force-dynamic';
 
-type SearchParams = { week?: string; view?: string };
+type SearchParams = { month?: string; week?: string; view?: string };
 
 /**
- * The authenticated home screen — the Weekly Overview inside the app shell. The
- * selected week and view are driven by URL search params (`?week=YYYY-MM-DD`,
- * `?view=calendar|status`) so the page is server-rendered and linkable. The
- * proxy redirects signed-out users to /login, so reaching here means a session.
+ * The authenticated home screen — the curriculum planning board inside the app
+ * shell. The selected curriculum coordinate and view are driven by URL search
+ * params (`?month=March&week=2`, `?view=calendar|status`) so the page is
+ * server-rendered and linkable. The proxy redirects signed-out users to /login.
  */
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { week, view: viewParam } = await searchParams;
+  const { month, week, view: viewParam } = await searchParams;
 
-  const weekStart = resolveWeekStart(week);
   const view = viewParam === 'status' ? 'status' : 'calendar';
-  const thisMonday = currentMonday();
+  const weekNum = week ? Number(week) : undefined;
 
-  // The week's plans and the creatable-class list (for the "+ Lesson" dialog) are
-  // independent reads — fetch them together.
-  const [data, groups] = await Promise.all([
-    getWeeklyOverview(weekStart),
-    getCreatableClasses(),
-  ]);
+  const data = await getBoardData({
+    month: month || undefined,
+    week: Number.isFinite(weekNum) ? weekNum : undefined,
+  });
 
   return (
     <AppShell name={data.teacherName} subtitle={data.context ?? undefined}>
-      <WeeklyOverview data={data} view={view} thisMonday={thisMonday} groups={groups} />
+      <WeeklyOverview data={data} view={view} />
 
       {/* Temporary dev aid: a quiet link to your auth uid, still needed to run
           the supabase/admin provisioning + sample-plan seed. Remove once

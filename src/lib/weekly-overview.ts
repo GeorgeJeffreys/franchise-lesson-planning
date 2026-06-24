@@ -1,183 +1,256 @@
-// Data layer for the Weekly Overview — the read view of a teacher's week.
+// Data layer for the planning board — the curriculum-driven view of a teacher's
+// week. The board is anchored on CURRICULUM coordinates (month · week · period),
+// NOT on calendar dates: for each year the signed-in teacher teaches, every
+// curriculum period (P1..P5) of the selected (month, week) is a slot, and every
+// plan the teacher can see whose `curriculum_lesson_id` matches a slot key renders
+// as a card over it.
 //
-// Everything here goes through the auth'd, cookie-bound Supabase client, so RLS
-// scopes the reads to the signed-in teacher: their own profile, the classes they
-// are assigned to (class_teachers), and the lesson_plans they may see. The
-// service-role key is never used on this path.
+// Everything goes through the auth'd, cookie-bound Supabase client, so RLS scopes
+// the reads: the teacher's own `class_teachers` rows, and the `lesson_plans` they
+// may see (class/centre within their centre, org across centres). The service-role
+// key is never used on this path.
 
 import { createClient } from '@/lib/supabase/server';
-import { getLessonById } from '@/lib/curriculumUtils';
-import {
-  WEEKDAYS,
-  formatWeekRange,
-  todayISO,
-  weekdayDates,
-  weekdayOf,
-} from '@/lib/week';
+import { getCurriculumNav, getCurriculumWeekCells } from '@/lib/curriculumUtils';
 import { initialsOf } from '@/components/weekly-overview/avatar';
-import type { PlanStatus } from '@/types/lesson';
+import type { PlanScope, PlanStatus } from '@/types/lesson';
 import type {
-  ClassWeek,
-  CurriculumTarget,
+  BoardClass,
+  BoardCoordinate,
+  BoardData,
+  BoardSlot,
+  BoardYear,
   PlanOwner,
   SlotPlan,
-  WeekSlot,
-  WeeklyOverview,
 } from '@/types/weekly-overview';
 
-// Rows as returned by the (currently untyped) Supabase client. We hand-narrow
-// the nested selects below; database.types.ts is a placeholder until gen:types
-// runs against a live DB.
-interface ClassRow {
+// Calendar-month order so the prev/next arrows step through the scheme of work in
+// the right sequence regardless of how rows come back from the DB.
+const MONTH_ORDER = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function monthIndex(month: string): number {
+  const i = MONTH_ORDER.indexOf(month);
+  return i === -1 ? MONTH_ORDER.length : i;
+}
+
+// Hand-narrowed row shapes — database.types.ts is a placeholder until gen:types
+// runs against a live DB, so the client can't infer the nested selects.
+interface TaughtClassRow {
   id: string;
   year: number;
   group_label: string;
   archived_at: string | null;
+  school_id: string;
+  subject_id: string;
   schools: { name: string } | null;
-  subjects: { name: string } | null;
+  subjects: { code: string; name: string } | null;
 }
 
 interface PlanRow {
   id: string;
-  class_id: string;
   curriculum_lesson_id: string;
-  lesson_date: string;
-  period: number | null;
+  scope: PlanScope;
+  class_id: string | null;
+  school_id: string | null;
+  subject_id: string | null;
+  year: number | null;
   status: PlanStatus;
   review_note: string | null;
   created_by: string;
 }
 
-// A plan row with its class embedded — the shape of the week's `lesson_plans`
-// query below. The class embed lets the grid show plans for classes the caller
-// can see via RLS (e.g. an admin, or a subject coordinator) even when they are
-// not enrolled in `class_teachers` for them.
-interface PlanRowWithClass extends PlanRow {
-  classes: ClassRow | null;
+interface MembershipRow {
+  school_id: string;
+  subject_id: string;
+  role: 'teacher' | 'coordinator';
 }
 
-/** Resolve a curriculum key to its daily LO + theme, or null if unknown. */
-async function resolveTarget(curriculumLessonId: string): Promise<CurriculumTarget | null> {
-  const lesson = await getLessonById(curriculumLessonId);
-  if (!lesson) return null;
-  // Some keys (exam slots) map to multiple year rows; the first carries the
-  // headline we need for the slot.
-  const one = Array.isArray(lesson) ? lesson[0] : lesson;
-  if (!one) return null;
-  return { dailyLO: one.dailyLO, theme: one.theme };
+/** The empty board shown when there's no session or no teaching assignment. */
+function emptyBoard(teacherName: string, subjectName = ''): BoardData {
+  return {
+    teacherName,
+    context: null,
+    subjectName,
+    coordinate: { month: '', week: 1 },
+    coordinateLabel: '—',
+    prev: null,
+    next: null,
+    years: [],
+    owners: [],
+    planCount: 0,
+    hasClasses: false,
+    myClassesByYear: {},
+  };
+}
+
+/** Order plans within a slot: by scope (class → centre → org), then owner name. */
+const SCOPE_ORDER: Record<PlanScope, number> = { class: 0, centre: 1, org: 2 };
+function byScopeThenOwner(a: SlotPlan, b: SlotPlan): number {
+  const s = SCOPE_ORDER[a.scope] - SCOPE_ORDER[b.scope];
+  if (s !== 0) return s;
+  return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '');
 }
 
 /**
- * Load the signed-in teacher's week: every class they are assigned to, with a
- * Monday–Friday slot per class carrying any plan, its status, and the plan's
- * resolved curriculum target. `weekStart` must be the Monday of the week.
+ * Load the planning board for the signed-in teacher at a curriculum coordinate.
+ *
+ * `month`/`week` select the curriculum coordinate; when omitted (or out of range)
+ * the first synced coordinate for the teacher's subject is used. The board shows
+ * one band per year the teacher teaches (distinct `classes.year` via
+ * `class_teachers`), each with the P1..P5 curriculum slots for that coordinate and
+ * every plan — at any scope the teacher can see — covering them.
  */
-export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOverview> {
+export async function getBoardData(input: {
+  month?: string;
+  week?: number;
+}): Promise<BoardData> {
   const supabase = await createClient();
-  const dates = weekdayDates(weekStart);
-  const today = todayISO();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return emptyBoard('there');
 
-  const weekLabel = formatWeekRange(weekStart);
-
-  // No session shouldn't happen (the proxy protects this route), but stay safe.
-  if (!user) {
-    return {
-      weekStart,
-      weekLabel,
-      teacherName: 'there',
-      context: null,
-      planCount: 0,
-      classes: [],
-    };
-  }
-
-  // Three independent reads — the profile (display name), the caller's own
-  // assigned classes (`class_teachers`), and every plan they may see this week —
-  // depend only on the user id and week, so fetch them in parallel. RLS scopes
-  // each: own `class_teachers` rows, and the `lesson_plans` they can read.
-  //
-  // The plan query is NOT pre-filtered to `class_teachers` classes: visibility is
-  // RLS's job, and the access model now grants it via subject membership / admin,
-  // not just `class_teachers`. Pre-filtering here would hide plans an admin or
-  // subject coordinator can legitimately see. The class is embedded so those
-  // plans' classes can join the grid even when the caller doesn't teach them.
-  const [{ data: profile }, { data: ctRows }, { data: plans }] = await Promise.all([
-    supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+  // Identity, the teacher's own classes (taught years + subject), and their
+  // memberships (coordinator spaces) depend only on the user id — fetch together.
+  const [{ data: profile }, { data: ctRows }, { data: memRows }] = await Promise.all([
+    supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle(),
     supabase
       .from('class_teachers')
       .select(
-        'classes ( id, year, group_label, archived_at, schools ( name ), subjects ( name ) )',
+        'classes ( id, year, group_label, archived_at, school_id, subject_id, schools ( name ), subjects ( code, name ) )',
       )
       .eq('teacher_id', user.id),
     supabase
-      .from('lesson_plans')
-      .select(
-        'id, class_id, curriculum_lesson_id, lesson_date, period, status, review_note, created_by, classes ( id, year, group_label, archived_at, schools ( name ), subjects ( name ) )',
-      )
-      .gte('lesson_date', dates.mon)
-      .lte('lesson_date', dates.fri),
+      .from('subject_membership')
+      .select('school_id, subject_id, role')
+      .eq('profile_id', user.id),
   ]);
 
-  const teacherName = profile?.full_name ?? user.email ?? 'there';
+  const teacherName =
+    (profile as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'there';
+  const isAdmin = (profile as { role?: string } | null)?.role === 'admin';
 
-  // database.types.ts is still a placeholder (`Database = Record<string, never>`),
-  // so the client can't infer the nested select shape — narrow it by hand. The
-  // embeds are all many-to-one, so each resolves to a single object at runtime.
-  const ctNarrowed = (ctRows ?? []) as unknown as Array<{ classes: ClassRow | null }>;
-  const planRowsWithClass = (plans ?? []) as unknown as PlanRowWithClass[];
-  const planRows: PlanRow[] = planRowsWithClass;
+  // The teacher's (non-archived) classes — they define the taught years and the
+  // board's subject. Archived classes are removed from planning.
+  const taught = ((ctRows ?? []) as unknown as Array<{ classes: TaughtClassRow | null }>)
+    .map((r) => r.classes)
+    .filter((c): c is TaughtClassRow => !!c && !c.archived_at);
 
-  // The grid's class set is the union of the caller's own classes and the classes
-  // referenced by the plans they can see this week — so empty (unplanned) classes
-  // still show as "Not started" columns, while plans on classes the caller
-  // doesn't teach (admin / coordinator views) appear too. Dedup by class id.
-  // Archived classes are removed from planning, so they never become grid rows
-  // (even if a kept plan still references one).
-  const classById = new Map<string, ClassRow>();
-  for (const row of ctNarrowed) {
-    if (row.classes && !row.classes.archived_at) classById.set(row.classes.id, row.classes);
-  }
-  for (const plan of planRowsWithClass) {
-    if (plan.classes && !plan.classes.archived_at) classById.set(plan.classes.id, plan.classes);
-  }
-  const classRows: ClassRow[] = [...classById.values()];
-
-  // Stable, readable order: by year then group label.
-  classRows.sort((a, b) => a.year - b.year || a.group_label.localeCompare(b.group_label));
-
-  const context = (() => {
-    const first = classRows[0];
-    const school = first?.schools?.name;
-    const subject = first?.subjects?.name;
-    if (school && subject) return `${school} · ${subject}`;
-    return school ?? subject ?? null;
-  })();
-
-  // Index plans by `${classId}:${weekday}` for O(1) slot lookup.
-  const planByCell = new Map<string, PlanRow>();
-  for (const plan of planRows) {
-    const weekday = weekdayOf(plan.lesson_date);
-    if (!weekday) continue; // weekend / out of range — ignore defensively
-    planByCell.set(`${plan.class_id}:${weekday}`, plan);
+  if (taught.length === 0) {
+    return emptyBoard(teacherName);
   }
 
-  // Resolve curriculum targets up front (the slot map below is synchronous). The
-  // curriculum read is cached and deduped per id, so this is a handful of lookups.
-  const targetByKey = new Map<string, CurriculumTarget | null>();
-  await Promise.all(
-    [...new Set(planRows.map((p) => p.curriculum_lesson_id))].map(async (id) => {
-      targetByKey.set(id, await resolveTarget(id));
-    }),
+  // Board subject (English first). A teacher normally teaches one subject; if more
+  // than one, pick the one with the most classes (deterministic, name-tiebroken).
+  const subjectCounts = new Map<string, { code: string; name: string; school: string; n: number }>();
+  for (const c of taught) {
+    const code = c.subjects?.code ?? '';
+    const prev = subjectCounts.get(code);
+    subjectCounts.set(code, {
+      code,
+      name: c.subjects?.name ?? '',
+      school: c.schools?.name ?? '',
+      n: (prev?.n ?? 0) + 1,
+    });
+  }
+  const subject = [...subjectCounts.values()].sort(
+    (a, b) => b.n - a.n || a.name.localeCompare(b.name),
+  )[0];
+  const subjectCode = subject.code;
+  const subjectName = subject.name;
+  const context = [subject.school, subjectName].filter(Boolean).join(' · ') || null;
+
+  // Years the teacher teaches in this subject, ascending.
+  const years = [
+    ...new Set(taught.filter((c) => (c.subjects?.code ?? '') === subjectCode).map((c) => c.year)),
+  ].sort((a, b) => a - b);
+
+  // The teacher's own classes in the board subject, grouped by year — the "My
+  // class" choices in the scope chooser.
+  const myClassesByYear: Record<number, BoardClass[]> = {};
+  for (const c of taught) {
+    if ((c.subjects?.code ?? '') !== subjectCode) continue;
+    (myClassesByYear[c.year] ??= []).push({
+      id: c.id,
+      label: `Year ${c.year} · ${c.group_label}`,
+    });
+  }
+  for (const list of Object.values(myClassesByYear)) {
+    list.sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  // The coordinator spaces the teacher belongs to — drives per-plan edit rights.
+  const coordinatorSpaces = new Set(
+    ((memRows ?? []) as unknown as MembershipRow[])
+      .filter((m) => m.role === 'coordinator')
+      .map((m) => `${m.school_id}:${m.subject_id}`),
   );
 
-  // Resolve plan owners (the "whose plan" avatar + people filter). One read for
-  // the distinct creators across this week's visible plans. The co-member profiles
-  // policy (migration 0013) lets a member read a teammate's id + full_name when
-  // they share a (school, subject) space; the auth'd client keeps it RLS-scoped.
+  // Build the ordered list of curriculum coordinates available across the taught
+  // years, so prev/next step through the scheme of work. Union the per-year navs.
+  const navs = await Promise.all(years.map((y) => getCurriculumNav(subjectCode, y)));
+  const weeksByMonth = new Map<string, Set<number>>();
+  for (const nav of navs) {
+    for (const { month, weeks } of nav) {
+      if (!weeksByMonth.has(month)) weeksByMonth.set(month, new Set());
+      const set = weeksByMonth.get(month)!;
+      for (const w of weeks) set.add(w);
+    }
+  }
+  const coords: BoardCoordinate[] = [...weeksByMonth.entries()]
+    .sort((a, b) => monthIndex(a[0]) - monthIndex(b[0]))
+    .flatMap(([month, weeks]) =>
+      [...weeks].sort((a, b) => a - b).map((week) => ({ month, week })),
+    );
+
+  // Nothing synced for this subject/years yet → an empty-but-valid board.
+  if (coords.length === 0) {
+    return {
+      ...emptyBoard(teacherName, subjectName),
+      context,
+      hasClasses: true,
+      years: years.map((year) => ({ year, slots: [] })),
+      myClassesByYear,
+    };
+  }
+
+  // Resolve the selected coordinate from the params (snap to a real one).
+  let index = coords.findIndex((c) => c.month === input.month && c.week === input.week);
+  if (index === -1) index = 0;
+  const coordinate = coords[index];
+  const prev = index > 0 ? coords[index - 1] : null;
+  const next = index < coords.length - 1 ? coords[index + 1] : null;
+
+  // The curriculum slots (P1..P5) for each taught year at the selected coordinate.
+  const cellsByYear = await Promise.all(
+    years.map((y) => getCurriculumWeekCells(subjectCode, y, coordinate.month, coordinate.week)),
+  );
+
+  // Every slot key across the board — the join target for the visible plans.
+  const slotKeys = new Set<string>();
+  for (const cells of cellsByYear) for (const cell of cells) slotKeys.add(cell.lessonKey);
+
+  // All plans (any scope) the teacher can see whose curriculum_lesson_id is one of
+  // the slot keys. RLS enforces visibility; legacy plans whose key matches no slot
+  // simply never load. Skip the query entirely when there are no slots.
+  let planRows: PlanRow[] = [];
+  if (slotKeys.size > 0) {
+    const { data: plans } = await supabase
+      .from('lesson_plans')
+      .select(
+        'id, curriculum_lesson_id, scope, class_id, school_id, subject_id, year, status, review_note, created_by',
+      )
+      .in('curriculum_lesson_id', [...slotKeys]);
+    planRows = (plans ?? []) as unknown as PlanRow[];
+  }
+
+  // Resolve plan owners (avatar + people filter). One read for the distinct
+  // creators; the co-member profiles policy (0013) lets a teammate's id + name be
+  // read within a shared space, kept RLS-scoped by the auth'd client.
   const ownerById = new Map<string, PlanOwner>();
   const ownerIds = [...new Set(planRows.map((p) => p.created_by).filter(Boolean))];
   if (ownerIds.length > 0) {
@@ -191,46 +264,55 @@ export async function getWeeklyOverview(weekStart: string): Promise<WeeklyOvervi
     }
   }
 
-  const classes: ClassWeek[] = classRows.map((c) => {
-    const slots: WeekSlot[] = WEEKDAYS.map((weekday) => {
-      const date = dates[weekday];
-      const plan = planByCell.get(`${c.id}:${weekday}`);
-      const slotPlan: SlotPlan | null = plan
-        ? {
-            id: plan.id,
-            status: plan.status,
-            period: plan.period,
-            reviewNote: plan.review_note,
-            owner: ownerById.get(plan.created_by) ?? null,
-          }
-        : null;
-      return {
-        weekday,
-        date,
-        isToday: date === today,
-        plan: slotPlan,
-        status: plan ? plan.status : 'not_started',
-        target: plan ? targetByKey.get(plan.curriculum_lesson_id) ?? null : null,
-      };
-    });
+  const canEdit = (p: PlanRow): boolean =>
+    p.created_by === user.id ||
+    isAdmin ||
+    (!!p.school_id && !!p.subject_id && coordinatorSpaces.has(`${p.school_id}:${p.subject_id}`));
 
-    return {
-      classId: c.id,
-      year: c.year,
-      groupLabel: c.group_label,
-      schoolName: c.schools?.name ?? '',
-      subjectName: c.subjects?.name ?? '',
-      label: `Year ${c.year} · ${c.group_label}`,
-      slots,
+  // Index plans by slot key.
+  const plansByKey = new Map<string, SlotPlan[]>();
+  for (const p of planRows) {
+    const card: SlotPlan = {
+      id: p.id,
+      status: p.status,
+      scope: p.scope,
+      owner: ownerById.get(p.created_by) ?? null,
+      canEdit: canEdit(p),
+      reviewNote: p.review_note,
     };
+    const list = plansByKey.get(p.curriculum_lesson_id);
+    if (list) list.push(card);
+    else plansByKey.set(p.curriculum_lesson_id, [card]);
+  }
+  for (const list of plansByKey.values()) list.sort(byScopeThenOwner);
+
+  const yearBands: BoardYear[] = years.map((year, i) => {
+    const slots: BoardSlot[] = cellsByYear[i].map((cell) => ({
+      lessonKey: cell.lessonKey,
+      year,
+      period: cell.period,
+      dailyOutcome: cell.dailyOutcome,
+      focusArea: cell.focusArea,
+      plans: plansByKey.get(cell.lessonKey) ?? [],
+    }));
+    return { year, slots };
   });
 
+  // Distinct owners across the board, for the people filter.
+  const owners = [...ownerById.values()].sort((a, b) => a.name.localeCompare(b.name));
+
   return {
-    weekStart,
-    weekLabel,
     teacherName,
     context,
+    subjectName,
+    coordinate,
+    coordinateLabel: `${coordinate.month} · Week ${coordinate.week}`,
+    prev,
+    next,
+    years: yearBands,
+    owners,
     planCount: planRows.length,
-    classes,
+    hasClasses: true,
+    myClassesByYear,
   };
 }

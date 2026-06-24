@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getLessonById } from '@/lib/curriculumUtils';
 import { DEFAULT_BLOCKS } from '@/lib/blocks';
 import { getTagVocabulary, listFolders, getResourcesByIds } from '@/lib/resources';
-import type { Block, LessonBlockType, LessonPlan } from '@/types/lesson';
+import type { Block, LessonBlockType, LessonPlan, PlanScope } from '@/types/lesson';
 import type { Folder, ResourceWithTags, TagsByDimension } from '@/types/resource';
 
 /** Block types that have a pre-approved activity bank today. */
@@ -21,7 +21,11 @@ export interface ActivityBankItem {
   sort_order: number;
 }
 
-/** The locked class context shown in the slim header. */
+/**
+ * The locked class context shown in the slim header. For `centre`/`org` scope
+ * plans there is no single class, so `id`/`groupLabel` may be empty and `literacy`
+ * defaults to `mixed`; the year/subject/centre come from the plan's own columns.
+ */
 export interface EditorClassContext {
   id: string;
   year: number;
@@ -29,8 +33,10 @@ export interface EditorClassContext {
   literacy: ClassLiteracy;
   schoolName: string;
   subjectName: string;
-  /** The class's subject id — scopes the embedded Resource Bank panel. */
+  /** The subject id — scopes the embedded Resource Bank panel. */
   subjectId: string | null;
+  /** Plan scope, so the header/wizard can label centre/org plans. */
+  scope: PlanScope;
 }
 
 /**
@@ -86,9 +92,13 @@ interface RawClassJoin {
 
 interface RawPlanRow {
   id: string;
-  class_id: string;
+  class_id: string | null;
+  scope: PlanScope;
+  school_id: string | null;
+  subject_id: string | null;
+  year: number | null;
   curriculum_lesson_id: string;
-  lesson_date: string;
+  lesson_date: string | null;
   period: number | null;
   status: LessonPlan['status'];
   smartt_objective: string | null;
@@ -131,7 +141,8 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     supabase
       .from('lesson_plans')
       .select(
-        `id, class_id, curriculum_lesson_id, lesson_date, period, status,
+        `id, class_id, scope, school_id, subject_id, year,
+         curriculum_lesson_id, lesson_date, period, status,
          smartt_objective, smartt_check, blocks, worksheet, required_materials, created_by,
          submitted_at, reviewed_at, review_note, created_at, updated_at,
          class:classes (
@@ -155,20 +166,47 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
 
   const row = planRow as unknown as RawPlanRow;
   const rawClass = one(row.class);
-  if (!rawClass) return null;
 
-  const school = one(rawClass.school);
-  const subject = one(rawClass.subject);
-
-  const classContext: EditorClassContext = {
-    id: rawClass.id,
-    year: rawClass.year,
-    groupLabel: rawClass.group_label,
-    literacy: rawClass.literacy,
-    schoolName: school?.name ?? '',
-    subjectName: subject?.name ?? '',
-    subjectId: subject?.id ?? null,
-  };
+  // Class-scope plans take their context from the joined class. Centre/org-scope
+  // plans have no single class, so resolve year/subject/centre from the plan's own
+  // scope columns (literacy defaults to `mixed`, no group label).
+  let classContext: EditorClassContext;
+  if (rawClass) {
+    const school = one(rawClass.school);
+    const subject = one(rawClass.subject);
+    classContext = {
+      id: rawClass.id,
+      year: rawClass.year,
+      groupLabel: rawClass.group_label,
+      literacy: rawClass.literacy,
+      schoolName: school?.name ?? '',
+      subjectName: subject?.name ?? '',
+      subjectId: subject?.id ?? null,
+      scope: row.scope,
+    };
+  } else {
+    // Look up the subject + centre names from the plan's scope columns.
+    const [{ data: subjectRow }, schoolRes] = await Promise.all([
+      row.subject_id
+        ? supabase.from('subjects').select('id, name').eq('id', row.subject_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      row.school_id
+        ? supabase.from('schools').select('name').eq('id', row.school_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const subject = subjectRow as { id: string; name: string } | null;
+    const school = schoolRes.data as { name: string } | null;
+    classContext = {
+      id: '',
+      year: row.year ?? 0,
+      groupLabel: '',
+      literacy: 'mixed',
+      schoolName: school?.name ?? '',
+      subjectName: subject?.name ?? '',
+      subjectId: row.subject_id,
+      scope: row.scope,
+    };
+  }
 
   // Resolve the locked curriculum context from the Supabase-backed curriculum.
   const lookup = await getLessonById(row.curriculum_lesson_id);
@@ -227,6 +265,10 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
   const plan: LessonPlan = {
     id: row.id,
     class_id: row.class_id,
+    scope: row.scope,
+    subject_id: row.subject_id,
+    school_id: row.school_id,
+    year: row.year,
     curriculum_lesson_id: row.curriculum_lesson_id,
     lesson_date: row.lesson_date,
     period: row.period,

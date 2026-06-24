@@ -30,10 +30,12 @@ function Header({ model }: { model: PlanPdfModel }) {
       <Text style={styles.brand}>Alsama · Lesson Plan</Text>
       <Text style={styles.classTitle}>{classHeadline(c)}</Text>
       <View style={styles.metaRow}>
-        <Text style={styles.metaItem}>
-          <Text style={styles.metaStrong}>Date: </Text>
-          {formatLongDate(plan.lesson_date)}
-        </Text>
+        {plan.lesson_date ? (
+          <Text style={styles.metaItem}>
+            <Text style={styles.metaStrong}>Date: </Text>
+            {formatLongDate(plan.lesson_date)}
+          </Text>
+        ) : null}
         {plan.period != null && (
           <Text style={styles.metaItem}>
             <Text style={styles.metaStrong}>Period: </Text>
@@ -171,7 +173,8 @@ function LessonPlanPage({ model }: { model: PlanPdfModel }) {
 
       <View style={styles.footer} fixed>
         <Text>
-          {classHeadline(model.classContext)} · {formatLongDate(model.plan.lesson_date)}
+          {classHeadline(model.classContext)}
+          {model.plan.lesson_date ? ` · ${formatLongDate(model.plan.lesson_date)}` : ''}
         </Text>
         <Text
           render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`}
@@ -183,7 +186,9 @@ function LessonPlanPage({ model }: { model: PlanPdfModel }) {
 
 /** A single lesson plan as a one-page PDF document. */
 export function LessonPlanDocument({ model }: { model: PlanPdfModel }) {
-  const title = `Lesson Plan — ${classHeadline(model.classContext)} — ${model.plan.lesson_date}`;
+  const title = `Lesson Plan — ${classHeadline(model.classContext)}${
+    model.plan.lesson_date ? ` — ${model.plan.lesson_date}` : ''
+  }`;
   return (
     <Document title={title} author="Alsama" subject="Lesson plan">
       <LessonPlanPage model={model} />

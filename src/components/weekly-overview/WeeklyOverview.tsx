@@ -6,38 +6,23 @@ import { StatusView } from '@/components/weekly-overview/StatusView';
 import { WeekNav } from '@/components/weekly-overview/WeekNav';
 import { ViewToggle } from '@/components/weekly-overview/ViewToggle';
 import { PeopleFilter, EVERYONE } from '@/components/weekly-overview/PeopleFilter';
-import { CreateLessonProvider } from '@/components/create-lesson/CreateLessonContext';
-import { AddLessonButton } from '@/components/create-lesson/AddLessonButton';
-import type { ClassWeek, PlanOwner, WeeklyOverview as WeeklyOverviewData } from '@/types/weekly-overview';
-import type { CreateSpaceGroup } from '@/components/create-lesson/types';
+import { ScopeChooserProvider } from '@/components/weekly-overview/ScopeChooser';
+import type { BoardData } from '@/types/weekly-overview';
 
 type View = 'calendar' | 'status';
 
 /**
- * The Weekly Overview: a flat page header (people filter + week navigation + the
- * Calendar ⇄ Status toggle + the "+ Lesson" hero) over whichever view is selected.
+ * The planning board: a flat header (people filter + curriculum-week navigation +
+ * the Calendar ⇄ Status toggle) over whichever view is selected.
  *
- * The two views are presentations of the SAME already-loaded `data`, so the
- * toggle is pure client state — instant, with no server round-trip or re-fetch.
- * The "Everyone" people filter is likewise a pure view filter over the loaded
- * plans (by owner). Changing the *week* still navigates (it needs different data).
- *
- * The whole tree is wrapped in CreateLessonProvider so the hero button, the
- * Calendar blank-day "+ Plan" card, and the Status "Not started" chips can all
- * open the same create dialog.
+ * The board auto-populates from the curriculum for the years the teacher teaches —
+ * there is no "+ Lesson" hero; creation happens on the board itself (a "Not
+ * started" card or a "+ make your own" affordance opens the inline scope chooser).
+ * The two views are presentations of the SAME loaded `data`, so the toggle and the
+ * "Everyone" owner filter are pure client state — no re-fetch. Changing the
+ * curriculum week still navigates (it needs different data).
  */
-export function WeeklyOverview({
-  data,
-  view: initialView,
-  thisMonday,
-  groups,
-}: {
-  data: WeeklyOverviewData;
-  view: View;
-  thisMonday: string;
-  /** Classes the user can plan for, grouped by space — for the create dialog. */
-  groups: CreateSpaceGroup[];
-}) {
+export function WeeklyOverview({ data, view: initialView }: { data: BoardData; view: View }) {
   const [view, setView] = useState<View>(initialView);
   const [owner, setOwner] = useState<string>(EVERYONE);
 
@@ -45,45 +30,34 @@ export function WeeklyOverview({
     (next: View) => {
       setView(next);
       // Keep the URL truthful without a navigation: no server component re-run.
-      window.history.replaceState(null, '', `/?week=${data.weekStart}&view=${next}`);
+      const { month, week } = data.coordinate;
+      window.history.replaceState(
+        null,
+        '',
+        `/?month=${encodeURIComponent(month)}&week=${week}&view=${next}`,
+      );
     },
-    [data.weekStart],
+    [data.coordinate],
   );
 
-  // Distinct plan owners present in the loaded week — the people-filter options.
-  const owners = useMemo<PlanOwner[]>(() => {
-    const byId = new Map<string, PlanOwner>();
-    for (const c of data.classes) {
-      for (const slot of c.slots) {
-        if (slot.plan?.owner) byId.set(slot.plan.owner.id, slot.plan.owner);
+  const ownerId = owner === EVERYONE ? null : owner;
+
+  // Plans shown after the owner filter (Not started cards are unaffected).
+  const planCount = useMemo(() => {
+    if (ownerId === null) return data.planCount;
+    let n = 0;
+    for (const band of data.years) {
+      for (const slot of band.slots) {
+        for (const p of slot.plans) if (p.owner?.id === ownerId) n++;
       }
     }
-    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [data.classes]);
-
-  // Apply the owner filter: a plan owned by someone else is hidden (its slot
-  // reverts to "not started"). "Everyone" passes through unchanged.
-  const filteredClasses = useMemo<ClassWeek[]>(() => {
-    if (owner === EVERYONE) return data.classes;
-    return data.classes.map((c) => ({
-      ...c,
-      slots: c.slots.map((slot) =>
-        slot.plan && slot.plan.owner?.id !== owner
-          ? { ...slot, plan: null, status: 'not_started' as const, target: null }
-          : slot,
-      ),
-    }));
-  }, [data.classes, owner]);
-
-  const planCount = useMemo(
-    () => filteredClasses.reduce((n, c) => n + c.slots.filter((s) => s.plan).length, 0),
-    [filteredClasses],
-  );
+    return n;
+  }, [data.years, data.planCount, ownerId]);
 
   return (
-    <CreateLessonProvider groups={groups} weekStart={data.weekStart}>
+    <ScopeChooserProvider subjectName={data.subjectName} myClassesByYear={data.myClassesByYear}>
       <div>
-        {/* Header: context + filters + week nav + view toggle + hero */}
+        {/* Header: context + filters + week nav + view toggle */}
         <div className="mb-[22px] flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-[25px] font-semibold tracking-[-0.01em]">This week</h1>
@@ -93,39 +67,56 @@ export function WeeklyOverview({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-[14px]">
-            <PeopleFilter owners={owners} value={owner} onChange={setOwner} />
+            <PeopleFilter owners={data.owners} value={owner} onChange={setOwner} />
             <WeekNav
-              weekStart={data.weekStart}
-              weekLabel={data.weekLabel}
-              thisMonday={thisMonday}
+              coordinateLabel={data.coordinateLabel}
+              prev={data.prev}
+              next={data.next}
               view={view}
             />
             <ViewToggle view={view} onChange={changeView} />
-            <AddLessonButton />
           </div>
         </div>
 
         {/* Body */}
-        {data.classes.length === 0 ? (
+        {!data.hasClasses ? (
           <EmptyClasses />
+        ) : data.years.length === 0 || data.coordinate.month === '' ? (
+          <EmptyCurriculum subjectName={data.subjectName} />
         ) : view === 'status' ? (
-          <StatusView classes={filteredClasses} />
+          <StatusView years={data.years} ownerId={ownerId} />
         ) : (
-          <CalendarView classes={filteredClasses} />
+          <CalendarView years={data.years} ownerId={ownerId} />
         )}
       </div>
-    </CreateLessonProvider>
+    </ScopeChooserProvider>
   );
 }
 
-/** Shown when the signed-in teacher has no classes assigned yet. */
+/** Shown when the signed-in teacher teaches no classes yet. */
 function EmptyClasses() {
   return (
     <div className="rounded-[14px] border border-border px-6 py-16 text-center">
       <p className="text-[15px] font-semibold text-ink">No classes assigned yet</p>
-      <p className="mx-auto mt-2 max-w-[420px] text-[13.5px] text-text-muted">
-        Once a coordinator assigns you to classes, your week will appear here — a
-        slot for each class on every weekday.
+      <p className="mx-auto mt-2 max-w-[460px] text-[13.5px] text-text-muted">
+        Pick the classes you teach in{' '}
+        <a href="/settings" className="font-semibold text-teal underline underline-offset-2">
+          Settings
+        </a>{' '}
+        and your curriculum board will appear here — one section per year you teach.
+      </p>
+    </div>
+  );
+}
+
+/** Shown when the teacher's subject/years have no synced curriculum yet. */
+function EmptyCurriculum({ subjectName }: { subjectName: string }) {
+  return (
+    <div className="rounded-[14px] border border-border px-6 py-16 text-center">
+      <p className="text-[15px] font-semibold text-ink">No curriculum synced yet</p>
+      <p className="mx-auto mt-2 max-w-[460px] text-[13.5px] text-text-muted">
+        {subjectName ? `${subjectName} has` : 'This subject has'} no curriculum lessons synced
+        for the years you teach. Once a coordinator syncs the curriculum, your board will fill in.
       </p>
     </div>
   );

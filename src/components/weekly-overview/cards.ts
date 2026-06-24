@@ -1,90 +1,85 @@
-// Shared derivation: flatten the class × weekday grid into lesson "cards", the
-// unit both the Calendar and Status views render. A card is one (class, weekday)
-// slot — either a real plan or a derived "Not started" placeholder.
+// Shared derivation for the board's two views. A board is years × period slots;
+// each slot carries the plans (any scope) covering it. The Status view wants a
+// flat list of plan cards and a flat list of empty ("Not started") slots; the
+// Calendar view reads the year/slot structure directly.
 
-import { WEEKDAYS, WEEKDAY_LABELS, type Weekday } from '@/lib/week';
-import type { ClassWeek, PlanOwner, SlotStatus } from '@/types/weekly-overview';
+import type { PlanScope, PlanStatus } from '@/types/lesson';
+import type { BoardYear, PlanOwner } from '@/types/weekly-overview';
 
-export interface LessonCard {
-  /** Stable key, `${classId}:${weekday}`. */
+/** One plan as a board card (Calendar cell + Status column). */
+export interface PlanCard {
+  /** Stable key — the plan id. */
   key: string;
-  /** The class this card belongs to (used to pre-seed the create dialog). */
-  classId: string;
-  /** Class label, e.g. "Year 1 · A". */
-  classLabel: string;
-  /** Weekday the card sits on. */
-  weekday: Weekday;
-  /** Short weekday label, e.g. "Mon". */
-  dayLabel: string;
-  /** The card's calendar date, `YYYY-MM-DD` (used to pre-seed the create dialog). */
-  date: string;
-  /** Day-of-month number for the card's date, e.g. 15. */
-  dateNum: number;
-  /** Lesson period (1–5), or null when there's no plan. */
-  period: number | null;
-  /** Slot status (the four stored ones, or derived `not_started`). */
-  status: SlotStatus;
-  /** Plan id when one exists, else null (a non-interactive "Not started" card). */
-  planId: string | null;
-  /** Coordinator note for `needs_review`, else null. */
-  reviewNote: string | null;
-  /** Who owns the plan, for the "whose plan" avatar. Null when not started. */
+  planId: string;
+  year: number;
+  period: number;
+  status: PlanStatus;
+  scope: PlanScope;
   owner: PlanOwner | null;
+  /** Whether the viewer may edit (drives editable-wizard vs read-only routing). */
+  canEdit: boolean;
+  reviewNote: string | null;
 }
 
-/** Day-of-month (1–31) from a `YYYY-MM-DD` string, without timezone drift. */
-function dayOfMonth(iso: string): number {
-  return Number(iso.slice(8, 10));
+/** A curriculum slot with no plan of any scope — a "Not started" card. */
+export interface EmptySlotCard {
+  /** Stable key — the slot's lesson key. */
+  key: string;
+  lessonKey: string;
+  year: number;
+  period: number;
+  dailyOutcome: string;
+  focusArea: string;
 }
 
-/** Order cards within a day: by period (earliest first), unplanned last, then class. */
-export function byTimeThenClass(a: LessonCard, b: LessonCard): number {
-  const pa = a.period ?? Number.POSITIVE_INFINITY;
-  const pb = b.period ?? Number.POSITIVE_INFINITY;
-  if (pa !== pb) return pa - pb;
-  return a.classLabel.localeCompare(b.classLabel);
+/** The "time" line shown on a card — the curriculum period. */
+export function periodLabel(period: number): string {
+  return `Period ${period}`;
 }
 
-/** The "time" line shown on a card — the period for now (no clock time yet). */
-export function timeLabel(period: number | null): string {
-  return period == null ? '—' : `Period ${period}`;
-}
-
-/** One card per (class, weekday) for the given weekday, ordered for display. */
-export function cardsForWeekday(classes: ClassWeek[], weekday: Weekday): LessonCard[] {
-  return classes
-    .map((c) => toCard(c, weekday))
-    .filter((card): card is LessonCard => card != null)
-    .sort(byTimeThenClass);
-}
-
-/** Every (class, weekday) card across the week, flat and unordered. */
-export function allCards(classes: ClassWeek[]): LessonCard[] {
-  const cards: LessonCard[] = [];
-  for (const c of classes) {
-    for (const weekday of WEEKDAYS) {
-      const card = toCard(c, weekday);
-      if (card) cards.push(card);
+/**
+ * Every plan card across the board, optionally filtered to one owner. The owner
+ * filter hides only plan cards — it never turns a covered slot back into "Not
+ * started" (a slot leaves Not started for everyone once any plan exists).
+ */
+export function planCardsForYears(years: BoardYear[], ownerId: string | null): PlanCard[] {
+  const out: PlanCard[] = [];
+  for (const band of years) {
+    for (const slot of band.slots) {
+      for (const p of slot.plans) {
+        if (ownerId && p.owner?.id !== ownerId) continue;
+        out.push({
+          key: p.id,
+          planId: p.id,
+          year: slot.year,
+          period: slot.period,
+          status: p.status,
+          scope: p.scope,
+          owner: p.owner,
+          canEdit: p.canEdit,
+          reviewNote: p.reviewNote,
+        });
+      }
     }
   }
-  return cards;
+  return out;
 }
 
-function toCard(c: ClassWeek, weekday: Weekday): LessonCard | null {
-  const slot = c.slots.find((s) => s.weekday === weekday);
-  if (!slot) return null;
-  return {
-    key: `${c.classId}:${weekday}`,
-    classId: c.classId,
-    classLabel: c.label,
-    weekday,
-    dayLabel: WEEKDAY_LABELS[weekday],
-    date: slot.date,
-    dateNum: dayOfMonth(slot.date),
-    period: slot.plan?.period ?? null,
-    status: slot.status,
-    planId: slot.plan?.id ?? null,
-    reviewNote: slot.plan?.reviewNote ?? null,
-    owner: slot.plan?.owner ?? null,
-  };
+/** Slots with no plan of any scope (always unfiltered) → "Not started" cards. */
+export function emptySlotCards(years: BoardYear[]): EmptySlotCard[] {
+  const out: EmptySlotCard[] = [];
+  for (const band of years) {
+    for (const slot of band.slots) {
+      if (slot.plans.length > 0) continue;
+      out.push({
+        key: slot.lessonKey,
+        lessonKey: slot.lessonKey,
+        year: slot.year,
+        period: slot.period,
+        dailyOutcome: slot.dailyOutcome,
+        focusArea: slot.focusArea,
+      });
+    }
+  }
+  return out;
 }
