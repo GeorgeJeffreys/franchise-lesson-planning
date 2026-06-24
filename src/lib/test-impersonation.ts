@@ -37,13 +37,26 @@ const ROLE_UID_ENV: Record<TestRole, string> = {
 };
 
 /**
- * The master switch. The bar renders and the route acts ONLY when this is true:
- * the explicit flag is set AND we are not in production. Absence of the flag is
- * off; production is always off regardless of the flag.
+ * The master switch. The bar renders and the route acts ONLY when the explicit
+ * `ENABLE_TEST_IMPERSONATION` flag is set. Absence of the flag is off.
+ *
+ * Production is refused by default: when `VERCEL_ENV === 'production'` the bar is
+ * permitted ONLY if the separate, explicit `ALLOW_IMPERSONATION_IN_PRODUCTION`
+ * flag is also `'true'`. This second flag exists so enabling impersonation in
+ * production is a deliberate, easily-removable opt-in (testers-only deployment)
+ * rather than a silent deletion of the guard — leave it unset for real users.
+ * Outside production this flag is irrelevant; the master switch is all that's
+ * needed.
  */
 export function impersonationEnabled(): boolean {
-  if (process.env.VERCEL_ENV === 'production') return false;
-  return process.env.ENABLE_TEST_IMPERSONATION === 'true';
+  if (process.env.ENABLE_TEST_IMPERSONATION !== 'true') return false;
+  if (
+    process.env.VERCEL_ENV === 'production' &&
+    process.env.ALLOW_IMPERSONATION_IN_PRODUCTION !== 'true'
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Real-admin allowlist from `TEST_IMPERSONATION_ALLOWED_UIDS` (comma-separated). */
