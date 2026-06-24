@@ -61,9 +61,30 @@ function fail(stage: Stage, message: string, status: number) {
   return NextResponse.json({ ok: false, stage, message }, { status });
 }
 
-/** `Error.message` if it's an Error, else a stage-appropriate fallback. */
+/**
+ * Render an unknown error as a secret-free, human-readable string. Supabase
+ * `AuthError`s carry `status`/`code` and sometimes an opaque `message` (e.g. the
+ * literal `"{}"` when GoTrue returns an empty body — i.e. the call failed before
+ * a real API response). Pull name/status/code alongside the message so the
+ * surfaced reason is never just `"{}"` or `"[object Object]"`. None of these
+ * fields carry a password or secret.
+ */
 function reason(err: unknown, fallback: string): string {
-  return err instanceof Error && err.message ? err.message : fallback;
+  if (err == null) return fallback;
+  if (typeof err === 'string') return err.trim() || fallback;
+  if (typeof err === 'object') {
+    const e = err as { name?: unknown; message?: unknown; status?: unknown; code?: unknown };
+    const parts: string[] = [];
+    if (typeof e.name === 'string' && e.name) parts.push(e.name);
+    const meta: string[] = [];
+    if (e.status != null && e.status !== '') meta.push(`status ${String(e.status)}`);
+    if (typeof e.code === 'string' && e.code) meta.push(`code ${e.code}`);
+    if (meta.length) parts.push(`[${meta.join(', ')}]`);
+    const msg = typeof e.message === 'string' ? e.message.trim() : '';
+    if (msg && msg !== '{}') parts.push(msg);
+    return parts.join(' ').trim() || fallback;
+  }
+  return String(err).trim() || fallback;
 }
 
 export async function POST(request: NextRequest) {
@@ -157,6 +178,18 @@ export async function POST(request: NextRequest) {
     // cookies, so RLS resolves to that user on subsequent requests. No token is
     // self-signed and no password is ever returned or logged.
     stage = 'auth';
+    // Diagnostic (secret-free): the resolved email + whether the anon client's
+    // envs are present. A missing URL/key here is the likeliest cause of an
+    // empty/opaque sign-in error (the request never reaches GoTrue).
+    console.error(
+      '[test-impersonate] sign-in attempt',
+      JSON.stringify({
+        role,
+        email: creds.email,
+        hasAnonUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
+        hasAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()),
+      }),
+    );
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
