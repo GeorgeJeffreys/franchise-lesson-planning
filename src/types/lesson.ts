@@ -96,6 +96,51 @@ export interface SmarttComponentResult {
 export type SmarttCheck = Partial<Record<SmarttComponent, SmarttComponentResult>>;
 
 /**
+ * A tiptap rich-text document, structurally typed so the domain layer need not
+ * depend on the editor package. The concrete node shape is tiptap's
+ * `JSONContent`; consumers cast to it where they hold an editor instance.
+ */
+export type WorksheetDoc = { type?: string; content?: unknown[] } & Record<string, unknown>;
+
+/**
+ * A teacher-authored "Free block": a tiptap document (optionally produced by the
+ * AI generator). `doc` is null only for a freshly inserted, never-edited block.
+ */
+export interface WorksheetFreeBlock {
+  id: string;
+  kind: 'free';
+  doc: WorksheetDoc | null;
+  /** True when the doc was produced by the AI generator (shows the badge). */
+  fromAI: boolean;
+}
+
+/**
+ * A reference to a shared resource pulled in from the bank. Only the id is
+ * persisted; the resource itself is resolved through the resource layer on
+ * render. `uploaderName` is a display snapshot for the block badge.
+ */
+export interface WorksheetResourceBlock {
+  id: string;
+  kind: 'resource';
+  resourceId: string;
+  uploaderName: string | null;
+}
+
+/** One ordered exercise in the student worksheet body. */
+export type WorksheetBlock = WorksheetFreeBlock | WorksheetResourceBlock;
+
+/**
+ * The persisted student-worksheet body, stored in `lesson_plans.worksheet`
+ * (JSONB, migration 0009). `version` lets the loader migrate older shapes — v1
+ * was a single bare tiptap document; v2 is this ordered block list. The column
+ * is unenforced by Postgres, so this type is the source of truth for its shape.
+ */
+export interface Worksheet {
+  version: 2;
+  blocks: WorksheetBlock[];
+}
+
+/**
  * Domain representation of a `lesson_plans` row, with the JSONB columns typed.
  * Dates/timestamps are ISO strings as returned by Supabase.
  */
@@ -139,10 +184,12 @@ export interface LessonPlan {
   created_at: string;
   updated_at: string;
   /**
-   * Student worksheet as a rich-text (tiptap) document. Stored in the
-   * `lesson_plans.worksheet` JSONB column. Tiptap's JSON shape is unenforced
-   * here; the editor defines the concrete document type when it wires
-   * persistence. Optional so existing plans/code keep working.
+   * Student worksheet body. Stored in the `lesson_plans.worksheet` JSONB column
+   * and unenforced by Postgres. The current shape is the versioned {@link
+   * Worksheet} envelope (an ordered {@link WorksheetBlock} list); older rows hold
+   * a bare tiptap document. Left as `unknown` at the row boundary and normalised
+   * via `parseWorksheet` (see @/lib/editor/worksheet). Optional so existing
+   * plans/code keep working.
    */
   worksheet?: unknown;
   /**

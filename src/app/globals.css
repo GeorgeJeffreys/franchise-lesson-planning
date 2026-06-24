@@ -123,33 +123,56 @@
  * Worksheet editor (tiptap) typography. Tailwind's preflight strips list markers
  * and heading sizes, so the rich-text surface needs them restored within its own
  * scope. Kept minimal and on-brand (warm neutrals from the token ramp).
+ *
+ * The worksheet builder's "Free block" document surface. This renders on the A4
+ * page canvas (Step 3), so the typography is larger and more print-like than the
+ * compact .worksheet-prose above — matching the mockup's Word-style document.
  */
-.worksheet-prose {
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--color-neutral-900);
+.worksheet-doc {
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--color-ink);
   outline: none;
 }
-.worksheet-prose:focus {
+.worksheet-doc:focus {
   outline: none;
 }
-.worksheet-prose > * + * {
-  margin-top: 0.55em;
+.worksheet-doc > * + * {
+  margin-top: 14px;
 }
-.worksheet-prose h2 {
-  font-size: 16px;
-  font-weight: 600;
+.worksheet-doc h1 {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--color-ink);
 }
-.worksheet-prose ul {
+.worksheet-doc h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.worksheet-doc p {
+  margin: 0;
+}
+.worksheet-doc ul {
   list-style: disc;
-  padding-left: 1.4em;
+  padding-left: 26px;
 }
-.worksheet-prose ol {
+.worksheet-doc ol {
   list-style: decimal;
-  padding-left: 1.4em;
+  padding-left: 26px;
 }
-.worksheet-prose p.is-editor-empty:first-child::before {
+.worksheet-doc li {
+  margin: 4px 0;
+}
+.worksheet-doc img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--color-neutral-150);
+  margin: 6px 0;
+}
+.worksheet-doc p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--color-neutral-400);
   float: left;

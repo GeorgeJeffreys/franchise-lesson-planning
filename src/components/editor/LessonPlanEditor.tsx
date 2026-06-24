@@ -23,7 +23,8 @@ import { CurriculumBand } from '@/components/editor/CurriculumBand';
 import { ObjectiveStep } from '@/components/editor/ObjectiveStep';
 import { ObjectiveBanner } from '@/components/editor/ObjectiveBanner';
 import { WritingStep } from '@/components/editor/WritingStep';
-import { WorksheetBuilder } from '@/components/editor/WorksheetBuilder';
+import { PractiseStep } from '@/components/editor/PractiseStep';
+import type { WorksheetContext } from '@/components/editor/worksheet/context';
 import { LinkItStep } from '@/components/editor/LinkItStep';
 import { ReviewStep } from '@/components/editor/ReviewStep';
 
@@ -170,11 +171,6 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
     [classContext.subjectId, classContext.year, curriculum?.theme, curriculum?.focusArea],
   );
 
-  const practiseContext = useMemo<SuggestContext>(
-    () => ({ ...teachContext, stageKeywords: STAGE_KEYWORDS.practise }),
-    [teachContext],
-  );
-
   const canSubmit = remainder.trim().length > 0;
 
   async function handleCheck() {
@@ -233,6 +229,31 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
   const cfuBlock = getBlock(blocks, 'cfu');
   const exitBlock = getBlock(blocks, 'exit_ticket');
 
+  // Real lesson/curriculum/class context for the worksheet builder's locked
+  // master frame and the Generate/bank flows. Subject comes from the lesson's
+  // subject space (classContext), curriculum from the resolved curriculum_lesson.
+  const worksheetContext = useMemo<WorksheetContext>(
+    () => ({
+      subjectName: classContext.subjectName,
+      year: classContext.year,
+      theme: curriculum?.theme ?? '',
+      dailyOutcome: curriculum?.dailyLO ?? '',
+      centreName: classContext.schoolName,
+      lessonCode: curriculum?.lessonCode ?? plan.curriculum_lesson_id,
+      exitTicket:
+        exitBlock?.students_do?.trim() ||
+        exitBlock?.activity_title?.trim() ||
+        exitBlock?.note?.trim() ||
+        '',
+      weeklyOutcome: curriculum?.weekLO ?? '',
+      grammarVocab: curriculum?.grammarVocab ?? '',
+      literacy: classContext.literacy,
+      lessonPlanId: plan.id,
+      subjectId: classContext.subjectId,
+    }),
+    [classContext, curriculum, exitBlock, plan.id, plan.curriculum_lesson_id],
+  );
+
   return (
     <div className="mx-auto -my-8 max-w-[1340px]">
       <EditorSubHeader
@@ -284,23 +305,13 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         ) : null}
 
         {step === 3 && practiceBlock ? (
-          <WritingStep
-            title="Practise"
+          <PractiseStep
             block={practiceBlock}
             onPatch={(patch) => patchType('independent_practice', patch)}
-            subjectId={resourceBank.subjectId}
+            worksheet={worksheet}
+            onWorksheetChange={setWorksheet}
+            context={worksheetContext}
             vocabulary={resourceBank.vocabulary}
-            folders={resourceBank.folders}
-            suggestContext={practiseContext}
-            attachedResources={attachedFor(practiceBlock)}
-            onAttach={(resource) => attachResource('independent_practice', resource)}
-            onRemove={(resourceId) => detachResource('independent_practice', resourceId)}
-            worksheetSlot={
-              <WorksheetBuilder
-                value={worksheet as Parameters<typeof WorksheetBuilder>[0]['value']}
-                onChange={setWorksheet}
-              />
-            }
           />
         ) : null}
 

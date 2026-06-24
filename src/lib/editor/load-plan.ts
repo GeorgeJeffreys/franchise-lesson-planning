@@ -66,6 +66,8 @@ export interface EditorCurriculumContext {
   weekLO: string;
   /** The broader skill objective ("This month ·" context under the daily outcome). */
   monthLO: string;
+  /** The curriculum lesson's code (taxonomy id / lesson key), shown on the worksheet footer. */
+  lessonCode: string;
 }
 
 /** Everything the client editor needs, fully serializable. */
@@ -225,6 +227,9 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
         // stem-cleaned by getLessonById.
         weekLO: lesson.knowledgeLO,
         monthLO: lesson.skillLO,
+        // `lesson.id` is the taxonomy id when present, else the lesson key; fall
+        // back to the plan's stored reference so the footer always has a code.
+        lessonCode: lesson.id || row.curriculum_lesson_id,
       }
     : null;
 

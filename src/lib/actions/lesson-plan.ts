@@ -20,9 +20,10 @@ export interface SavePlanInput {
   /** Required-materials chips. Optional; persisted to `required_materials`. */
   required_materials?: string[];
   /**
-   * The student worksheet as a tiptap JSON document. Optional: only sent once
-   * the teacher has edited the worksheet. Stored verbatim in the unenforced
-   * `worksheet` JSONB column.
+   * The student worksheet body — the versioned `Worksheet` envelope (an ordered
+   * exercise-block list; see @/types/lesson). Optional: only sent once the
+   * teacher has touched the worksheet. Stored verbatim in the unenforced
+   * `worksheet` JSONB column and normalised on read via `parseWorksheet`.
    */
   worksheet?: unknown;
 }

@@ -17,6 +17,7 @@ import {
   getMostUsed,
   getResourceDownloadUrl,
   getResourcesByIds,
+  getUploaderNames,
   listFolderResources,
   listResources,
   moveResourceBetweenFolders,
@@ -66,6 +67,13 @@ export async function getResourcesByIdsAction(
   ids: string[]
 ): Promise<ResourceWithTags[]> {
   return getResourcesByIds(ids);
+}
+
+/** Resolve resource uploader ids to display names (for the bank "Shared by" facet). */
+export async function getUploaderNamesAction(
+  ids: string[]
+): Promise<Record<string, string>> {
+  return getUploaderNames(ids);
 }
 
 // ── folders ────────────────────────────────────────────────────────────────────

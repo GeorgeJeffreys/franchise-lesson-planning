@@ -1,0 +1,122 @@
+'use client';
+
+// A "From bank" exercise: a reference to a shared resource inserted via the bank
+// modal. Only the resource id is persisted; the resolved resource is passed in
+// from the builder. Image-backed resources render an inline preview (resolved
+// through a short-lived signed URL); other formats show a titled card with the
+// format badge and an open link.
+
+import { useEffect, useState } from 'react';
+import type { HTMLAttributes } from 'react';
+import type { ResourceWithTags } from '@/types/resource';
+import { BlockBar } from './BlockBar';
+import { resourceFormat, formatColors } from './resourceFormat';
+import { getDownloadUrlAction } from '@/lib/actions/resources';
+
+export function ResourceBlock({
+  resource,
+  uploaderName,
+  index,
+  loading,
+  onDelete,
+  dragHandleProps,
+}: {
+  resource: ResourceWithTags | null;
+  uploaderName: string | null;
+  index: number;
+  loading?: boolean;
+  onDelete: () => void;
+  dragHandleProps?: HTMLAttributes<HTMLSpanElement>;
+}) {
+  // Cache the signed preview URL alongside the path it was signed for, so a stale
+  // URL is never shown after the resource changes (and so the effect never calls
+  // setState synchronously).
+  const [preview, setPreview] = useState<{ path: string; url: string } | null>(null);
+  const format = resource ? resourceFormat(resource) : 'FILE';
+  const isImage = format === 'IMG';
+  const filePath = resource?.file_path ?? null;
+
+  useEffect(() => {
+    if (!filePath || !isImage) return;
+    let active = true;
+    getDownloadUrlAction(filePath).then((url) => {
+      if (active && url) setPreview({ path: filePath, url });
+    });
+    return () => {
+      active = false;
+    };
+  }, [filePath, isImage]);
+
+  const previewUrl = preview && preview.path === filePath ? preview.url : null;
+
+  const badgeText = uploaderName ? `From bank · ${uploaderName}` : 'From bank';
+  const colors = formatColors(format);
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{ border: '1px solid #E7DECF', borderRadius: 14, background: '#fff', overflow: 'hidden' }}
+    >
+      <BlockBar
+        index={index}
+        badge={{ text: badgeText, variant: 'bank' }}
+        onDelete={onDelete}
+        dragHandleProps={dragHandleProps}
+      />
+      <div style={{ padding: '20px 24px' }}>
+        {!resource ? (
+          <div style={{ fontSize: 14, color: '#8A8178' }}>
+            {loading ? 'Loading resource…' : 'This resource is no longer available.'}
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 18, fontWeight: 700 }}>{resource.title}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: colors.color, background: colors.bg, borderRadius: 5, padding: '2px 7px' }}>
+                {format}
+              </span>
+            </div>
+
+            {isImage && previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt={resource.title}
+                style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid #E4DACB', display: 'block' }}
+              />
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  border: '1px solid #E4DACB',
+                  borderRadius: 10,
+                  padding: '16px 18px',
+                  background: '#FBF8F3',
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: colors.color, background: colors.bg, borderRadius: 6, padding: '6px 10px' }}>
+                  {format}
+                </span>
+                <span style={{ flex: 1, fontSize: 13.5, color: '#5C544E' }}>
+                  {resource.description || 'Shared resource attached to this worksheet.'}
+                </span>
+                {resource.external_url ? (
+                  <a
+                    href={resource.external_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12.5, fontWeight: 600, color: '#1F7A6C' }}
+                  >
+                    Open ↗
+                  </a>
+                ) : null}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -136,6 +136,24 @@ export async function getResourcesByIds(ids: string[]): Promise<ResourceWithTags
   return attachTags(supabase, data as Resource[]);
 }
 
+/**
+ * Resolve resource uploader ids to display names via `profiles`. RLS exposes
+ * `id` + `full_name` for co-members (migration 0013), so non-visible uploaders
+ * simply fall out of the map. Used by the worksheet bank modal's "Shared by"
+ * facet and the From-bank block badge.
+ */
+export async function getUploaderNames(ids: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(ids)].filter(Boolean);
+  if (unique.length === 0) return {};
+  const supabase = await createClient();
+  const { data } = await supabase.from('profiles').select('id, full_name').in('id', unique);
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as Array<{ id: string; full_name: string | null }>) {
+    if (row.full_name) map[row.id] = row.full_name;
+  }
+  return map;
+}
+
 /** Fetch a single resource with its tags, or null if not visible/found. */
 export async function getResource(id: string): Promise<ResourceWithTags | null> {
   const supabase = await createClient();
