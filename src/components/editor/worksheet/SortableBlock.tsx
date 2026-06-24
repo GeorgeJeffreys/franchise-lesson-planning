@@ -27,6 +27,8 @@ export function SortableBlock({
   onDeactivate,
   selectedElementId,
   onSelectElement,
+  onElementDrop,
+  registerBox,
 }: {
   block: WorksheetBlock;
   index: number;
@@ -41,6 +43,8 @@ export function SortableBlock({
   onDeactivate: (id: string) => void;
   selectedElementId: string | null;
   onSelectElement: (id: string | null) => void;
+  onElementDrop: (fromBlockId: string, element: FloatingElement | null, rect: import('./FloatingElementView').ScreenRect) => void;
+  registerBox: (blockId: string, el: HTMLDivElement | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
@@ -72,6 +76,8 @@ export function SortableBlock({
           onDeactivate={onDeactivate}
           selectedElementId={selectedElementId}
           onSelectElement={onSelectElement}
+          onElementDrop={onElementDrop}
+          registerBox={registerBox}
           dragHandleProps={dragHandleProps}
         />
       ) : (
