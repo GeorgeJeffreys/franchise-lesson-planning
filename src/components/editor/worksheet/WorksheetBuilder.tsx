@@ -38,11 +38,13 @@ import type { FloatingElement, Worksheet, WorksheetDoc } from '@/types/lesson';
 import type { ResourceWithTags, TagsByDimension } from '@/types/resource';
 import {
   appendBlock,
+  clampGeom,
   duplicateBlock,
   isWorksheetEmpty,
   moveBlock,
   newFreeBlock,
   newResourceBlock,
+  nextZ,
   parseWorksheet,
   removeBlock,
   updateBlock,
@@ -55,7 +57,11 @@ import { SortableBlock } from './SortableBlock';
 import { ResourceBankModal } from './ResourceBankModal';
 import { WordToolbar } from './WordToolbar';
 import { WorksheetPrintView } from './WorksheetPrintView';
+import type { ScreenRect } from './FloatingElementView';
 import type { ActiveBlock } from './FreeBlock';
+
+const MIN_TEXTBOX = { w: 120, h: 56 };
+const MIN_IMAGE = { w: 48, h: 48 };
 
 const PAGE_WIDTH = 794;
 const MIN_ZOOM = 0.25;
@@ -310,6 +316,71 @@ export function WorksheetBuilder({
     [commit],
   );
 
+  // ── Cross-block drag (re-home an element into the block it's dropped over) ──
+  const blockBoxes = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerBox = useCallback((blockId: string, el: HTMLDivElement | null) => {
+    if (el) blockBoxes.current.set(blockId, el);
+    else blockBoxes.current.delete(blockId);
+  }, []);
+
+  const onElementDrop = useCallback(
+    (fromBlockId: string, element: FloatingElement | null, rect: ScreenRect) => {
+      if (!element) return;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      // The block whose content box contains the dropped element's centre wins;
+      // default to the source block (snap back) if it lands outside every block.
+      let targetId = fromBlockId;
+      let targetEl = blockBoxes.current.get(fromBlockId) ?? null;
+      for (const [bid, bel] of blockBoxes.current) {
+        const r = bel.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+          targetId = bid;
+          targetEl = bel;
+          break;
+        }
+      }
+      if (!targetEl) return;
+      const tRect = targetEl.getBoundingClientRect();
+      const scale = targetEl.clientWidth ? tRect.width / targetEl.clientWidth : 1;
+      const box = { w: targetEl.clientWidth, h: targetEl.clientHeight };
+      const min = element.kind === 'image' ? MIN_IMAGE : MIN_TEXTBOX;
+      const geom = clampGeom(
+        {
+          x: (rect.left - tRect.left) / scale,
+          y: (rect.top - tRect.top) / scale,
+          w: rect.width / scale,
+          h: rect.height / scale,
+        },
+        box,
+        min,
+      );
+
+      const cur = wsRef.current;
+      if (targetId === fromBlockId) {
+        commit(
+          updateBlock(cur, fromBlockId, (b) =>
+            b.kind === 'free'
+              ? { ...b, elements: b.elements.map((e) => (e.id === element.id ? { ...e, ...geom } : e)) }
+              : b,
+          ),
+        );
+        return;
+      }
+      // Re-home: remove from the source block, add to the target block on top.
+      let next = updateBlock(cur, fromBlockId, (b) =>
+        b.kind === 'free' ? { ...b, elements: b.elements.filter((e) => e.id !== element.id) } : b,
+      );
+      next = updateBlock(next, targetId, (b) =>
+        b.kind === 'free'
+          ? { ...b, elements: [...b.elements, { ...element, ...geom, z: nextZ(b.elements) }] }
+          : b,
+      );
+      commit(next);
+    },
+    [commit],
+  );
+
   // Insert into the active Free block (the toolbar enables these only when one is
   // active, so clicking the page never spawns an element).
   const insertTextBox = useCallback(() => active?.insertTextBox(), [active]);
@@ -470,6 +541,8 @@ export function WorksheetBuilder({
                               onDeactivate={onDeactivate}
                               selectedElementId={selectedEl}
                               onSelectElement={setSelectedEl}
+                              onElementDrop={onElementDrop}
+                              registerBox={registerBox}
                             />
                           ))}
                         </div>

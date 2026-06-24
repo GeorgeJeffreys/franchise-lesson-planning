@@ -7,11 +7,20 @@
 
 import { useEffect, useState } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
-import type { JSONContent } from '@tiptap/core';
+import { generateHTML, type JSONContent } from '@tiptap/core';
 import type { FloatingTextBox as FloatingTextBoxModel, WorksheetDoc } from '@/types/lesson';
 import { worksheetEditorExtensions } from './editorExtensions';
-import { FloatingElementView, type Geom } from './FloatingElementView';
+import { FloatingElementView, type Geom, type ScreenRect } from './FloatingElementView';
 import type { ActiveBlock } from './FreeBlock';
+
+function ghostHtml(doc: WorksheetDoc | null): string {
+  if (!doc) return '';
+  try {
+    return generateHTML(doc as JSONContent, worksheetEditorExtensions());
+  } catch {
+    return '';
+  }
+}
 
 export function FloatingTextBox({
   el,
@@ -22,6 +31,7 @@ export function FloatingTextBox({
   insertFloatingImage,
   onSelect,
   onCommit,
+  onMoveEnd,
   onDelete,
   onRestack,
   onDocChange,
@@ -38,6 +48,7 @@ export function FloatingTextBox({
   insertFloatingImage: () => void;
   onSelect: () => void;
   onCommit: (geom: Geom) => void;
+  onMoveEnd: (rect: ScreenRect) => void;
   onDelete: () => void;
   onRestack: (dir: 'forward' | 'backward') => void;
   onDocChange: (doc: WorksheetDoc) => void;
@@ -77,8 +88,25 @@ export function FloatingTextBox({
       resize="box"
       onSelect={onSelect}
       onCommit={onCommit}
+      onMoveEnd={onMoveEnd}
       onDelete={onDelete}
       onRestack={onRestack}
+      ghost={
+        <div
+          className="worksheet-doc"
+          style={{
+            width: '100%',
+            height: '100%',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            padding: 10,
+            background: el.fill === 'white' ? '#fff' : 'transparent',
+            border: el.border ? '1.5px solid #C9B89F' : 'none',
+            borderRadius: 6,
+          }}
+          dangerouslySetInnerHTML={{ __html: ghostHtml(el.doc) }}
+        />
+      }
       controls={
         <>
           <button

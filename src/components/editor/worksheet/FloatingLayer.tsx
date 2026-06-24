@@ -7,13 +7,15 @@
 // size + zoom scale when clamping drags.
 
 import type { FloatingElement, FloatingImage, FloatingTextBox as FloatingTextBoxModel, WorksheetDoc } from '@/types/lesson';
-import { FloatingElementView, type Geom } from './FloatingElementView';
+import { FloatingElementView, type Geom, type ScreenRect } from './FloatingElementView';
 import { FloatingTextBox } from './FloatingTextBox';
 import type { ActiveBlock } from './FreeBlock';
 
 export interface FloatingActions {
   onSelect: (id: string | null) => void;
   onCommit: (id: string, geom: Geom) => void;
+  /** A move ended — re-home the element by its final on-screen rect. */
+  onMoveEnd: (id: string, rect: ScreenRect) => void;
   onDelete: (id: string) => void;
   onRestack: (id: string, dir: 'forward' | 'backward') => void;
   onDocChange: (id: string, doc: WorksheetDoc) => void;
@@ -56,6 +58,7 @@ export function FloatingLayer({
             insertFloatingImage={insertFloatingImage}
             onSelect={() => actions.onSelect(el.id)}
             onCommit={(geom) => actions.onCommit(el.id, geom)}
+            onMoveEnd={(rect) => actions.onMoveEnd(el.id, rect)}
             onDelete={() => actions.onDelete(el.id)}
             onRestack={(dir) => actions.onRestack(el.id, dir)}
             onDocChange={(doc) => actions.onDocChange(el.id, doc)}
@@ -73,8 +76,13 @@ export function FloatingLayer({
             aspect={el.h ? el.w / el.h : 1}
             onSelect={() => actions.onSelect(el.id)}
             onCommit={(geom) => actions.onCommit(el.id, geom)}
+            onMoveEnd={(rect) => actions.onMoveEnd(el.id, rect)}
             onDelete={() => actions.onDelete(el.id)}
             onRestack={(dir) => actions.onRestack(el.id, dir)}
+            ghost={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(el as FloatingImage).src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+            }
             controls={
               <button
                 type="button"

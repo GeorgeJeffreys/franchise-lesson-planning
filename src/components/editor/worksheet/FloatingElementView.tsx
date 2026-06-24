@@ -7,7 +7,8 @@
 // coordinate box) and clamped to the printable body box, so an element can never
 // leave the page or overlap the locked chrome.
 
-import { useState, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import type { FloatingElement } from '@/types/lesson';
 import { clampGeom } from '@/lib/editor/worksheet';
 
@@ -16,6 +17,14 @@ export interface Geom {
   y: number;
   w: number;
   h: number;
+}
+
+/** A screen-space rectangle (px), used to re-home an element across blocks. */
+export interface ScreenRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 const TEAL = '#1F7A6C';
@@ -47,8 +56,10 @@ export function FloatingElementView({
   aspect,
   onSelect,
   onCommit,
+  onMoveEnd,
   onDelete,
   onRestack,
+  ghost,
   controls,
   children,
 }: {
@@ -60,12 +71,21 @@ export function FloatingElementView({
   aspect?: number; // width / height, for aspect-locked image corners
   onSelect: () => void;
   onCommit: (geom: Geom) => void;
+  /** Move finished — its final on-screen rect, for in-block move or cross-block re-home. */
+  onMoveEnd: (rect: ScreenRect) => void;
   onDelete: () => void;
   onRestack: (dir: 'forward' | 'backward') => void;
+  /** A static stand-in shown in the drag ghost (the live content can't be cloned). */
+  ghost?: ReactNode;
   controls?: ReactNode;
   children: ReactNode;
 }) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [live, setLive] = useState<Geom | null>(null);
+  // While dragging, the element is shown as a fixed-position ghost (a portal to
+  // <body>) so it escapes the block card's clipping and can be carried into
+  // another block; the original is hidden until the drop re-homes it.
+  const [dragRect, setDragRect] = useState<ScreenRect | null>(null);
   const geom: Geom = live ?? { x: el.x, y: el.y, w: el.w, h: el.h };
   const min = resize === 'image' ? { w: 48, h: 48 } : { w: 120, h: 56 };
 
@@ -84,22 +104,23 @@ export function FloatingElementView({
     e.preventDefault();
     e.stopPropagation();
     onSelect();
-    const { scale, box } = measure();
-    const start = { x: el.x, y: el.y, w: el.w, h: el.h };
+    const node = wrapperRef.current;
+    if (!node) return;
+    const r = node.getBoundingClientRect();
+    const start: ScreenRect = { left: r.left, top: r.top, width: r.width, height: r.height };
     const sx = e.clientX;
     const sy = e.clientY;
+    let latest = start;
+    setDragRect(start);
     const onMove = (ev: PointerEvent) => {
-      const dx = (ev.clientX - sx) / scale;
-      const dy = (ev.clientY - sy) / scale;
-      setLive(clampGeom({ ...start, x: start.x + dx, y: start.y + dy }, box, min));
+      latest = { ...start, left: start.left + (ev.clientX - sx), top: start.top + (ev.clientY - sy) };
+      setDragRect(latest);
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      setLive((g) => {
-        if (g) onCommit(g);
-        return null;
-      });
+      setDragRect(null);
+      onMoveEnd(latest);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -147,8 +168,11 @@ export function FloatingElementView({
 
   const handles: Handle[] = resize === 'image' ? CORNERS : [...CORNERS, ...EDGES];
 
+  const dragging = dragRect !== null;
+
   return (
     <div
+      ref={wrapperRef}
       className="ws-float-el"
       // Grabbing the element (its frame/border, or an image's body) moves it,
       // exactly like Word. Editable surfaces inside (a text box's text area) stop
@@ -164,13 +188,39 @@ export function FloatingElementView({
         zIndex: el.z,
         pointerEvents: 'auto',
         cursor: 'move',
-        outline: selected ? `1.5px solid ${TEAL}` : '1px dashed transparent',
+        opacity: dragging ? 0 : 1,
+        outline: selected && !dragging ? `1.5px solid ${TEAL}` : '1px dashed transparent',
         outlineOffset: 2,
       }}
     >
       {children}
 
-      {selected ? (
+      {/* Drag ghost — a fixed-position stand-in carried across blocks. */}
+      {dragRect
+        ? createPortal(
+            <div
+              style={{
+                position: 'fixed',
+                left: dragRect.left,
+                top: dragRect.top,
+                width: dragRect.width,
+                height: dragRect.height,
+                zIndex: 10000,
+                pointerEvents: 'none',
+                outline: `1.5px solid ${TEAL}`,
+                outlineOffset: 2,
+                boxShadow: '0 12px 32px -12px rgba(40,30,20,0.55)',
+                overflow: 'hidden',
+                background: '#fff',
+              }}
+            >
+              {ghost}
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {selected && !dragging ? (
         <>
           {/* Control strip */}
           <div

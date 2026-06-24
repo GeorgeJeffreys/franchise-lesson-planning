@@ -28,6 +28,7 @@ import { AiComposer } from './AiComposer';
 import { BlockBar } from './BlockBar';
 import { ExerciseHeading } from './ExerciseHeading';
 import { FloatingLayer } from './FloatingLayer';
+import type { ScreenRect } from './FloatingElementView';
 import type { WorksheetContext } from './context';
 import { markdownToHtml, escapeHtml } from '@/lib/editor/markdown';
 import { uploadWorksheetImageAction } from '@/lib/actions/worksheet';
@@ -102,6 +103,8 @@ export function FreeBlock({
   onDeactivate,
   selectedElementId,
   onSelectElement,
+  onElementDrop,
+  registerBox,
   dragHandleProps,
 }: {
   block: WorksheetFreeBlock;
@@ -119,6 +122,10 @@ export function FreeBlock({
   /** The currently selected element id across the worksheet (or null). */
   selectedElementId: string | null;
   onSelectElement: (id: string | null) => void;
+  /** A move ended — re-home the element (possibly into a different block). */
+  onElementDrop: (fromBlockId: string, element: FloatingElement | null, rect: ScreenRect) => void;
+  /** Register this block's content box for cross-block drop hit-testing. */
+  registerBox: (blockId: string, el: HTMLDivElement | null) => void;
   dragHandleProps?: HTMLAttributes<HTMLSpanElement>;
 }) {
   const hasContent = Boolean(block.doc) || block.elements.length > 0;
@@ -281,6 +288,12 @@ export function FreeBlock({
     setView('compose');
   }, []);
 
+  // Register this block's content box so cross-block drops can hit-test it.
+  useEffect(() => {
+    registerBox(block.id, boxRef.current);
+    return () => registerBox(block.id, null);
+  }, [block.id, view, registerBox]);
+
   // Make this block's doc editor the active toolbar target on focus.
   useEffect(() => {
     if (!editor) return;
@@ -312,6 +325,8 @@ export function FreeBlock({
       onSelect: (id: string | null) => onSelectElement(id),
       onCommit: (id: string, geom: { x: number; y: number; w: number; h: number }) =>
         commitElements(elementsRef.current.map((e) => (e.id === id ? { ...e, ...geom } : e))),
+      onMoveEnd: (id: string, rect: ScreenRect) =>
+        onElementDrop(block.id, elementsRef.current.find((e) => e.id === id) ?? null, rect),
       onDelete: (id: string) => {
         commitElements(elementsRef.current.filter((e) => e.id !== id));
         onSelectElement(null);
@@ -330,7 +345,7 @@ export function FreeBlock({
       onActivate,
       onDeactivate,
     }),
-    [commitElements, onSelectElement, makeImageInline, onActivate, onDeactivate],
+    [commitElements, onSelectElement, makeImageInline, onActivate, onDeactivate, onElementDrop, block.id],
   );
 
   // Activate this block (without focusing text) when its chrome/empty area is
