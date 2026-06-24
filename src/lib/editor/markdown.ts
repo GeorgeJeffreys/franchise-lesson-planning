@@ -16,13 +16,17 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Apply inline emphasis (bold then italic) to already-escaped text. */
+/**
+ * Apply inline emphasis (bold then italic) to already-escaped text. Only
+ * asterisk syntax is honoured — worksheet content routinely contains underscores
+ * (fill-in-the-blank runs, snake_case), so treating `_` as emphasis would mangle
+ * it. `**bold**` is matched before `*italic*` so the single-asterisk rule does
+ * not split a bold run.
+ */
 function inline(text: string): string {
   return text
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
-    .replace(/(^|[^_])_([^_]+)_/g, '$1<em>$2</em>');
+    .replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>');
 }
 
 /** Render one block of non-list lines as a paragraph (single <br> between lines). */
