@@ -62,10 +62,20 @@ export function TestUserBar({ impersonating, currentRole }: TestUserBarProps) {
         setBusyRole(null);
         return;
       }
+      // A clean fallback (e.g. the real session expired while impersonating) asks
+      // us to send the user to normal login rather than surfacing an error.
+      let redirectTo: string | null = null;
+      try {
+        const data = (await res.json()) as { redirectTo?: unknown };
+        if (typeof data?.redirectTo === 'string') redirectTo = data.redirectTo;
+      } catch {
+        // No / non-JSON body — just refresh in place.
+      }
       // Cookies are now swapped; refresh so server components re-read the session
-      // and RLS-scoped data re-loads as the new user.
+      // and RLS-scoped data re-loads as the new user (or go to login on fallback).
       startTransition(() => {
-        router.refresh();
+        if (redirectTo) router.push(redirectTo);
+        else router.refresh();
         setBusyRole(null);
       });
     } catch {

@@ -1,6 +1,13 @@
 import 'server-only';
 
 import { cookies } from 'next/headers';
+import {
+  DEFAULT_COOKIE_OPTIONS,
+  createChunks,
+  isChunkLike,
+  stringToBase64URL,
+} from '@supabase/ssr';
+import type { Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { isTestRole, type TestRole } from '@/lib/test-roles';
 
@@ -32,11 +39,78 @@ export const STASH_COOKIE = 'test-impersonation-stash';
  */
 export const IMPERSONATION_ROLE_COOKIE = 'test-impersonation-role';
 
-/** Shape stashed in {@link STASH_COOKIE}: the real user's id + session tokens. */
+/**
+ * Shape stashed in {@link STASH_COOKIE}: the real user's id + their ENTIRE
+ * Supabase session (access + refresh + expiry + user). We stash the whole
+ * session so "Return" can resume it by writing the auth cookies directly — with
+ * no `setSession` round-trip that would re-validate or rotate a refresh token
+ * that may already have been spent by the time the user returns.
+ */
 export interface ImpersonationStash {
   uid: string;
-  access_token: string;
-  refresh_token: string;
+  session: Session;
+}
+
+/** next/headers cookie store (writable inside Route Handlers). */
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+/**
+ * The cookie name `@supabase/ssr` stores the session under. supabase-js derives
+ * the default storage key from the project URL as `sb-<ref>-auth-token`; we
+ * mirror that here so a direct write lands where the SSR client will read it.
+ */
+export function authTokenCookieName(): string {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL; cannot derive the auth cookie name.');
+  }
+  return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+}
+
+/**
+ * Whether a stashed session's access token is still good enough to resume
+ * without a refresh. `expires_at` is in seconds; a small skew avoids handing
+ * back a token that is about to expire. A missing/absent expiry is treated as
+ * unusable (force the clean login fallback rather than a guess).
+ */
+export function isStashedSessionResumable(session: Session): boolean {
+  if (!session?.access_token || !session?.refresh_token) return false;
+  const expiresAt = session.expires_at;
+  if (typeof expiresAt !== 'number') return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return expiresAt > nowSeconds + 10;
+}
+
+/**
+ * Write a real session back into the SSR auth cookie(s) directly, in exactly the
+ * format `@supabase/ssr` reads (base64url-prefixed value, chunked under the
+ * storage key). No server round-trip, so a possibly-rotated refresh token is
+ * never replayed. Any stale chunks from the prior (impersonated) session are
+ * removed first.
+ */
+export function writeSessionToAuthCookies(cookieStore: CookieStore, session: Session): void {
+  const key = authTokenCookieName();
+  const encoded = `base64-${stringToBase64URL(JSON.stringify(session))}`;
+  const chunks = createChunks(key, encoded);
+  const nextNames = new Set(chunks.map((c) => c.name));
+
+  // Drop any existing chunk cookies for this key that the new write won't cover.
+  for (const { name } of cookieStore.getAll()) {
+    if (isChunkLike(name, key) && !nextNames.has(name)) {
+      cookieStore.delete(name);
+    }
+  }
+  for (const { name, value } of chunks) {
+    cookieStore.set(name, value, { ...DEFAULT_COOKIE_OPTIONS });
+  }
+}
+
+/** Remove every auth-token chunk cookie — used when there is no resumable session. */
+export function clearAuthCookies(cookieStore: CookieStore): void {
+  const key = authTokenCookieName();
+  for (const { name } of cookieStore.getAll()) {
+    if (isChunkLike(name, key)) cookieStore.delete(name);
+  }
 }
 
 /** Map each role key to the env vars holding its sign-in credentials. */

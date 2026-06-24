@@ -6,11 +6,14 @@ import { createClient } from '@/lib/supabase/server';
 import {
   IMPERSONATION_ROLE_COOKIE,
   STASH_COOKIE,
+  clearAuthCookies,
   getAllowedUids,
   impersonationEnabled,
+  isStashedSessionResumable,
   isTestRole,
   roleToCredentials,
   stashCookieOptions,
+  writeSessionToAuthCookies,
   type ImpersonationStash,
 } from '@/lib/test-impersonation';
 
@@ -126,18 +129,25 @@ export async function POST(request: NextRequest) {
       if (!stash) {
         return NextResponse.json({ ok: true, impersonating: false });
       }
-      // setSession restores the real session (and refreshes it if the stashed
-      // access token has since expired), writing the auth cookies back.
-      const { error } = await supabase.auth.setSession({
-        access_token: stash.access_token,
-        refresh_token: stash.refresh_token,
-      });
-      if (error) {
-        return fail('restore', reason(error, 'failed to restore the real session'), 500);
+
+      // If the stashed real session is still good, resume it by writing the auth
+      // cookies directly — no setSession round-trip, so a refresh token that has
+      // since been rotated/spent is never replayed (the cause of the prior
+      // `refresh_token_already_used` 400).
+      if (isStashedSessionResumable(stash.session)) {
+        writeSessionToAuthCookies(cookieStore, stash.session);
+        cookieStore.delete(STASH_COOKIE);
+        cookieStore.delete(IMPERSONATION_ROLE_COOKIE);
+        return NextResponse.json({ ok: true, impersonating: false });
       }
+
+      // The real session has since expired: there is nothing to safely resume.
+      // Clear the impersonated session + stash and send the user through the
+      // normal Entra login — a clean fallback, not an error.
+      clearAuthCookies(cookieStore);
       cookieStore.delete(STASH_COOKIE);
       cookieStore.delete(IMPERSONATION_ROLE_COOKIE);
-      return NextResponse.json({ ok: true, impersonating: false });
+      return NextResponse.json({ ok: true, impersonating: false, redirectTo: '/login' });
     }
 
     // ── Switch role: validate the requested role ─────────────────────────────
@@ -164,11 +174,9 @@ export async function POST(request: NextRequest) {
       if (!session) {
         return fail('auth', 'no active session to stash', 401);
       }
-      const toStash: ImpersonationStash = {
-        uid: user.id,
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      };
+      // Stash the WHOLE session (incl. expiry + user) so Return can resume it by
+      // writing cookies directly, with no refresh-token replay.
+      const toStash: ImpersonationStash = { uid: user.id, session };
       cookieStore.set(STASH_COOKIE, JSON.stringify(toStash), stashCookieOptions());
     }
 
@@ -212,12 +220,14 @@ function readStash(raw: string | undefined): ImpersonationStash | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<ImpersonationStash>;
+    const session = parsed.session;
     if (
       typeof parsed.uid === 'string' &&
-      typeof parsed.access_token === 'string' &&
-      typeof parsed.refresh_token === 'string'
+      session &&
+      typeof session.access_token === 'string' &&
+      typeof session.refresh_token === 'string'
     ) {
-      return { uid: parsed.uid, access_token: parsed.access_token, refresh_token: parsed.refresh_token };
+      return { uid: parsed.uid, session };
     }
     return null;
   } catch {
