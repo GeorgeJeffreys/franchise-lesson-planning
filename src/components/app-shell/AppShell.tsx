@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { TopNav } from '@/components/app-shell/TopNav';
 import { UserMenu } from '@/components/app-shell/UserMenu';
+import { TestUserBar } from '@/components/app-shell/TestUserBar';
 import { isAdmin, getMyMemberships } from '@/lib/auth';
+import { getImpersonationState } from '@/lib/test-impersonation';
 
 type AppShellProps = {
   /** The signed-in user's display name (full_name, falling back to email). */
@@ -23,12 +25,29 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
   // The "Settings" nav link is shown to admins and coordinators (anyone with
   // console tabs beyond Profile); `/settings` is role-aware, so this is
   // presentation only. Everyone reaches Settings via the avatar menu too.
-  const [admin, memberships] = await Promise.all([isAdmin(), getMyMemberships()]);
+  const [admin, memberships, impersonation] = await Promise.all([
+    isAdmin(),
+    getMyMemberships(),
+    getImpersonationState(),
+  ]);
   const showSettings = admin || memberships.some((m) => m.role === 'coordinator');
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 flex h-16 items-center gap-6 border-b border-border bg-surface px-[30px]">
+      {impersonation.active ? (
+        <TestUserBar
+          impersonating={impersonation.impersonating}
+          currentRole={impersonation.currentRole}
+        />
+      ) : null}
+
+      {/* The shell header sticks just below the test bar when it is present, so
+          neither occludes the other; otherwise it sticks to the very top. */}
+      <header
+        className={`sticky z-50 flex h-16 items-center gap-6 border-b border-border bg-surface px-[30px] ${
+          impersonation.active ? 'top-10' : 'top-0'
+        }`}
+      >
         {/* Brand — links home to the Weekly Overview */}
         <Link
           href="/"
