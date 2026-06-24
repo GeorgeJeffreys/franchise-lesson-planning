@@ -10,9 +10,7 @@ import type { ReactNode } from 'react';
 import type { Block, TeachingPhase } from '@/types/lesson';
 import type { Folder, ResourceWithTags, TagsByDimension } from '@/types/resource';
 import type { SuggestContext } from '@/lib/editor/resource-suggest';
-import { blockMinutes } from '@/lib/blocks';
 import { PhaseSelect } from '@/components/editor/PhaseSelect';
-import { TimeStepper } from '@/components/editor/TimeStepper';
 import { FieldLabel, Textarea } from '@/components/editor/fields';
 import { AttachedList } from '@/components/editor/AttachedList';
 import { ResourcePanel } from '@/components/editor/ResourcePanel';
@@ -56,11 +54,6 @@ export function WritingStep({
             />
           </div>
         </div>
-        <TimeStepper
-          label="min"
-          value={blockMinutes(block)}
-          onChange={(next) => onPatch({ minutes: next })}
-        />
       </div>
 
       {/* Two panes: writing (left) · embedded resource bank (right, 396px) */}

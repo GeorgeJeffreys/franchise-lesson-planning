@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import type { Block, TeachingPhase } from '@/types/lesson';
 import type { ActivityBankItem, ClassLiteracy } from '@/lib/editor/load-plan';
-import { blockMinutes } from '@/lib/blocks';
 import { PhaseSelect } from '@/components/editor/PhaseSelect';
-import { TimeStepper } from '@/components/editor/TimeStepper';
 import { Textarea } from '@/components/editor/fields';
 
 const VISIBLE_BEFORE_EXPAND = 4;
@@ -214,18 +212,6 @@ export function LinkItStep({
               onChange={(phase) => onCfuChange({ phase: phase as TeachingPhase | null })}
             />
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-[10px]">
-          <TimeStepper
-            label="CFU min"
-            value={blockMinutes(cfuBlock)}
-            onChange={(next) => onCfuChange({ minutes: next })}
-          />
-          <TimeStepper
-            label="Exit min"
-            value={blockMinutes(exitBlock)}
-            onChange={(next) => onExitChange({ minutes: next })}
-          />
         </div>
       </div>
       {/* TODO(reskin): the mockup shows a right-hand resource bank pane on this

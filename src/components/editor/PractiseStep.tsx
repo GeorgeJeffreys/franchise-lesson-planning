@@ -1,16 +1,14 @@
 'use client';
 
 // Step 3 (Practise) body. Unlike the two-pane "Teach it" step, Practise is a
-// single full-width card: the block header (phase + minutes), the two pink-
+// single full-width card: the block header (phase), the two pink-
 // editable teacher/student textareas, and below them the full student-worksheet
 // builder (toolbar + inline A4 canvas). The resource bank is reached through the
 // builder's modal (not an embedded side panel), matching the mockup.
 
 import type { Block, TeachingPhase, Worksheet } from '@/types/lesson';
 import type { TagsByDimension } from '@/types/resource';
-import { blockMinutes } from '@/lib/blocks';
 import { PhaseSelect } from '@/components/editor/PhaseSelect';
-import { TimeStepper } from '@/components/editor/TimeStepper';
 import { FieldLabel, Textarea } from '@/components/editor/fields';
 import { WorksheetBuilder } from '@/components/editor/worksheet/WorksheetBuilder';
 import type { WorksheetContext } from '@/components/editor/worksheet/context';
@@ -39,9 +37,6 @@ export function PractiseStep({
           value={block.phase}
           onChange={(phase) => onPatch({ phase: phase as TeachingPhase | null })}
         />
-        <div className="ml-auto">
-          <TimeStepper label="min" value={blockMinutes(block)} onChange={(next) => onPatch({ minutes: next })} />
-        </div>
       </div>
 
       {/* Teacher / student writing (pink-editable) */}

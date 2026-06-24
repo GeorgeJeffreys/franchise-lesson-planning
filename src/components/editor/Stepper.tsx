@@ -85,15 +85,23 @@ export function Stepper({
         })}
 
         <div className="ml-5 flex shrink-0 gap-[9px]">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="rounded-[9px] border border-border-strong bg-surface px-[15px] py-[9px] text-[13px] font-medium text-ink hover:bg-surface-subtle"
-            >
-              ← Back
-            </button>
-          ) : null}
+          {/* Always rendered so the cluster keeps an identical width on every
+              step — on Step 1 it is hidden (but still occupies its box) and
+              made inert, so the stepper band doesn't reflow at the 1 ↔ 2
+              transition. */}
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={step === 1}
+            tabIndex={step === 1 ? -1 : undefined}
+            aria-hidden={step === 1 ? true : undefined}
+            className={
+              'rounded-[9px] border border-border-strong bg-surface px-[15px] py-[9px] text-[13px] font-medium text-ink hover:bg-surface-subtle' +
+              (step === 1 ? ' invisible' : '')
+            }
+          >
+            ← Back
+          </button>
           {isLast ? (
             submitSlot
           ) : (
