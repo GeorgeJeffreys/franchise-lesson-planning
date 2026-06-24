@@ -138,6 +138,73 @@ test('English: sheet/header/grain detected; helper excluded; English mapping int
   assert.ok(report.warnings.some((w) => w.includes('#REF!')));
 });
 
+// ── Combined "Monthly Learning Outcome" → monthly_lo, forward-filled ─────────────
+//
+// English (and most subjects) carry ONE combined "Monthly Learning Outcome" merged
+// down the month (value on the first row, blank beneath). It must map to the
+// monthlyLearningOutcome field, land in the monthly_lo column, and forward-fill onto
+// EVERY row of the month — not just week-1/period-1 — while the split skill/knowledge
+// columns stay null for the combined shape.
+
+test('combined Monthly Learning Outcome maps to monthly_lo and fills every row of the month', () => {
+  const headers: CellSpec[] = [
+    '', 'Subject', 'Year', 'Month', 'Monthly Learning Outcome', 'Week', 'Period #', 'Daily Learning Outcome',
+  ];
+  const rows: CellSpec[][] = [
+    ['', 'English', 'Year 1', 'March', 'Master greetings', 1, 'Period 1', 'Say hello'],
+    ['', '', '', '', '', 1, 'Period 2', 'Say goodbye'],
+    ['', '', '', '', '', 2, 'Period 1', 'Introduce self'],
+    ['', '', '', 'April', 'Master numbers', 3, 'Period 1', 'Count to ten'],
+    ['', '', '', '', '', 3, 'Period 2', 'Count to twenty'],
+  ];
+  const wb = makeWorkbook({ 'English Curriculum': [...headerBlock(headers), ...rows] });
+
+  const { report, lessonRows } = parseCurriculumWorkbook(wb, 'english');
+
+  // The combined column maps to monthlyLearningOutcome (NOT a split field, NOT unmapped).
+  const monthly = report.columnMap.find((m) => m.canonicalField === 'monthlyLearningOutcome');
+  assert.equal(monthly?.column, 'E');
+  assert.equal(monthly?.confidence, 1);
+  assert.equal(
+    report.unmappedHeaders.some((u) => u.header === 'Monthly Learning Outcome'),
+    false,
+  );
+
+  // monthly_lo is forward-filled onto EVERY row of each month; the split columns are
+  // null (English does not split), and the value resets on the next month's value.
+  assert.equal(lessonRows.length, 5);
+  assert.deepEqual(
+    lessonRows.map((r) => r.monthly_lo),
+    ['Master greetings', 'Master greetings', 'Master greetings', 'Master numbers', 'Master numbers'],
+  );
+  for (const r of lessonRows) {
+    assert.equal(r.monthly_skills_lo, null);
+    assert.equal(r.monthly_knowledge_lo, null);
+  }
+});
+
+// ── Split monthly LO (Prof V1 shape) stays split; combined never steals it ────────
+
+test('split Monthly Skill/Knowledge LO map to their own columns, not the combined one', () => {
+  const headers: CellSpec[] = [
+    '', 'Year', 'Month',
+    'Monthly Skill Learning Outcome', 'Monthly Knowledge Learning Outcome',
+    'Week', 'Period #', 'Daily Learning Outcome',
+  ];
+  const data: CellSpec[] = ['', 'Year 2', 'May', 'Skill: present well', 'Know: etiquette', 1, 'Period 1', 'Practice'];
+  const wb = makeWorkbook({ 'Professionalism V1': [...headerBlock(headers), data] });
+
+  const { report, lessonRows } = parseCurriculumWorkbook(wb, 'professionalism');
+  const fields = report.columnMap.map((m) => m.canonicalField);
+  assert.ok(fields.includes('monthlySkillLearningOutcome'));
+  assert.ok(fields.includes('monthlyKnowledgeLearningOutcome'));
+  // The combined field must NOT bind either split column.
+  assert.equal(fields.includes('monthlyLearningOutcome'), false);
+  assert.equal(lessonRows[0].monthly_skills_lo, 'Skill: present well');
+  assert.equal(lessonRows[0].monthly_knowledge_lo, 'Know: etiquette');
+  assert.equal(lessonRows[0].monthly_lo, null);
+});
+
 // ── Shifted columns — position must not matter ───────────────────────────────────
 
 test('shifted column letters: Daily LO in a different column still maps', () => {
