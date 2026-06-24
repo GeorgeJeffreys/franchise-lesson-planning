@@ -18,7 +18,7 @@ import { WordToolbar } from './WordToolbar';
 import { AiComposer } from './AiComposer';
 import { BlockBar } from './BlockBar';
 import type { WorksheetContext } from './context';
-import { markdownToHtml } from '@/lib/editor/markdown';
+import { markdownToHtml, escapeHtml } from '@/lib/editor/markdown';
 import { uploadWorksheetImageAction } from '@/lib/actions/worksheet';
 import {
   requestGeneratedResource,
@@ -129,7 +129,7 @@ export function FreeBlock({
     setGenError(null);
     try {
       const result = await requestGeneratedResource(ctx, prompt.trim());
-      const html = `<h1>${result.title.replace(/</g, '&lt;')}</h1>${markdownToHtml(result.body)}`;
+      const html = `<h1>${escapeHtml(result.title)}</h1>${markdownToHtml(result.body)}`;
       setFrom(true);
       // setContent's second arg (emitUpdate) is false, so lift the doc explicitly.
       editor.commands.setContent(html, false);

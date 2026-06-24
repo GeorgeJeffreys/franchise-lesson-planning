@@ -235,7 +235,10 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
   const worksheetContext = useMemo<WorksheetContext>(
     () => ({
       subjectName: classContext.subjectName,
-      year: classContext.year,
+      // Class plans always carry a real class year (0–6). Centre/org plans have
+      // no single class, so the loader coerces a missing year to 0; use the
+      // plan's own nullable year there to avoid a spurious "Year 0".
+      year: classContext.scope === 'class' ? classContext.year : plan.year,
       theme: curriculum?.theme ?? '',
       dailyOutcome: curriculum?.dailyLO ?? '',
       centreName: classContext.schoolName,
@@ -251,7 +254,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
       lessonPlanId: plan.id,
       subjectId: classContext.subjectId,
     }),
-    [classContext, curriculum, exitBlock, plan.id, plan.curriculum_lesson_id],
+    [classContext, curriculum, exitBlock, plan.id, plan.curriculum_lesson_id, plan.year],
   );
 
   return (

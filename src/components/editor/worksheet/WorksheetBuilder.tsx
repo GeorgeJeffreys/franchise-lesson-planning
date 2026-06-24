@@ -86,15 +86,20 @@ export function WorksheetBuilder({
     const missing = resourceIds.filter((id) => !attempted.has(id));
     if (missing.length === 0) return;
     let active = true;
-    getResourcesByIdsAction(missing).then((rows) => {
-      if (!active) return;
-      setResolved((prev) => {
-        const next = { ...prev };
-        for (const r of rows) next[r.id] = r;
-        return next;
+    getResourcesByIdsAction(missing)
+      .then((rows) => {
+        if (!active) return;
+        setResolved((prev) => {
+          const next = { ...prev };
+          for (const r of rows) next[r.id] = r;
+          return next;
+        });
+      })
+      .finally(() => {
+        // Mark these ids attempted regardless of outcome, so a failed resolve
+        // settles to "no longer available" instead of an endless "Loading…".
+        if (active) setAttempted((prev) => new Set([...prev, ...missing]));
       });
-      setAttempted((prev) => new Set([...prev, ...missing]));
-    });
     return () => {
       active = false;
     };

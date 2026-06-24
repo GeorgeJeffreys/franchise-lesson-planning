@@ -73,12 +73,18 @@ export function ResourceBankModal({
     searchResourcesAction({
       subjectId: subjectScoped && ctx.subjectId ? ctx.subjectId : undefined,
       limit: 200,
-    }).then(async (rows) => {
-      if (!active) return;
-      setAll(rows);
-      const map = await getUploaderNamesAction(rows.map((r) => r.uploaded_by));
-      if (active) setNames(map);
-    });
+    })
+      .then(async (rows) => {
+        if (!active) return;
+        setAll(rows);
+        const map = await getUploaderNamesAction(rows.map((r) => r.uploaded_by));
+        if (active) setNames(map);
+      })
+      .catch(() => {
+        // Surface an empty bank ("No resources match") rather than a permanent
+        // loading spinner if the read fails (RLS/network).
+        if (active) setAll([]);
+      });
     return () => {
       active = false;
     };
@@ -155,7 +161,10 @@ export function ResourceBankModal({
     setUploaderSel(new Set());
   };
 
-  const pickedResource = filtered.find((r) => r.id === picked) ?? all?.find((r) => r.id === picked) ?? null;
+  // Only honour a selection that is still visible in the filtered grid, so
+  // tightening a filter that hides the picked card disables Add rather than
+  // adding an invisible resource.
+  const pickedResource = filtered.find((r) => r.id === picked) ?? null;
 
   return (
     <div
