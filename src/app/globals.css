@@ -133,9 +133,20 @@
   line-height: 1.75;
   color: var(--color-ink);
   outline: none;
+  /* The editable column spans the full A4 text width and wraps at word
+   * boundaries — fixes mid-word breaks like "Ok let m / e try". */
+  width: 100%;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .worksheet-doc:focus {
   outline: none;
+}
+/* Contain floated (left/right aligned) images so the block doesn't collapse. */
+.worksheet-doc::after {
+  content: '';
+  display: block;
+  clear: both;
 }
 .worksheet-doc > * + * {
   margin-top: 14px;
@@ -172,10 +183,60 @@
   border: 1px solid var(--color-neutral-150);
   margin: 6px 0;
 }
+/* Resizable-image NodeView: the wrapper owns the size + float, so the inner img
+ * fills it and drops the default standalone-image margin/border. */
+.worksheet-doc .ws-img-nv {
+  max-width: 100%;
+}
+.worksheet-doc .ws-img-nv img {
+  margin: 0;
+}
 .worksheet-doc p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--color-neutral-400);
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/*
+ * Worksheet editor: full-screen + print.
+ *
+ * `.ws-no-print` hides editor chrome (toolbar, zoom, rail, block bars, the
+ * Generate button) from the printout. The print path renders only `.ws-print-area`
+ * — the A4 page surface at true size, with the on-screen preview scale reset to 1.
+ */
+.ws-shell:fullscreen,
+.ws-shell:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+@media print {
+  /* Hide everything, then reveal only the print surface. */
+  body * {
+    visibility: hidden !important;
+  }
+  .ws-print-area,
+  .ws-print-area * {
+    visibility: visible !important;
+  }
+  .ws-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  /* The page surface prints at natural A4 — undo the on-screen preview scale. */
+  .ws-print-scale {
+    transform: none !important;
+  }
+  .ws-no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
 }

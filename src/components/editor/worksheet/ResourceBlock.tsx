@@ -20,6 +20,7 @@ export function ResourceBlock({
   loading,
   onDelete,
   dragHandleProps,
+  chromeless,
 }: {
   resource: ResourceWithTags | null;
   uploaderName: string | null;
@@ -27,6 +28,8 @@ export function ResourceBlock({
   loading?: boolean;
   onDelete: () => void;
   dragHandleProps?: HTMLAttributes<HTMLSpanElement>;
+  /** Print/preview render: drop the block bar and card border for a clean page. */
+  chromeless?: boolean;
 }) {
   // Cache the signed preview URL alongside the path it was signed for, so a stale
   // URL is never shown after the resource changes (and so the effect never calls
@@ -55,15 +58,21 @@ export function ResourceBlock({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      style={{ border: '1px solid #E7DECF', borderRadius: 14, background: '#fff', overflow: 'hidden' }}
+      style={
+        chromeless
+          ? { background: '#fff' }
+          : { border: '1px solid #E7DECF', borderRadius: 14, background: '#fff', overflow: 'hidden' }
+      }
     >
-      <BlockBar
-        index={index}
-        badge={{ text: badgeText, variant: 'bank' }}
-        onDelete={onDelete}
-        dragHandleProps={dragHandleProps}
-      />
-      <div style={{ padding: '20px 24px' }}>
+      {chromeless ? null : (
+        <BlockBar
+          index={index}
+          badge={{ text: badgeText, variant: 'bank' }}
+          onDelete={onDelete}
+          dragHandleProps={dragHandleProps}
+        />
+      )}
+      <div style={{ padding: chromeless ? 0 : '20px 24px' }}>
         {!resource ? (
           <div style={{ fontSize: 14, color: '#8A8178' }}>
             {loading ? 'Loading resource…' : 'This resource is no longer available.'}

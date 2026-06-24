@@ -8,13 +8,12 @@
 // markdown result into the editor. The block's document is lifted to the parent
 // on every change for autosave into lesson_plans.worksheet.
 
-import { useCallback, useRef, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/core';
 import type { WorksheetFreeBlock, WorksheetDoc } from '@/types/lesson';
 import type { HTMLAttributes } from 'react';
 import { worksheetEditorExtensions } from './editorExtensions';
-import { WordToolbar } from './WordToolbar';
 import { AiComposer } from './AiComposer';
 import { BlockBar } from './BlockBar';
 import type { WorksheetContext } from './context';
@@ -26,6 +25,14 @@ import {
 } from '@/lib/editor/generate-resource-client';
 
 type View = 'blank' | 'compose' | 'doc';
+
+/** The imperative surface a focused Free block exposes to the chrome toolbar. */
+export interface ActiveBlock {
+  id: string;
+  editor: Editor;
+  insertImage: () => void;
+  startGenerate: () => void;
+}
 
 function PenIcon() {
   return (
@@ -58,6 +65,8 @@ export function FreeBlock({
   onChange,
   onDelete,
   onDuplicate,
+  onActivate,
+  onDeactivate,
   dragHandleProps,
 }: {
   block: WorksheetFreeBlock;
@@ -66,6 +75,10 @@ export function FreeBlock({
   onChange: (doc: WorksheetDoc, fromAI: boolean) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  /** Register this block as the chrome toolbar's target when it gains focus. */
+  onActivate: (api: ActiveBlock) => void;
+  /** Clear the active block when this one unmounts (e.g. is deleted). */
+  onDeactivate: (id: string) => void;
   dragHandleProps?: HTMLAttributes<HTMLSpanElement>;
 }) {
   const [view, setView] = useState<View>(block.doc ? 'doc' : 'blank');
@@ -149,6 +162,18 @@ export function FreeBlock({
     setView('compose');
   }, []);
 
+  // Register with the chrome toolbar as the active block whenever this block's
+  // editor gains focus, and clear the registration on unmount (delete).
+  useEffect(() => {
+    if (!editor) return;
+    const announce = () => onActivate({ id: block.id, editor, insertImage: pickImage, startGenerate: toCompose });
+    editor.on('focus', announce);
+    return () => {
+      editor.off('focus', announce);
+      onDeactivate(block.id);
+    };
+  }, [editor, block.id, pickImage, toCompose, onActivate, onDeactivate]);
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
@@ -168,10 +193,6 @@ export function FreeBlock({
         onDuplicate={onDuplicate}
         dragHandleProps={dragHandleProps}
       />
-
-      {editor ? (
-        <WordToolbar editor={editor} onInsertImage={pickImage} onGenerate={toCompose} />
-      ) : null}
 
       <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
 

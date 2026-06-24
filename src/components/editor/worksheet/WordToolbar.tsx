@@ -1,18 +1,41 @@
 'use client';
 
-// The Word-like formatting toolbar shown at the top of every Free block. It acts
-// on the block's tiptap editor (headings, bold/italic/underline, a pink text
-// colour, alignment, lists), exposes the image-insert and Generate-with-AI
-// actions, and mirrors the mockup's layout exactly. The "size" and table
-// controls are visual-only for v1 (StarterKit has no font-size / table schema).
+// The Word-like formatting toolbar. It lives in the editor *chrome* (always
+// rendered at 100%, never zoom-scaled) and acts on the currently-active block's
+// tiptap editor — the last Free block that held focus. When no block is active
+// it renders disabled. Toolbar buttons keep the editor's selection alive by
+// preventing the mousedown default, so a chain().focus() command still lands on
+// the right block.
+//
+// "size" and table controls remain visual-only for v1 (StarterKit has no
+// font-size / table schema).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 
 const TEAL = '#1F7A6C';
 const TEAL_TEXT = '#186155';
 const TEAL_TINT = '#E4F0ED';
 const PINK = '#B62A5C';
+
+/** Re-render the toolbar whenever the active editor's selection/content changes. */
+function useEditorTick(editor: Editor | null) {
+  const [, force] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => force();
+    editor.on('transaction', update);
+    editor.on('selectionUpdate', update);
+    editor.on('focus', update);
+    editor.on('blur', update);
+    return () => {
+      editor.off('transaction', update);
+      editor.off('selectionUpdate', update);
+      editor.off('focus', update);
+      editor.off('blur', update);
+    };
+  }, [editor]);
+}
 
 /** A 30×30 square toolbar button with an active (teal) state. */
 function IconButton({
@@ -34,6 +57,7 @@ function IconButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
+      disabled={inert}
       onMouseDown={(e) => e.preventDefault()}
       onClick={inert ? undefined : onClick}
       style={{
@@ -44,7 +68,7 @@ function IconButton({
         justifyContent: 'center',
         borderRadius: 7,
         border: 'none',
-        cursor: 'pointer',
+        cursor: inert ? 'default' : 'pointer',
         background: active ? TEAL_TINT : 'transparent',
         color: active ? TEAL_TEXT : '#2A2422',
         font: 'inherit',
@@ -65,7 +89,7 @@ const HEADING_OPTIONS = [
   { label: 'Paragraph', level: 0 as const },
 ];
 
-function HeadingDropdown({ editor }: { editor: Editor }) {
+function HeadingDropdown({ editor }: { editor: Editor | null }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -78,13 +102,14 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const current = editor.isActive('heading', { level: 1 })
+  const current = editor?.isActive('heading', { level: 1 })
     ? 'Heading 1'
-    : editor.isActive('heading', { level: 2 })
+    : editor?.isActive('heading', { level: 2 })
       ? 'Heading 2'
       : 'Paragraph';
 
   const apply = (level: 0 | 1 | 2) => {
+    if (!editor) return;
     if (level === 0) editor.chain().focus().setParagraph().run();
     else editor.chain().focus().toggleHeading({ level }).run();
     setOpen(false);
@@ -94,8 +119,9 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         type="button"
+        disabled={!editor}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => editor && setOpen((o) => !o)}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -107,7 +133,7 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
           border: '1px solid #E7DECF',
           borderRadius: 7,
           padding: '6px 10px',
-          cursor: 'pointer',
+          cursor: editor ? 'pointer' : 'default',
           font: 'inherit',
         }}
       >
@@ -116,7 +142,7 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {open ? (
+      {open && editor ? (
         <div
           style={{
             position: 'absolute',
@@ -166,22 +192,31 @@ export function WordToolbar({
   onInsertImage,
   onGenerate,
 }: {
-  editor: Editor;
+  /** The active block's editor, or null when no block is focused. */
+  editor: Editor | null;
   onInsertImage: () => void;
   onGenerate: () => void;
 }) {
-  const colorActive = editor.isActive('textStyle', { color: PINK });
+  useEditorTick(editor);
+  const disabled = !editor;
+  const colorActive = editor?.isActive('textStyle', { color: PINK }) ?? false;
+  const run = (fn: (e: Editor) => void) => () => {
+    if (editor) fn(editor);
+  };
 
   return (
     <div
+      className="ws-no-print"
+      title={disabled ? 'Select an exercise to format it' : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 5,
         flexWrap: 'wrap',
-        padding: '8px 12px',
+        padding: '8px 24px',
         background: '#fff',
         borderBottom: '1px solid #EFE8DD',
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       <HeadingDropdown editor={editor} />
@@ -209,23 +244,22 @@ export function WordToolbar({
 
       <Divider />
 
-      <IconButton title="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+      <IconButton title="Bold" inert={disabled} active={editor?.isActive('bold')} onClick={run((e) => e.chain().focus().toggleBold().run())}>
         <span style={{ fontSize: 14, fontWeight: 800 }}>B</span>
       </IconButton>
-      <IconButton title="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+      <IconButton title="Italic" inert={disabled} active={editor?.isActive('italic')} onClick={run((e) => e.chain().focus().toggleItalic().run())}>
         <span style={{ fontSize: 14, fontStyle: 'italic' }}>I</span>
       </IconButton>
-      <IconButton title="Underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+      <IconButton title="Underline" inert={disabled} active={editor?.isActive('underline')} onClick={run((e) => e.chain().focus().toggleUnderline().run())}>
         <span style={{ fontSize: 14, textDecoration: 'underline' }}>U</span>
       </IconButton>
       <IconButton
         title="Text colour"
+        inert={disabled}
         active={colorActive}
-        onClick={() =>
-          colorActive
-            ? editor.chain().focus().unsetColor().run()
-            : editor.chain().focus().setColor(PINK).run()
-        }
+        onClick={run((e) =>
+          colorActive ? e.chain().focus().unsetColor().run() : e.chain().focus().setColor(PINK).run(),
+        )}
       >
         <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>A</span>
@@ -235,12 +269,12 @@ export function WordToolbar({
 
       <Divider />
 
-      <IconButton title="Align left" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+      <IconButton title="Align left" inert={disabled} active={editor?.isActive({ textAlign: 'left' })} onClick={run((e) => e.chain().focus().setTextAlign('left').run())}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="3" y1="6" x2="15" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="13" y2="18" />
         </svg>
       </IconButton>
-      <IconButton title="Align centre" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+      <IconButton title="Align centre" inert={disabled} active={editor?.isActive({ textAlign: 'center' })} onClick={run((e) => e.chain().focus().setTextAlign('center').run())}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="6" y1="6" x2="18" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="6" y1="18" x2="18" y2="18" />
         </svg>
@@ -248,12 +282,12 @@ export function WordToolbar({
 
       <Divider />
 
-      <IconButton title="Bullet list" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+      <IconButton title="Bullet list" inert={disabled} active={editor?.isActive('bulletList')} onClick={run((e) => e.chain().focus().toggleBulletList().run())}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="9" y1="6" x2="20" y2="6" /><line x1="9" y1="12" x2="20" y2="12" /><line x1="9" y1="18" x2="20" y2="18" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" />
         </svg>
       </IconButton>
-      <IconButton title="Numbered list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+      <IconButton title="Numbered list" inert={disabled} active={editor?.isActive('orderedList')} onClick={run((e) => e.chain().focus().toggleOrderedList().run())}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="10" y1="6" x2="20" y2="6" /><line x1="10" y1="12" x2="20" y2="12" /><line x1="10" y1="18" x2="20" y2="18" /><path d="M4 6h1v4M4 10h2M6 18H4l2-3H4" />
         </svg>
@@ -261,7 +295,7 @@ export function WordToolbar({
 
       <Divider />
 
-      <IconButton title="Insert image" onClick={onInsertImage}>
+      <IconButton title="Insert image" inert={disabled} onClick={onInsertImage}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" />
         </svg>
@@ -274,6 +308,8 @@ export function WordToolbar({
 
       <button
         type="button"
+        disabled={disabled}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={onGenerate}
         style={{
           marginLeft: 'auto',
@@ -287,7 +323,7 @@ export function WordToolbar({
           border: 'none',
           borderRadius: 8,
           padding: '7px 11px',
-          cursor: 'pointer',
+          cursor: disabled ? 'default' : 'pointer',
           font: 'inherit',
         }}
       >
