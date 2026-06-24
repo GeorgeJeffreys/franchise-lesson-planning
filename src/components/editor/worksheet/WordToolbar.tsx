@@ -1,19 +1,20 @@
 'use client';
 
 // The Word-like formatting toolbar. It lives in the editor *chrome* (always
-// rendered at 100%, never zoom-scaled) and acts on the currently-active block's
-// tiptap editor — the last Free block that held focus. When no block is active
-// it renders disabled. Toolbar buttons keep the editor's selection alive by
-// preventing the mousedown default, so a chain().focus() command still lands on
-// the right block.
+// rendered at 100%, never zoom-scaled) and reads left→right exactly like Word:
+// paragraph style → font size → B / I / U → colour → align → lists → insert group
+// (image, text box, table).
 //
-// "size" and table controls remain visual-only for v1 (StarterKit has no
-// font-size / table schema).
+// Formatting controls act on the currently-active block's tiptap editor (the last
+// Free block / text box that held focus) and disable when none is active. The
+// insert controls are document-level (drop a floating image or text box onto the
+// page) and stay enabled regardless. Toolbar buttons keep the editor's selection
+// alive by preventing the mousedown default, so a chain().focus() command still
+// lands on the right block.
 
 import { useEffect, useReducer, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 
-const TEAL = '#1F7A6C';
 const TEAL_TEXT = '#186155';
 const TEAL_TINT = '#E4F0ED';
 const PINK = '#B62A5C';
@@ -71,6 +72,7 @@ function IconButton({
         cursor: inert ? 'default' : 'pointer',
         background: active ? TEAL_TINT : 'transparent',
         color: active ? TEAL_TEXT : '#2A2422',
+        opacity: inert ? 0.4 : 1,
         font: 'inherit',
       }}
     >
@@ -89,7 +91,34 @@ const HEADING_OPTIONS = [
   { label: 'Paragraph', level: 0 as const },
 ];
 
-function HeadingDropdown({ editor }: { editor: Editor | null }) {
+const pillStyle = (disabled: boolean): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 12.5,
+  fontWeight: 500,
+  color: '#2A2422',
+  background: '#FBF8F3',
+  border: '1px solid #E7DECF',
+  borderRadius: 7,
+  padding: '6px 10px',
+  cursor: disabled ? 'default' : 'pointer',
+  opacity: disabled ? 0.4 : 1,
+  font: 'inherit',
+});
+
+/** A generic dropdown pill (used by the heading + font-size controls). */
+function DropdownPill({
+  label,
+  disabled,
+  width,
+  children,
+}: {
+  label: React.ReactNode;
+  disabled: boolean;
+  width?: number;
+  children: (close: () => void) => React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -102,47 +131,21 @@ function HeadingDropdown({ editor }: { editor: Editor | null }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const current = editor?.isActive('heading', { level: 1 })
-    ? 'Heading 1'
-    : editor?.isActive('heading', { level: 2 })
-      ? 'Heading 2'
-      : 'Paragraph';
-
-  const apply = (level: 0 | 1 | 2) => {
-    if (!editor) return;
-    if (level === 0) editor.chain().focus().setParagraph().run();
-    else editor.chain().focus().toggleHeading({ level }).run();
-    setOpen(false);
-  };
-
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         type="button"
-        disabled={!editor}
+        disabled={disabled}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => editor && setOpen((o) => !o)}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          fontSize: 12.5,
-          fontWeight: 500,
-          color: '#2A2422',
-          background: '#FBF8F3',
-          border: '1px solid #E7DECF',
-          borderRadius: 7,
-          padding: '6px 10px',
-          cursor: editor ? 'pointer' : 'default',
-          font: 'inherit',
-        }}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        style={pillStyle(disabled)}
       >
-        {current}
+        {label}
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {open && editor ? (
+      {open && !disabled ? (
         <div
           style={{
             position: 'absolute',
@@ -154,48 +157,110 @@ function HeadingDropdown({ editor }: { editor: Editor | null }) {
             boxShadow: '0 16px 40px -16px rgba(40,30,20,0.5)',
             padding: 5,
             zIndex: 30,
-            minWidth: 140,
+            minWidth: width ?? 140,
+            maxHeight: 280,
+            overflowY: 'auto',
           }}
         >
-          {HEADING_OPTIONS.map((opt) => (
-            <button
-              key={opt.label}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => apply(opt.level)}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                fontSize: 12.5,
-                fontWeight: current === opt.label ? 600 : 500,
-                color: current === opt.label ? TEAL_TEXT : '#2A2422',
-                background: current === opt.label ? TEAL_TINT : 'transparent',
-                border: 'none',
-                borderRadius: 6,
-                padding: '7px 9px',
-                cursor: 'pointer',
-                font: 'inherit',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {children(() => setOpen(false))}
         </div>
       ) : null}
     </div>
   );
 }
 
+function menuItemStyle(activeItem: boolean): React.CSSProperties {
+  return {
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    fontSize: 12.5,
+    fontWeight: activeItem ? 600 : 500,
+    color: activeItem ? TEAL_TEXT : '#2A2422',
+    background: activeItem ? TEAL_TINT : 'transparent',
+    border: 'none',
+    borderRadius: 6,
+    padding: '7px 9px',
+    cursor: 'pointer',
+    font: 'inherit',
+  };
+}
+
+function HeadingDropdown({ editor }: { editor: Editor | null }) {
+  const current = editor?.isActive('heading', { level: 1 })
+    ? 'Heading 1'
+    : editor?.isActive('heading', { level: 2 })
+      ? 'Heading 2'
+      : 'Paragraph';
+
+  const apply = (level: 0 | 1 | 2) => {
+    if (!editor) return;
+    if (level === 0) editor.chain().focus().setParagraph().run();
+    else editor.chain().focus().toggleHeading({ level }).run();
+  };
+
+  return (
+    <DropdownPill label={current} disabled={!editor}>
+      {(close) =>
+        HEADING_OPTIONS.map((opt) => (
+          <button
+            key={opt.label}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              apply(opt.level);
+              close();
+            }}
+            style={menuItemStyle(current === opt.label)}
+          >
+            {opt.label}
+          </button>
+        ))
+      }
+    </DropdownPill>
+  );
+}
+
+const FONT_SIZES = [10, 11, 12, 13, 14, 16, 17, 18, 20, 24, 28, 32, 40, 48];
+const DEFAULT_FONT_SIZE = 17; // matches the .worksheet-doc base size
+
+function FontSizeDropdown({ editor }: { editor: Editor | null }) {
+  const raw = editor?.getAttributes('textStyle')?.fontSize as string | undefined;
+  const current = raw ? parseInt(raw, 10) : DEFAULT_FONT_SIZE;
+
+  return (
+    <DropdownPill label={String(current)} disabled={!editor} width={86}>
+      {(close) =>
+        FONT_SIZES.map((size) => (
+          <button
+            key={size}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              editor?.chain().focus().setFontSize(`${size}px`).run();
+              close();
+            }}
+            style={menuItemStyle(current === size)}
+          >
+            {size}
+          </button>
+        ))
+      }
+    </DropdownPill>
+  );
+}
+
 export function WordToolbar({
   editor,
   onInsertImage,
-  onGenerate,
+  onInsertTextBox,
 }: {
   /** The active block's editor, or null when no block is focused. */
   editor: Editor | null;
+  /** Insert a floating image onto the page (document-level, always enabled). */
   onInsertImage: () => void;
-  onGenerate: () => void;
+  /** Insert a floating text box onto the page (document-level, always enabled). */
+  onInsertTextBox: () => void;
 }) {
   useEditorTick(editor);
   const disabled = !editor;
@@ -207,7 +272,6 @@ export function WordToolbar({
   return (
     <div
       className="ws-no-print"
-      title={disabled ? 'Select an exercise to format it' : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -216,31 +280,10 @@ export function WordToolbar({
         padding: '8px 24px',
         background: '#fff',
         borderBottom: '1px solid #EFE8DD',
-        opacity: disabled ? 0.55 : 1,
       }}
     >
       <HeadingDropdown editor={editor} />
-
-      <div
-        title="Text size (coming soon)"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          fontSize: 12.5,
-          fontWeight: 500,
-          color: '#2A2422',
-          background: '#FBF8F3',
-          border: '1px solid #E7DECF',
-          borderRadius: 7,
-          padding: '6px 10px',
-        }}
-      >
-        17
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </div>
+      <FontSizeDropdown editor={editor} />
 
       <Divider />
 
@@ -295,9 +338,15 @@ export function WordToolbar({
 
       <Divider />
 
-      <IconButton title="Insert image" inert={disabled} onClick={onInsertImage}>
+      {/* Insert group — document-level, always enabled */}
+      <IconButton title="Insert image" onClick={onInsertImage}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" />
+        </svg>
+      </IconButton>
+      <IconButton title="Insert text box" onClick={onInsertTextBox}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 9h8M8 13h5" />
         </svg>
       </IconButton>
       <IconButton title="Insert table (coming soon)" inert>
@@ -305,33 +354,6 @@ export function WordToolbar({
           <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" />
         </svg>
       </IconButton>
-
-      <button
-        type="button"
-        disabled={disabled}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onGenerate}
-        style={{
-          marginLeft: 'auto',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 12,
-          fontWeight: 600,
-          color: '#fff',
-          background: TEAL,
-          border: 'none',
-          borderRadius: 8,
-          padding: '7px 11px',
-          cursor: disabled ? 'default' : 'pointer',
-          font: 'inherit',
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z" />
-        </svg>
-        Generate with AI
-      </button>
     </div>
   );
 }

@@ -44,7 +44,7 @@ function StaticFloatingLayer({ elements }: { elements: Worksheet['elements'] }) 
                 ...base,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
-                padding: '8px 10px',
+                padding: 10,
                 background: el.fill === 'white' ? '#fff' : 'transparent',
                 border: el.border ? '1.5px solid #C9B89F' : 'none',
                 borderRadius: 6,

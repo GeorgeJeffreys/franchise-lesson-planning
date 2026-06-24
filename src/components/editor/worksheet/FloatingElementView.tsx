@@ -150,7 +150,10 @@ export function FloatingElementView({
   return (
     <div
       className="ws-float-el"
-      onPointerDown={() => onSelect()}
+      // Grabbing the element (its frame/border, or an image's body) moves it,
+      // exactly like Word. Editable surfaces inside (a text box's text area) stop
+      // propagation so clicking into them edits instead of dragging.
+      onPointerDown={startMove}
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
@@ -160,6 +163,7 @@ export function FloatingElementView({
         height: geom.h,
         zIndex: el.z,
         pointerEvents: 'auto',
+        cursor: 'move',
         outline: selected ? `1.5px solid ${TEAL}` : '1px dashed transparent',
         outlineOffset: 2,
       }}
@@ -187,9 +191,6 @@ export function FloatingElementView({
               whiteSpace: 'nowrap',
             }}
           >
-            <span title="Move" onPointerDown={startMove} style={{ ...stripBtn, cursor: 'grab', color: '#8A8178' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" /></svg>
-            </span>
             {controls}
             <button type="button" title="Bring forward" onClick={() => onRestack('forward')} style={stripBtn}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="3" width="13" height="13" rx="2" /><path d="M5 11v8a2 2 0 0 0 2 2h8" /></svg>

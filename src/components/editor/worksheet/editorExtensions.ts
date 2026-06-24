@@ -10,6 +10,7 @@ import Color from '@tiptap/extension-color';
 import TextAlign from '@tiptap/extension-text-align';
 import type { AnyExtension } from '@tiptap/core';
 import { ResizableImage, type FloatImageInfo } from './resizableImage';
+import { FontSize } from './fontSize';
 
 export interface WorksheetEditorOptions {
   /** Called when the teacher converts an inline image to a free floating one. */
@@ -23,6 +24,7 @@ export function worksheetEditorExtensions(opts: WorksheetEditorOptions = {}): An
     Underline,
     TextStyle,
     Color,
+    FontSize,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ResizableImage.configure({ inline: false, allowBase64: false, onFloatImage: opts.onFloatImage }),
   ];

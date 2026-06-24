@@ -1,8 +1,10 @@
 'use client';
 
 // The locked (cream, read-only) "Master" frame of the A4 worksheet page: the
-// header, the objective strip, the exit-ticket band, and the footer. The
-// editable BODY is rendered as `children` between the strip and the exit band.
+// header, the objective strip, and the footer. The editable BODY is rendered as
+// `children` between the objective strip and the footer. (The exit ticket is
+// chosen per-lesson in the wizard, not on the worksheet, so it is not a section
+// here.)
 //
 // Every value comes from real lesson/curriculum/class context (WorksheetContext);
 // the "Animals / Year 1" copy from the mockup is placeholder only. Colour follows
@@ -50,7 +52,6 @@ export function MasterFrame({
   overlay?: ReactNode;
 }) {
   const dailyOutcome = ctx.dailyOutcome.trim() || 'meet today’s learning outcome';
-  const exitTicket = ctx.exitTicket.trim() || 'Write one thing you learned today:';
 
   return (
     <div
@@ -184,40 +185,6 @@ export function MasterFrame({
             {overlay}
           </div>
         ) : null}
-      </div>
-
-      {/* EXIT TICKET (master) */}
-      <div
-        style={{
-          flexShrink: 0,
-          margin: '0 52px 14px',
-          border: '1.5px solid #E2B9C8',
-          borderRadius: 12,
-          background: '#FCF4F7',
-          padding: '13px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-        }}
-      >
-        <span
-          style={{
-            flexShrink: 0,
-            fontSize: 10.5,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#B62A5C',
-            border: '1px solid #E6C2D0',
-            borderRadius: 6,
-            padding: '4px 9px',
-            background: '#fff',
-          }}
-        >
-          Exit ticket
-        </span>
-        <span style={{ fontSize: 16, color: '#2A2422' }}>{exitTicket}</span>
-        <span style={{ flex: 1, borderBottom: '1.5px solid #C9B89F', height: 20 }} />
       </div>
 
       {/* FOOTER (master) */}

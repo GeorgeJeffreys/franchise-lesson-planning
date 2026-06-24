@@ -112,6 +112,9 @@ export function FloatingTextBox({
         </>
       }
     >
+      {/* The box itself = the draggable frame (cursor: move on the padding/border,
+          inherited from FloatingElementView). The inner text area stops the drag
+          so clicking into it edits, like Word. */}
       <div
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
@@ -120,15 +123,23 @@ export function FloatingTextBox({
           height: '100%',
           boxSizing: 'border-box',
           overflow: 'hidden',
-          padding: '8px 10px',
+          padding: 10,
           background: el.fill === 'white' ? '#fff' : 'transparent',
           border: el.border ? '1.5px solid #C9B89F' : showOutline ? '1px dashed #CFE6E0' : '1px dashed transparent',
           borderRadius: 6,
-          cursor: 'text',
         }}
       >
         <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
-        <EditorContent editor={editor} />
+        <div
+          className="ws-tb-edit"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          style={{ height: '100%', overflow: 'auto', cursor: 'text' }}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </FloatingElementView>
   );

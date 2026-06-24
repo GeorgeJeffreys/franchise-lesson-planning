@@ -292,31 +292,6 @@ export function WorksheetBuilder({
     };
   }, []);
 
-  const toggleFullscreen = useCallback(() => {
-    const el = shellRef.current as
-      | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void })
-      | null;
-    const d = document as Document & {
-      webkitFullscreenElement?: Element;
-      webkitExitFullscreen?: () => Promise<void> | void;
-    };
-    if (!fsActive) {
-      if (!el) return;
-      const request = el.requestFullscreen ?? el.webkitRequestFullscreen;
-      if (request) {
-        Promise.resolve(request.call(el)).catch(() => setMaximised(true));
-      } else {
-        setMaximised(true); // no Fullscreen API → CSS maximise
-      }
-    } else {
-      if (d.fullscreenElement || d.webkitFullscreenElement) {
-        const exit = d.exitFullscreen ?? d.webkitExitFullscreen;
-        exit?.call(d);
-      }
-      setMaximised(false);
-    }
-  }, [fsActive]);
-
   // ── Block actions ─────────────────────────────────────────────────────────
   const createNew = useCallback(() => {
     setMenuOpen(false);
@@ -506,22 +481,10 @@ export function WorksheetBuilder({
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#B62A5C" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
               <rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h3" />
             </svg>
-            <span style={{ fontSize: 15, fontWeight: 700, color: fsActive ? '#fff' : undefined }}>Student worksheet</span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>Student worksheet</span>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#B62A5C', background: '#FBF2F5', border: '1px solid #F1D8E1', borderRadius: 6, padding: '3px 9px' }}>
               students see this
             </span>
-          </div>
-
-          {/* Insert floating elements */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            <button type="button" onClick={insertTextBox} title="Insert a movable text box" style={insertButton}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M8 9h8M8 13h5" /></svg>
-              Text box
-            </button>
-            <button type="button" onClick={insertFloatingImage} title="Insert a floating image" style={insertButton}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></svg>
-              Image
-            </button>
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 9 }}>
@@ -548,28 +511,15 @@ export function WorksheetBuilder({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="3" width="12" height="6" rx="1" /><path d="M6 14h12v7H6z" /><path d="M6 14H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2" /></svg>
               Print preview
             </button>
-
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              title={fsActive ? 'Exit full screen (Esc)' : 'Full screen'}
-              style={chromeButton(true)}
-            >
-              {fsActive ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3v6H3M21 9h-6V3M3 15h6v6M15 21v-6h6" /></svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
-              )}
-              {fsActive ? 'Exit' : 'Full screen'}
-            </button>
           </div>
         </div>
 
-        {/* Shared formatting toolbar — acts on the active block */}
+        {/* Shared formatting toolbar — formatting acts on the active block, the
+            insert group drops floating elements onto the page */}
         <WordToolbar
           editor={active?.editor ?? null}
-          onInsertImage={() => active?.insertImage()}
-          onGenerate={() => active?.startGenerate()}
+          onInsertImage={insertFloatingImage}
+          onInsertTextBox={insertTextBox}
         />
       </div>
 
@@ -763,21 +713,6 @@ const zoomBtn: React.CSSProperties = {
   justifyContent: 'center',
   cursor: 'pointer',
   border: 'none',
-};
-
-const insertButton: React.CSSProperties = {
-  fontFamily: 'inherit',
-  fontSize: 12.5,
-  fontWeight: 500,
-  color: '#2A2422',
-  background: '#fff',
-  border: '1px solid #DDD4C8',
-  padding: '7px 11px',
-  borderRadius: 9,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 7,
 };
 
 function chromeButton(teal: boolean): React.CSSProperties {
