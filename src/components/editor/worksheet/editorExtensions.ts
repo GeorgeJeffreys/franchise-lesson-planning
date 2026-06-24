@@ -5,11 +5,11 @@
 
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
-import Image from '@tiptap/extension-image';
 import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import TextAlign from '@tiptap/extension-text-align';
 import type { AnyExtension } from '@tiptap/core';
+import { ResizableImage } from './resizableImage';
 
 /** Build the extension list (a fresh array per editor instance). */
 export function worksheetEditorExtensions(): AnyExtension[] {
@@ -19,6 +19,6 @@ export function worksheetEditorExtensions(): AnyExtension[] {
     TextStyle,
     Color,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Image.configure({ inline: false, allowBase64: false }),
+    ResizableImage.configure({ inline: false, allowBase64: false }),
   ];
 }

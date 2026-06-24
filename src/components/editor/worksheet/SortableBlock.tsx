@@ -9,7 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { HTMLAttributes } from 'react';
 import type { WorksheetBlock, WorksheetDoc } from '@/types/lesson';
 import type { ResourceWithTags } from '@/types/resource';
-import { FreeBlock } from './FreeBlock';
+import { FreeBlock, type ActiveBlock } from './FreeBlock';
 import { ResourceBlock } from './ResourceBlock';
 import type { WorksheetContext } from './context';
 
@@ -22,6 +22,8 @@ export function SortableBlock({
   onChangeFree,
   onDelete,
   onDuplicateFree,
+  onActivate,
+  onDeactivate,
 }: {
   block: WorksheetBlock;
   index: number;
@@ -31,6 +33,8 @@ export function SortableBlock({
   onChangeFree: (id: string, doc: WorksheetDoc, fromAI: boolean) => void;
   onDelete: (id: string) => void;
   onDuplicateFree: (id: string) => void;
+  onActivate: (api: ActiveBlock) => void;
+  onDeactivate: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
@@ -57,6 +61,8 @@ export function SortableBlock({
           onChange={(doc, fromAI) => onChangeFree(block.id, doc, fromAI)}
           onDelete={() => onDelete(block.id)}
           onDuplicate={() => onDuplicateFree(block.id)}
+          onActivate={onActivate}
+          onDeactivate={onDeactivate}
           dragHandleProps={dragHandleProps}
         />
       ) : (
