@@ -25,12 +25,13 @@ import type { HTMLAttributes } from 'react';
 import { worksheetEditorExtensions } from './editorExtensions';
 import type { FloatImageInfo } from './resizableImage';
 import { AiComposer } from './AiComposer';
+import { AdjustBar } from './AdjustBar';
 import { BlockBar } from './BlockBar';
 import { ExerciseHeading } from './ExerciseHeading';
 import { FloatingLayer } from './FloatingLayer';
 import type { ScreenRect } from './FloatingElementView';
 import type { WorksheetContext } from './context';
-import { markdownToHtml, escapeHtml } from '@/lib/editor/markdown';
+import { markdownToHtml, docToMarkdown, escapeHtml } from '@/lib/editor/markdown';
 import { uploadWorksheetImageAction } from '@/lib/actions/worksheet';
 import { clampGeom, newFloatingImage, newTextBox, nextZ, restackElements } from '@/lib/editor/worksheet';
 import {
@@ -149,6 +150,17 @@ export function FreeBlock({
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // ── Generated-doc affordances: teacher-notes tip + stateless Adjust ─────────
+  // `teacherNotes` is shown only as a dismissible tip — it is NEVER written into
+  // the worksheet doc and never prints. `preAdjust` holds the one-step undo
+  // snapshot (the doc + notes as they were before the last adjustment).
+  const [teacherNotes, setTeacherNotes] = useState<string | null>(null);
+  const [notesDismissed, setNotesDismissed] = useState(false);
+  const [adjustText, setAdjustText] = useState('');
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [preAdjust, setPreAdjust] = useState<{ doc: JSONContent; notes: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const floatImgInputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -292,6 +304,9 @@ export function FreeBlock({
       const html = `<h1>${escapeHtml(result.title)}</h1>${markdownToHtml(result.body)}`;
       setFrom(true);
       editor.commands.setContent(html, false);
+      setTeacherNotes(result.teacher_notes);
+      setNotesDismissed(false);
+      setPreAdjust(null); // fresh generate clears any earlier undo snapshot
       setView('doc');
       onChange(editor.getJSON() as WorksheetDoc, true);
     } catch (err) {
@@ -302,6 +317,48 @@ export function FreeBlock({
       setGenerating(false);
     }
   }, [editor, prompt, ctx, onChange, setFrom]);
+
+  // Stateless adjust: send the doc AS IT STANDS (markdown) + the refinement; the
+  // endpoint returns the full updated resource, which replaces the editor content.
+  // Because the base is the current content, hand-edits and adjustments compose.
+  const runAdjust = useCallback(
+    async (refinement: string) => {
+      const change = refinement.trim();
+      if (!editor || change.length === 0 || adjusting) return;
+      const snapshotDoc = editor.getJSON() as JSONContent;
+      const snapshotNotes = teacherNotes;
+      setAdjusting(true);
+      setAdjustError(null);
+      try {
+        const currentMarkdown = docToMarkdown(snapshotDoc);
+        const result = await requestGeneratedResource(ctx, '', change, currentMarkdown);
+        const html = `<h1>${escapeHtml(result.title)}</h1>${markdownToHtml(result.body)}`;
+        setPreAdjust({ doc: snapshotDoc, notes: snapshotNotes }); // enable one-step undo
+        setFrom(true);
+        editor.commands.setContent(html, false);
+        setTeacherNotes(result.teacher_notes);
+        setNotesDismissed(false);
+        setAdjustText('');
+        onChange(editor.getJSON() as WorksheetDoc, true);
+      } catch (err) {
+        setAdjustError(
+          err instanceof GenerateResourceRequestError ? err.message : 'Adjust failed. Try again.',
+        );
+      } finally {
+        setAdjusting(false);
+      }
+    },
+    [editor, adjusting, teacherNotes, ctx, onChange, setFrom],
+  );
+
+  const undoAdjust = useCallback(() => {
+    if (!editor || !preAdjust) return;
+    editor.commands.setContent(preAdjust.doc, false);
+    setTeacherNotes(preAdjust.notes);
+    setNotesDismissed(false);
+    setPreAdjust(null);
+    onChange(editor.getJSON() as WorksheetDoc, true);
+  }, [editor, preAdjust, onChange]);
 
   const toCompose = useCallback(() => {
     setGenError(null);
@@ -450,10 +507,45 @@ export function FreeBlock({
             <Sparkle /> Generated with AI
           </div>
         ) : null}
+
+        {/* Teacher-notes tip — guidance for the teacher only. Never inserted into
+            the student worksheet and never printed (it lives in component state). */}
+        {fromAI && teacherNotes && !notesDismissed ? (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: '#FBF6EF', border: '1px solid #EFE1CF', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            <span style={{ flexShrink: 0, marginTop: 1, color: '#B07A2E', display: 'inline-flex' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg>
+            </span>
+            <div style={{ flex: 1, fontSize: 12, lineHeight: 1.5, color: '#6B5A3E' }}>
+              <span style={{ fontWeight: 700 }}>Teacher note · not on the worksheet.</span> {teacherNotes}
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotesDismissed(true)}
+              title="Dismiss"
+              style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#9A8A6E', lineHeight: 0, padding: 2 }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        ) : null}
+
         {uploading ? (
           <div style={{ fontSize: 12.5, color: '#8A8178', marginBottom: 10 }}>Uploading image…</div>
         ) : null}
         <EditorContent editor={editor} />
+
+        {/* Adjust — stateless AI iteration on a generated doc (presets + undo). */}
+        {fromAI ? (
+          <AdjustBar
+            instruction={adjustText}
+            onInstructionChange={setAdjustText}
+            onAdjust={runAdjust}
+            adjusting={adjusting}
+            error={adjustError}
+            canUndo={preAdjust !== null}
+            onUndo={undoAdjust}
+          />
+        ) : null}
 
         <FloatingLayer
           elements={block.elements}

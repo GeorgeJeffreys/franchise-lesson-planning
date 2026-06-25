@@ -6,8 +6,6 @@
 // for `POST /api/generate-resource`; the IDS half scopes persistence, the bank
 // modal, and usage tracking.
 
-import type { ClassLiteracy } from '@/lib/editor/load-plan';
-
 export interface WorksheetContext {
   // ── Master frame (locked, read-only) ──────────────────────────────────────
   /** Subject name from the lesson's subject space (NOT profiles.subject_id). */
@@ -30,8 +28,6 @@ export interface WorksheetContext {
   weeklyOutcome: string;
   /** Combined grammar + vocabulary focus. */
   grammarVocab: string;
-  /** Class literacy flag for the generator. */
-  literacy: ClassLiteracy;
 
   // ── Ids / scoping ─────────────────────────────────────────────────────────
   /** The lesson plan id — for `recordUsage` and (future) image paths. */

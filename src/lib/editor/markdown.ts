@@ -1,10 +1,17 @@
-// A deliberately small Markdown → HTML converter for the AI generator's output.
+// A deliberately small Markdown ↔ HTML/doc converter for the AI generator.
 //
 // `POST /api/generate-resource` returns "simple markdown" (headings, paragraphs,
 // bold/italic, and unordered/ordered lists). Rather than pull in a full Markdown
 // dependency, we convert that subset to HTML and let tiptap parse the HTML into
 // its own schema (via `editor.commands.setContent`). Anything fancier than the
-// subset degrades gracefully to plain paragraphs.
+// subset degrades gracefully to plain paragraphs. `docToMarkdown` is the reverse:
+// it serialises a tiptap doc back to the same markdown subset so the builder can
+// send a Free block's current content to the generator as the base for a
+// stateless "Adjust" refinement.
+//
+// Note for type-only consumers: JSONContent is imported from @tiptap/core.
+
+import type { JSONContent } from '@tiptap/core';
 
 /** Escape the five HTML-significant characters in raw text. */
 export function escapeHtml(text: string): string {
@@ -110,4 +117,63 @@ export function markdownToHtml(markdown: string): string {
   flushPara();
   flushList();
   return out.join('');
+}
+
+/** Serialise tiptap inline content (text nodes with bold/italic marks) to markdown. */
+function inlineToMarkdown(nodes: JSONContent[] | undefined): string {
+  if (!nodes) return '';
+  return nodes
+    .map((node) => {
+      if (node.type === 'hardBreak') return '\n';
+      if (node.type !== 'text') return '';
+      let text = node.text ?? '';
+      const marks = node.marks ?? [];
+      // Bold inside italic, mirroring `inline()` above (** then *).
+      if (marks.some((m) => m.type === 'bold')) text = `**${text}**`;
+      if (marks.some((m) => m.type === 'italic')) text = `*${text}*`;
+      return text;
+    })
+    .join('');
+}
+
+/** First paragraph's inline content inside a list item (the subset we emit). */
+function listItemInline(item: JSONContent): string {
+  const firstBlock = item.content?.[0];
+  return inlineToMarkdown(firstBlock?.content);
+}
+
+/** Serialise one top-level tiptap block to a markdown string (or '' to skip). */
+function blockToMarkdown(node: JSONContent): string {
+  switch (node.type) {
+    case 'heading': {
+      const level = Math.min(3, Math.max(1, Number(node.attrs?.level) || 1));
+      return `${'#'.repeat(level)} ${inlineToMarkdown(node.content)}`;
+    }
+    case 'paragraph':
+      return inlineToMarkdown(node.content);
+    case 'bulletList':
+      return (node.content ?? []).map((li) => `- ${listItemInline(li)}`).join('\n');
+    case 'orderedList':
+      return (node.content ?? []).map((li, i) => `${i + 1}. ${listItemInline(li)}`).join('\n');
+    case 'image':
+      // Images don't round-trip into the generator's markdown; the adjust prompt
+      // works on text. The teacher's image stays in the editor regardless.
+      return '';
+    default:
+      return inlineToMarkdown(node.content);
+  }
+}
+
+/**
+ * Convert a tiptap/ProseMirror doc into the simple-markdown subset
+ * {@link markdownToHtml} consumes — the inverse direction. Used to send a Free
+ * block's current content to the resource generator as the base for an adjust.
+ */
+export function docToMarkdown(doc: JSONContent | null | undefined): string {
+  if (!doc?.content) return '';
+  return doc.content
+    .map(blockToMarkdown)
+    .filter((block) => block.trim().length > 0)
+    .join('\n\n')
+    .trim();
 }

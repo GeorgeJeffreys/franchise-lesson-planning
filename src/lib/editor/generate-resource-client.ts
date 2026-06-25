@@ -13,13 +13,20 @@ export interface GeneratedResource {
 export class GenerateResourceRequestError extends Error {}
 
 /**
- * Ask the generator for a resource described by `teacherPrompt`, using the
- * lesson's curriculum context. `lesson_stage` is fixed to the Practise step.
+ * Ask the generator for a resource, using the lesson's curriculum context.
+ * `lesson_stage` is fixed to the Practise step.
+ *
+ * Two modes:
+ *  - Fresh generate: pass `teacherPrompt`.
+ *  - Stateless adjust: pass `currentContent` (the doc as it stands, in markdown)
+ *    + `refinement` (the change). The endpoint refines the content and returns the
+ *    full updated resource; `teacherPrompt` may be empty.
  */
 export async function requestGeneratedResource(
   ctx: WorksheetContext,
   teacherPrompt: string,
   refinement?: string,
+  currentContent?: string,
 ): Promise<GeneratedResource> {
   const res = await fetch('/api/generate-resource', {
     method: 'POST',
@@ -27,14 +34,14 @@ export async function requestGeneratedResource(
     body: JSON.stringify({
       subject: ctx.subjectName,
       year: ctx.year ?? 0,
-      literacy_flag: ctx.literacy,
       daily_outcome: ctx.dailyOutcome,
       weekly_outcome: ctx.weeklyOutcome,
       grammar_vocab: ctx.grammarVocab,
       theme: ctx.theme,
       lesson_stage: 'independent_practice',
-      teacher_prompt: teacherPrompt,
+      ...(teacherPrompt.trim() ? { teacher_prompt: teacherPrompt } : {}),
       ...(refinement ? { refinement } : {}),
+      ...(currentContent ? { current_content: currentContent } : {}),
     }),
   });
 

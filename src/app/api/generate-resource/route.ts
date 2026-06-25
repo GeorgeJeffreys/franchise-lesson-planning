@@ -3,7 +3,6 @@ import {
   generateResource,
   GenerateResourceError,
   type GenerateResourceContext,
-  type LiteracyFlag,
   type LessonStage,
 } from '@/lib/ai/generate-resource';
 
@@ -19,19 +18,25 @@ import {
  * Destination-agnostic: it returns generated content; the caller decides where
  * it lands. No tags, resource_type, or lesson_stage are returned.
  *
- * Request body:
+ * Request body (fresh generate):
  *   {
  *     "subject": string,
  *     "year": number,
- *     "literacy_flag": "literate" | "illiterate" | "mixed",
  *     "daily_outcome": string,
  *     "weekly_outcome": string,
  *     "grammar_vocab": string,
  *     "theme": string,
  *     "lesson_stage": "new_content" | "independent_practice",
- *     "teacher_prompt": string,
- *     "refinement"?: string
+ *     "teacher_prompt": string
  *   }
+ *
+ * Request body (stateless adjust): as above but with `teacher_prompt` optional, plus
+ *   {
+ *     "current_content": string,  // the resource as it stands, in markdown
+ *     "refinement": string        // the change to apply
+ *   }
+ * When `current_content` + `refinement` are both present the route refines the
+ * provided content instead of generating fresh, and returns the full updated resource.
  *
  * Requires `ANTHROPIC_API_KEY` in the environment (locally and on Vercel).
  */
@@ -40,7 +45,6 @@ import {
 interface GenerateResourceBody {
   subject?: unknown;
   year?: unknown;
-  literacy_flag?: unknown;
   daily_outcome?: unknown;
   weekly_outcome?: unknown;
   grammar_vocab?: unknown;
@@ -48,9 +52,9 @@ interface GenerateResourceBody {
   lesson_stage?: unknown;
   teacher_prompt?: unknown;
   refinement?: unknown;
+  current_content?: unknown;
 }
 
-const LITERACY_FLAGS: readonly LiteracyFlag[] = ['literate', 'illiterate', 'mixed'];
 const LESSON_STAGES: readonly LessonStage[] = ['new_content', 'independent_practice'];
 
 /** Returns true for a present, non-empty string. */
@@ -66,13 +70,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
   }
 
+  // Adjust mode: refine `current_content` with `refinement`. Both present → the
+  // teacher's original prompt is no longer required (the doc is the base).
+  const isAdjust = isNonEmptyString(body.current_content) && isNonEmptyString(body.refinement);
+
   const requiredStrings: [keyof GenerateResourceBody, unknown][] = [
     ['subject', body.subject],
     ['daily_outcome', body.daily_outcome],
     ['weekly_outcome', body.weekly_outcome],
     ['grammar_vocab', body.grammar_vocab],
     ['theme', body.theme],
-    ['teacher_prompt', body.teacher_prompt],
+    ...(isAdjust ? [] : ([['teacher_prompt', body.teacher_prompt]] as [keyof GenerateResourceBody, unknown][])),
   ];
   for (const [field, value] of requiredStrings) {
     if (!isNonEmptyString(value)) {
@@ -86,13 +94,6 @@ export async function POST(request: NextRequest) {
   if (typeof body.year !== 'number' || !Number.isFinite(body.year)) {
     return NextResponse.json(
       { error: 'Field "year" is required and must be a number.' },
-      { status: 400 },
-    );
-  }
-
-  if (!LITERACY_FLAGS.includes(body.literacy_flag as LiteracyFlag)) {
-    return NextResponse.json(
-      { error: `Field "literacy_flag" must be one of: ${LITERACY_FLAGS.join(', ')}.` },
       { status: 400 },
     );
   }
@@ -111,17 +112,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (body.current_content !== undefined && typeof body.current_content !== 'string') {
+    return NextResponse.json(
+      { error: 'Field "current_content" must be a string when provided.' },
+      { status: 400 },
+    );
+  }
+
   const context: GenerateResourceContext = {
     subject: body.subject as string,
     year: body.year,
-    literacy_flag: body.literacy_flag as LiteracyFlag,
     daily_outcome: body.daily_outcome as string,
     weekly_outcome: body.weekly_outcome as string,
     grammar_vocab: body.grammar_vocab as string,
     theme: body.theme as string,
     lesson_stage: body.lesson_stage as LessonStage,
-    teacher_prompt: body.teacher_prompt as string,
+    ...(isNonEmptyString(body.teacher_prompt) ? { teacher_prompt: body.teacher_prompt } : {}),
     ...(typeof body.refinement === 'string' ? { refinement: body.refinement } : {}),
+    ...(typeof body.current_content === 'string' ? { current_content: body.current_content } : {}),
   };
 
   try {

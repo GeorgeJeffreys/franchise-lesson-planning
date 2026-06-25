@@ -56,7 +56,6 @@ export function ReadOnlyPlan({ data }: { data: EditorPlanData }) {
       '',
     weeklyOutcome: curriculum?.weekLO ?? '',
     grammarVocab: curriculum?.grammarVocab ?? '',
-    literacy: classContext.literacy,
     lessonPlanId: plan.id,
     subjectId: classContext.subjectId,
   };

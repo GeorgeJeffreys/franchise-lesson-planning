@@ -19,9 +19,6 @@ import Anthropic from '@anthropic-ai/sdk';
 /** Model used for generation. Pinned deliberately — see CLAUDE.md model notes. */
 const MODEL = 'claude-sonnet-4-6';
 
-/** Literacy profile of the class the resource is being generated for. */
-export type LiteracyFlag = 'literate' | 'illiterate' | 'mixed';
-
 /**
  * Lesson stage the resource targets. Mirrors the codebase block enum — note it
  * is `independent_practice`, NOT "practice".
@@ -29,17 +26,20 @@ export type LiteracyFlag = 'literate' | 'illiterate' | 'mixed';
 export type LessonStage = 'new_content' | 'independent_practice';
 
 /**
- * Everything needed to generate a resource. The curriculum fields are
- * non-negotiable anchors; `teacher_prompt` describes the format/context wanted;
- * `refinement` is present only on a refine call.
+ * Everything needed to generate (or adjust) a resource. The curriculum fields are
+ * non-negotiable anchors.
+ *
+ * Two modes share this shape:
+ *  - Fresh generate: `teacher_prompt` describes the format/context wanted.
+ *  - Stateless adjust: `current_content` (the doc as it stands, in markdown) plus
+ *    `refinement` (the change to apply). The model returns the full updated
+ *    resource; `teacher_prompt` is not required.
  */
 export interface GenerateResourceContext {
   /** Subject the lesson teaches (e.g. "English"). */
   subject: string;
   /** Year group the lesson is aimed at. */
   year: number;
-  /** Literacy profile of the class. */
-  literacy_flag: LiteracyFlag;
   /** The day's intended learning outcome. */
   daily_outcome: string;
   /** The week's intended learning outcome (sent to the model, not echoed back). */
@@ -50,10 +50,13 @@ export interface GenerateResourceContext {
   theme: string;
   /** Lesson stage the resource is for. */
   lesson_stage: LessonStage;
-  /** The teacher's free-text request describing the resource they want. */
-  teacher_prompt: string;
-  /** Optional refinement instruction, present only on a refine call. */
+  /** The teacher's free-text request. Required for a fresh generate; ignored on adjust. */
+  teacher_prompt?: string;
+  /** The change to apply (typed instruction or preset chip). Set on an adjust call. */
   refinement?: string;
+  /** The current resource (markdown) to refine. When present with `refinement`, the
+   *  call is a stateless adjust: apply the refinement to this and return the full result. */
+  current_content?: string;
 }
 
 /** Structured result of generating a resource. */
@@ -102,13 +105,11 @@ WHO THE STUDENTS ARE:
 - Arabic is their first language. Resources are for classroom learning in the target subject language.
 - Many have experienced trauma and displacement. Content should be calm, affirming, and grounded in possibility.
 
-MATCH FORMAT TO LITERACY (use year + literacy_flag together; never ask the teacher):
-- Year 0-1, or literacy_flag "illiterate": pre/early literacy — oral instructions, image-matching, trace/copy tasks. Assume no independent reading.
+MATCH FORMAT TO YEAR (infer the reading level from the year group; never ask the teacher):
+- Year 0-1: pre/early literacy — oral instructions, image-matching, trace/copy tasks. Assume no independent reading.
 - Year 2-3: emerging literacy — short sentences, supported reading, fill-in-the-blank with word banks.
 - Year 4-5: developing literacy — paragraph-length texts, guided writing frames, structured exercises.
 - Year 6: near-functional literacy — full reading passages, open-ended prompts, multi-step tasks.
-- literacy_flag "mixed": produce a two-tier resource — a supported version AND a stretch version in the same resource.
-- literacy_flag "literate": use the year-appropriate approach above.
 
 CONTENT GUARDRAILS (apply by default):
 Do NOT generate content involving: family separation or the death of a parent/sibling; war or conflict imagery; references to detention or immigration enforcement; grief or loss as a primary theme; hunger or poverty as a framing device.
@@ -127,24 +128,46 @@ SENSITIVE TOPICS:
 OUTPUT:
 Return ONLY a JSON object with keys "title", "body", "teacher_notes". "body" is the full resource in simple markdown. No code fences, no commentary outside the JSON.`;
 
+/** True when this call refines an existing resource rather than generating fresh. */
+function isAdjustCall(context: GenerateResourceContext): boolean {
+  return (
+    typeof context.current_content === 'string' &&
+    context.current_content.trim().length > 0 &&
+    typeof context.refinement === 'string' &&
+    context.refinement.trim().length > 0
+  );
+}
+
 /** Build the user-turn prompt from the curriculum context and teacher request. */
 function buildUserPrompt(context: GenerateResourceContext): string {
   const lines: string[] = [
     'Curriculum context (non-negotiable anchors — the resource MUST serve these):',
     `- Subject: ${context.subject}`,
     `- Year group: ${context.year}`,
-    `- Literacy: ${context.literacy_flag}`,
     `- Daily outcome: ${context.daily_outcome}`,
     `- Weekly outcome: ${context.weekly_outcome}`,
     `- Grammar / vocabulary: ${context.grammar_vocab}`,
     `- Theme: ${context.theme}`,
     `- Lesson stage: ${context.lesson_stage}`,
     '',
-    `Teacher's request:\n${context.teacher_prompt.trim()}`,
   ];
 
-  if (context.refinement && context.refinement.trim().length > 0) {
-    lines.push(`\nRefinement: ${context.refinement.trim()}`);
+  if (isAdjustCall(context)) {
+    // Stateless adjust: the provided content is the single source of truth — apply
+    // the change to it and return the FULL updated resource. No conversation history.
+    lines.push(
+      'You are refining an EXISTING resource. Apply the requested change to the resource below and return the FULL updated resource (not just the changed part). Keep everything the teacher already has, except where the change says otherwise, and keep it serving the curriculum anchors above.',
+      '',
+      'Current resource (markdown):',
+      context.current_content!.trim(),
+      '',
+      `Requested change: ${context.refinement!.trim()}`,
+    );
+  } else {
+    lines.push(`Teacher's request:\n${(context.teacher_prompt ?? '').trim()}`);
+    if (context.refinement && context.refinement.trim().length > 0) {
+      lines.push(`\nRefinement: ${context.refinement.trim()}`);
+    }
   }
 
   lines.push(
