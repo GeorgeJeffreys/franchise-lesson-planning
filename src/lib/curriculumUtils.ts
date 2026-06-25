@@ -82,6 +82,9 @@ function rowToLesson(row: CurriculumLessonRow): CurriculumLesson {
     skillLO: cleanLO(row.monthly_skills_lo ?? ''),
     knowledgeLORef: knowledgeRef,
     knowledgeLO: cleanLO(row.weekly_knowledge_lo ?? ''),
+    // Combined "Monthly Learning Outcome" column (distinct from monthly_skills_lo
+    // above); flows to the AI resource generator as monthly context.
+    monthlyLO: cleanLO(row.monthly_lo ?? ''),
     // The legacy `resources` was a single string; join the structured labels so the
     // shape is unchanged. Structured resources stay available on the DB row itself.
     resources: row.resources.map((r) => r.label).filter(Boolean).join(', '),

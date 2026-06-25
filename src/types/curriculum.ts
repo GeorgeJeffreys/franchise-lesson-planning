@@ -28,6 +28,12 @@ export interface CurriculumLesson {
   knowledgeLORef: string;
   /** Knowledge learning objective text */
   knowledgeLO: string;
+  /**
+   * Combined monthly learning outcome (curriculum_lesson.monthly_lo), distinct
+   * from skillLO (the monthly *skills* LO). Optional — only the DB-backed path
+   * populates it. Reserved for the AI resource generator's curriculum context.
+   */
+  monthlyLO?: string;
   /** Suggested resources and materials */
   resources: string;
   /** Vocabulary and linguistic skill content focus */

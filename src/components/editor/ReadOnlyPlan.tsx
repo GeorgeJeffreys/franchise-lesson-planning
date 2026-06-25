@@ -55,6 +55,7 @@ export function ReadOnlyPlan({ data }: { data: EditorPlanData }) {
       exitBlock?.note?.trim() ||
       '',
     weeklyOutcome: curriculum?.weekLO ?? '',
+    monthlyLo: curriculum?.monthlyLO ?? '',
     grammarVocab: curriculum?.grammarVocab ?? '',
     lessonPlanId: plan.id,
     subjectId: classContext.subjectId,

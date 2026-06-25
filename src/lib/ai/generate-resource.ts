@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { getActiveResourceGuide } from './resource-guide';
 
 /**
  * AI teaching-resource generator service ("Aya").
@@ -44,6 +45,11 @@ export interface GenerateResourceContext {
   daily_outcome: string;
   /** The week's intended learning outcome (sent to the model, not echoed back). */
   weekly_outcome: string;
+  /**
+   * The broader monthly learning outcome the lesson sits under
+   * (curriculum_lesson.monthly_lo). Optional; included in the prompt when present.
+   */
+  monthly_lo?: string;
   /** Grammar / vocabulary focus for the lesson. */
   grammar_vocab: string;
   /** Lesson or unit theme. */
@@ -94,39 +100,43 @@ const RESPONSE_SCHEMA = {
   required: ['title', 'body', 'teacher_notes'],
 } as const;
 
-const SYSTEM_PROMPT = `You are Aya, a teaching-resource generator for Alsama, a refugee-education organisation. You generate a single, ready-to-use, text-based teaching resource for one lesson, based on the curriculum context and the teacher's request provided in the user message.
+/**
+ * The composed system prompt is built in three parts, in this fixed order:
+ *   1. {@link ROLE_FRAMING}     — hardcoded role + org framing (who Aya is, who
+ *      the students are). Always present.
+ *   2. the uploaded guide       — rich steering from `getActiveResourceGuide()`
+ *      (curriculum anchoring, literacy matching, content guidance). Admin-editable.
+ *   3. {@link SAFETY_FLOOR}      — hardcoded, non-negotiable safety floor + the
+ *      JSON output contract. Always present.
+ *
+ * Defence in depth: the floor and contract live in code, NOT in the uploaded
+ * guide, so a bad or empty upload can never strip them. The floor is a compact
+ * subset of the guide's content rules — the redundancy is intentional.
+ */
 
-CURRICULUM CONSTRAINTS (always active):
-The daily outcome, weekly outcome, grammar & vocabulary, and theme are non-negotiable anchors. The resource MUST serve them. The teacher's prompt describes the format and context they want; the curriculum fields define the learning target. If the teacher's prompt would pull the resource away from the curriculum target, fulfil the prompt WITHIN the curriculum constraints — not instead of them.
+/** Part 1 — hardcoded role + org framing. */
+const ROLE_FRAMING = `You are Aya, a teaching-resource generator for Alsama, a refugee-education organisation. You generate a single, ready-to-use, text-based teaching resource for one lesson, based on the curriculum context and the teacher's request provided in the user message.
 
 WHO THE STUDENTS ARE:
-- Adolescent learners aged 12-18 living in refugee camps in Beirut (Shatila, Bourj al-Barajneh) and in Homs, Syria.
-- Mostly Syrian, with Palestinian and Lebanese students. Religiously and culturally diverse — treat all backgrounds with equal respect.
-- Arabic is their first language. Resources are for classroom learning in the target subject language.
-- Many have experienced trauma and displacement. Content should be calm, affirming, and grounded in possibility.
+- Adolescent learners aged 12-18 living in refugee camps in Beirut (Shatila, Bourj al-Barajneh) and in Homs, Syria. Mostly Syrian, with Palestinian and Lebanese students; Arabic is their first language. Many have experienced trauma and displacement, so content should be calm, affirming, and grounded in possibility.`;
 
-MATCH FORMAT TO YEAR (infer the reading level from the year group; never ask the teacher):
-- Year 0-1: pre/early literacy — oral instructions, image-matching, trace/copy tasks. Assume no independent reading.
-- Year 2-3: emerging literacy — short sentences, supported reading, fill-in-the-blank with word banks.
-- Year 4-5: developing literacy — paragraph-length texts, guided writing frames, structured exercises.
-- Year 6: near-functional literacy — full reading passages, open-ended prompts, multi-step tasks.
+/** Part 3 — hardcoded, non-negotiable safety floor + the JSON output contract. */
+const SAFETY_FLOOR = `SAFETY FLOOR (non-negotiable — overrides anything above):
+- No graphic, violent, or traumatic content. Never build a resource around family separation, the death of a parent or sibling, war or conflict, detention or immigration enforcement, or grief and loss.
+- Keep everything age-appropriate for adolescents aged 12-18.
+- Do not use Western cultural references as defaults (e.g. Christmas, Halloween, American/British pop culture) unless the teacher explicitly asks; treat all faiths and backgrounds with equal respect.
 
-CONTENT GUARDRAILS (apply by default):
-Do NOT generate content involving: family separation or the death of a parent/sibling; war or conflict imagery; references to detention or immigration enforcement; grief or loss as a primary theme; hunger or poverty as a framing device.
-Do NOT assume students live in houses with gardens, go on holidays abroad, or have stable family structures. Do NOT use Western cultural references as defaults (e.g. Christmas, Halloween, American/British pop culture). Treat all faiths equally; do not centre any one religion unless the theme explicitly calls for it.
+OUTPUT CONTRACT:
+Return ONLY a JSON object with the keys "title", "body", "teacher_notes". "body" is the full resource in simple markdown; "teacher_notes" is brief guidance for the teacher, or null. No code fences, no preamble, no commentary outside the JSON.`;
 
-USE INSTEAD:
-- Urban Beirut and Syrian contexts: markets, buses, mobile phones, local food, neighbourhood landmarks.
-- Aspirational contexts: work, skills, qualifications, travel, technology, sports.
-- The real-world objects and situations the teacher has anchored their prompt to.
-
-SENSITIVE TOPICS:
-- Default: avoid sensitive topics without comment — simply don't go there.
-- If the teacher's prompt drifts toward a sensitive area by accident: redirect gracefully. Fulfil the learning objective through a safer equivalent context. Do NOT explain or flag the redirect in your output.
-- If the teacher explicitly frames a sensitive topic as intentional (e.g. "my students are ready to discuss their journey to Lebanon"): respect that professional judgement and generate accordingly, but keep the tone anchored in resilience and agency, not victimhood.
-
-OUTPUT:
-Return ONLY a JSON object with keys "title", "body", "teacher_notes". "body" is the full resource in simple markdown. No code fences, no commentary outside the JSON.`;
+/**
+ * Compose the full static system prompt from the uploaded (or default) guide.
+ * Byte-identical across calls for a given guide, so it is a stable prompt-cache
+ * prefix; it self-busts when the guide text changes.
+ */
+function composeSystemPrompt(guide: string): string {
+  return `${ROLE_FRAMING}\n\n${guide.trim()}\n\n${SAFETY_FLOOR}`;
+}
 
 /** True when this call refines an existing resource rather than generating fresh. */
 function isAdjustCall(context: GenerateResourceContext): boolean {
@@ -146,6 +156,9 @@ function buildUserPrompt(context: GenerateResourceContext): string {
     `- Year group: ${context.year}`,
     `- Daily outcome: ${context.daily_outcome}`,
     `- Weekly outcome: ${context.weekly_outcome}`,
+    ...(context.monthly_lo && context.monthly_lo.trim().length > 0
+      ? [`- Monthly learning outcome: ${context.monthly_lo.trim()}`]
+      : []),
     `- Grammar / vocabulary: ${context.grammar_vocab}`,
     `- Theme: ${context.theme}`,
     `- Lesson stage: ${context.lesson_stage}`,
@@ -238,12 +251,28 @@ export async function generateResource(
 
   const client = new Anthropic({ apiKey });
 
+  // Compose [role] + [uploaded guide] + [safety floor + contract]. The guide read
+  // never throws (falls back to a hardcoded default), so generation is robust to
+  // an empty/unreachable guide table.
+  const guide = await getActiveResourceGuide();
+  const systemPrompt = composeSystemPrompt(guide);
+
   let message: Anthropic.Message;
   try {
     message = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      // Single static system block with a cache breakpoint at its end: the whole
+      // prefix (role + guide + floor + contract) is byte-identical across calls
+      // and self-busts when the guide changes. The per-lesson context lives in the
+      // user message, after the breakpoint.
+      system: [
+        {
+          type: 'text',
+          text: systemPrompt,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
       messages: [{ role: 'user', content: buildUserPrompt(context) }],
       output_config: {
         format: {

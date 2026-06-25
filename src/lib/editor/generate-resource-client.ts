@@ -36,6 +36,7 @@ export async function requestGeneratedResource(
       year: ctx.year ?? 0,
       daily_outcome: ctx.dailyOutcome,
       weekly_outcome: ctx.weeklyOutcome,
+      monthly_lo: ctx.monthlyLo,
       grammar_vocab: ctx.grammarVocab,
       theme: ctx.theme,
       lesson_stage: 'independent_practice',
