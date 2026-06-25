@@ -17,16 +17,21 @@ import {
   deleteResourceAction,
   getMostUsedAction,
   listFolderResourcesAction,
-  recordUsageAction,
   renameFolderAction,
   searchResourcesAction,
   updateResourceAction,
 } from '@/lib/actions/resources';
+import {
+  appendResourceBlocksToLessonAction,
+  type DraftLessonSummary,
+} from '@/lib/actions/lesson-drafts';
+import { buildBlocksFromResource } from '@/lib/editor/resource-to-block';
 import type { ActiveView, ResourceBankProps } from '@/components/resources/types';
 import { SearchHeader, type FilterChip } from '@/components/resources/SearchHeader';
 import { Sidebar } from '@/components/resources/Sidebar';
 import { ResourceCard } from '@/components/resources/ResourceCard';
 import { PreviewModal } from '@/components/resources/PreviewModal';
+import { LessonPickerModal } from '@/components/resources/LessonPickerModal';
 import { UploadModal } from '@/components/resources/UploadModal';
 import { ChevronDown } from '@/components/resources/icons';
 
@@ -64,6 +69,10 @@ export function ResourceBank({
   const [preview, setPreview] = useState<ResourceWithTags | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editing, setEditing] = useState<ResourceWithTags | null>(null);
+  // "Add to a lesson": the resource awaiting a draft-lesson pick, plus a transient
+  // confirmation toast (the teacher isn't in the editor to see it land).
+  const [addingTo, setAddingTo] = useState<ResourceWithTags | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const subjectName = subjects.find((s) => s.id === defaultSubjectId)?.name ?? 'English';
 
@@ -72,6 +81,13 @@ export function ResourceBank({
     const t = setTimeout(() => setAppliedQuery(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
+
+  // Auto-dismiss the "Added to …" confirmation toast.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const currentFilters = useCallback(
     (): ResourceFilters => ({
@@ -276,13 +292,33 @@ export function ResourceBank({
     [preview, refreshActiveView]
   );
 
-  const handleAddToLesson = useCallback(
-    async (r: ResourceWithTags) => {
-      const res = await recordUsageAction(r.id);
-      if (res.ok) refreshActiveView();
-      return res.ok;
+  // Opening the picker: choose which draft lesson to add the resource to.
+  const handleAddToLesson = useCallback((r: ResourceWithTags) => {
+    setPreview(null);
+    setAddingTo(r);
+  }, []);
+
+  // The chosen lesson: convert the resource into editable free block(s) — the same
+  // conversion the in-editor rail uses — and append them to that lesson's
+  // worksheet, then confirm with a toast and refresh popularity.
+  const handlePickLesson = useCallback(
+    async (lesson: DraftLessonSummary): Promise<{ ok: boolean; error?: string }> => {
+      const resource = addingTo;
+      if (!resource) return { ok: false, error: 'No resource selected.' };
+      let blocks;
+      try {
+        blocks = await buildBlocksFromResource(resource);
+      } catch {
+        return { ok: false, error: 'Could not prepare the resource.' };
+      }
+      const res = await appendResourceBlocksToLessonAction(lesson.id, resource.id, blocks);
+      if (!res.ok) return { ok: false, error: res.error };
+      setAddingTo(null);
+      setToast(`Added “${resource.title}” to ${res.lessonLabel ?? lesson.title}.`);
+      refreshActiveView();
+      return { ok: true };
     },
-    [refreshActiveView]
+    [addingTo, refreshActiveView]
   );
 
   const handleSaveToFolder = useCallback(
@@ -451,6 +487,20 @@ export function ResourceBank({
           onSubmitCreate={handleCreate}
           onSubmitEdit={handleEdit}
         />
+      ) : null}
+
+      {addingTo ? (
+        <LessonPickerModal
+          resourceTitle={addingTo.title}
+          onClose={() => setAddingTo(null)}
+          onPick={handlePickLesson}
+        />
+      ) : null}
+
+      {toast ? (
+        <div className="fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 rounded-[10px] bg-[#1F2421] px-4 py-[10px] text-[13px] font-medium text-white shadow-card">
+          {toast}
+        </div>
       ) : null}
     </div>
   );
