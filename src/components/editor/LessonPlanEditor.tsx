@@ -249,6 +249,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         exitBlock?.note?.trim() ||
         '',
       weeklyOutcome: curriculum?.weekLO ?? '',
+      monthlyLo: curriculum?.monthlyLO ?? '',
       grammarVocab: curriculum?.grammarVocab ?? '',
       literacy: classContext.literacy,
       lessonPlanId: plan.id,

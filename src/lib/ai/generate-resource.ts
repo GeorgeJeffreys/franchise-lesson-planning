@@ -45,6 +45,11 @@ export interface GenerateResourceContext {
   daily_outcome: string;
   /** The week's intended learning outcome (sent to the model, not echoed back). */
   weekly_outcome: string;
+  /**
+   * The broader monthly learning outcome the lesson sits under
+   * (curriculum_lesson.monthly_lo). Optional; included in the prompt when present.
+   */
+  monthly_lo?: string;
   /** Grammar / vocabulary focus for the lesson. */
   grammar_vocab: string;
   /** Lesson or unit theme. */
@@ -139,6 +144,9 @@ function buildUserPrompt(context: GenerateResourceContext): string {
     `- Literacy: ${context.literacy_flag}`,
     `- Daily outcome: ${context.daily_outcome}`,
     `- Weekly outcome: ${context.weekly_outcome}`,
+    ...(context.monthly_lo && context.monthly_lo.trim().length > 0
+      ? [`- Monthly learning outcome: ${context.monthly_lo.trim()}`]
+      : []),
     `- Grammar / vocabulary: ${context.grammar_vocab}`,
     `- Theme: ${context.theme}`,
     `- Lesson stage: ${context.lesson_stage}`,

@@ -26,6 +26,7 @@ import {
  *     "literacy_flag": "literate" | "illiterate" | "mixed",
  *     "daily_outcome": string,
  *     "weekly_outcome": string,
+ *     "monthly_lo"?: string,
  *     "grammar_vocab": string,
  *     "theme": string,
  *     "lesson_stage": "new_content" | "independent_practice",
@@ -43,6 +44,7 @@ interface GenerateResourceBody {
   literacy_flag?: unknown;
   daily_outcome?: unknown;
   weekly_outcome?: unknown;
+  monthly_lo?: unknown;
   grammar_vocab?: unknown;
   theme?: unknown;
   lesson_stage?: unknown;
@@ -111,6 +113,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (body.monthly_lo !== undefined && typeof body.monthly_lo !== 'string') {
+    return NextResponse.json(
+      { error: 'Field "monthly_lo" must be a string when provided.' },
+      { status: 400 },
+    );
+  }
+
   const context: GenerateResourceContext = {
     subject: body.subject as string,
     year: body.year,
@@ -121,6 +130,7 @@ export async function POST(request: NextRequest) {
     theme: body.theme as string,
     lesson_stage: body.lesson_stage as LessonStage,
     teacher_prompt: body.teacher_prompt as string,
+    ...(typeof body.monthly_lo === 'string' ? { monthly_lo: body.monthly_lo } : {}),
     ...(typeof body.refinement === 'string' ? { refinement: body.refinement } : {}),
   };
 

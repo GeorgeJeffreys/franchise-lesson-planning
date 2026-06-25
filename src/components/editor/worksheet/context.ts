@@ -28,6 +28,8 @@ export interface WorksheetContext {
   // ── Generate-with-AI payload (curriculum context) ─────────────────────────
   /** Week-level knowledge objective. */
   weeklyOutcome: string;
+  /** Combined monthly learning outcome (curriculum_lesson.monthly_lo). */
+  monthlyLo: string;
   /** Combined grammar + vocabulary focus. */
   grammarVocab: string;
   /** Class literacy flag for the generator. */
