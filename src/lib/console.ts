@@ -25,7 +25,8 @@ export type ConsoleTab =
   | 'subjects'
   | 'classes'
   | 'members'
-  | 'curriculum';
+  | 'curriculum'
+  | 'ai_guide';
 
 export interface CoordinatorSpace {
   schoolId: string;
@@ -47,7 +48,8 @@ export interface ConsoleAccess {
 
 /**
  * Resolve which console tabs the signed-in user gets and where they land.
- * Admin → Centres · Subjects · Classes · Members · Curriculum (+ Profile first).
+ * Admin → Centres · Subjects · Classes · Members · Curriculum · AI resource guide
+ * (+ Profile first).
  * Coordinator (non-admin, ≥1 coordinator membership) → Members · Curriculum.
  * Everyone has Profile. Teacher → Profile only.
  */
@@ -68,7 +70,7 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
   const tabs: ConsoleTab[] = ['profile'];
   let defaultTab: ConsoleTab = 'profile';
   if (isAdmin) {
-    tabs.push('centres', 'subjects', 'classes', 'members', 'curriculum');
+    tabs.push('centres', 'subjects', 'classes', 'members', 'curriculum', 'ai_guide');
     defaultTab = 'centres';
   } else if (isCoordinator) {
     tabs.push('members', 'curriculum');
@@ -515,4 +517,53 @@ export async function getCurriculumStatus(
       lastGoodAt: lastGood?.finished_at ?? null,
     };
   });
+}
+
+// ── AI resource guide (admin) ────────────────────────────────────────────────
+
+/** The active AI-resource-guide version, for the admin Settings preview. */
+export interface ResourceGuideVersion {
+  /** The full guide text (read-only preview). */
+  content: string;
+  /** When this version was uploaded. */
+  createdAt: string;
+  /** Display name of the uploader, best-effort (null if not resolvable). */
+  uploadedByName: string | null;
+}
+
+/**
+ * Load the active (latest) AI-resource-guide version for the admin console.
+ * Returns null when no guide has been uploaded yet (the UI then notes that the
+ * built-in default guide is in use). Admin-only by RLS
+ * (`ai_resource_guide_select_admin`); a non-admin read yields no rows → null.
+ *
+ * The uploader's name is best-effort: there is no admin-wide `profiles` SELECT
+ * policy (see the RLS note at the top of this file), so it resolves only when the
+ * admin shares a space with the uploader (commonly themselves). Falls back to null.
+ */
+export async function getActiveResourceGuideVersion(): Promise<ResourceGuideVersion | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('ai_resource_guide')
+    .select('content, created_at, uploaded_by')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const row = data as
+    | { content: string; created_at: string; uploaded_by: string | null }
+    | null;
+  if (!row) return null;
+
+  let uploadedByName: string | null = null;
+  if (row.uploaded_by) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', row.uploaded_by)
+      .maybeSingle();
+    uploadedByName = (profile as { full_name: string | null } | null)?.full_name ?? null;
+  }
+
+  return { content: row.content, createdAt: row.created_at, uploadedByName };
 }

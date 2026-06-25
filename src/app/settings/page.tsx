@@ -6,6 +6,7 @@ import { getOnboardingData, getMyClasses } from '@/lib/onboarding';
 import { SettingsForm } from '@/components/settings/SettingsForm';
 import { SettingsConsole } from '@/components/settings/SettingsConsole';
 import {
+  getActiveResourceGuideVersion,
   getAdminMembers,
   getCentres,
   getConsoleAccess,
@@ -18,6 +19,7 @@ import {
   type ConsoleClassesData,
   type CoordSpaceMembers,
   type CurriculumSubjectStatus,
+  type ResourceGuideVersion,
   type SubjectRow,
 } from '@/lib/console';
 
@@ -68,14 +70,16 @@ export default async function SettingsPage() {
   let adminMembers: AdminMembersData | undefined;
   let coordSpaces: CoordSpaceMembers[] | undefined;
   let curriculum: CurriculumSubjectStatus[] | undefined;
+  let resourceGuide: ResourceGuideVersion | null | undefined;
 
   if (access.isAdmin) {
-    [centres, subjects, classesData, adminMembers, curriculum] = await Promise.all([
+    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide] = await Promise.all([
       getCentres(),
       getSubjects(),
       getConsoleClasses(),
       getAdminMembers(),
       getCurriculumStatus(),
+      getActiveResourceGuideVersion(),
     ]);
   } else if (access.isCoordinator) {
     const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
@@ -107,6 +111,7 @@ export default async function SettingsPage() {
           adminMembers={adminMembers}
           coordSpaces={coordSpaces}
           curriculum={curriculum}
+          resourceGuide={resourceGuide}
         />
       </div>
     </AppShell>
