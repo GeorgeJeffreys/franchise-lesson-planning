@@ -1,15 +1,16 @@
 'use client';
 
-// The restored lesson card — verbatim from origin/main (commit aa46b49):
+// The restored lesson card — verbatim from the pre-reinvention board (commit
+// 5b60faf, "Restore the previous lesson card as the per-slot board unit"):
 //   • CardShell chrome (white, 1px border, 12px radius, inline pending spinner)
-//   • the Calendar variant: time line · class line · status badge + owner
-//   • the Status variant:   time line · class line, owner on the right (no badge —
-//     the kanban column conveys status)
+//   • the Calendar variant: time line · class line · status badge + scope chip + owner
+//   • the Status variant:   time line · class line · scope chip, owner on the right
 //   • the "Not started" variant: faint line · class line + teal "Plan" chip
 //
 // The ONLY changes from the old card are the data bindings the new model forces —
-// class line → "Year N" (never an A/B group label); time line → the period # — and
-// the small scope chip added to planned cards. Nothing is restyled.
+// class line → "Year N" (never an A/B group label); time line → the day-ordinal
+// "Period #" (re-derived from the day's stack) — and the small scope chip. Nothing
+// is restyled.
 
 import { CardShell } from '@/components/weekly-overview/CardShell';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
@@ -18,29 +19,24 @@ import { OwnerAvatar } from '@/components/weekly-overview/OwnerAvatar';
 import { periodLabel, type EmptySlotCard, type PlanCard } from '@/components/weekly-overview/cards';
 import { useScopeChooser } from '@/components/weekly-overview/ScopeChooser';
 
-/**
- * Calendar-view planned card. In the day-column layout the card carries the
- * `Period #` subtitle (the period no longer reads from a column header), the
- * `Year N` title, the status pill, and the author-initials avatar.
- *
- * The scope chip (Class / Centre / All centres) is intentionally NOT shown here —
- * the day-column target drops it. It still distinguishes co-located plans of
- * different scopes in the Status view, where `StatusLessonCard` keeps it.
- */
+/** Calendar-view planned card — restored CalendarCard (status badge + scope chip). */
 export function CalendarLessonCard({ card }: { card: PlanCard }) {
   return (
     <CardShell planId={card.planId} canEdit={card.canEdit}>
       <div className="text-[11.5px] font-semibold text-text-faint">{periodLabel(card.period)}</div>
       <div className="mb-[9px] mt-[3px] text-[14px] font-semibold">Year {card.year}</div>
       <div className="flex items-center justify-between gap-2">
-        <StatusChip status={card.status} />
+        <div className="flex items-center gap-[6px]">
+          <StatusChip status={card.status} />
+          <ScopeChip scope={card.scope} />
+        </div>
         {card.owner ? <OwnerAvatar owner={card.owner} /> : null}
       </div>
     </CardShell>
   );
 }
 
-/** Status-view planned card — restored origin/main StatusCard. */
+/** Status-view planned card — restored StatusCard. */
 export function StatusLessonCard({ card }: { card: PlanCard }) {
   return (
     <CardShell planId={card.planId} canEdit={card.canEdit}>
@@ -59,19 +55,25 @@ export function StatusLessonCard({ card }: { card: PlanCard }) {
 }
 
 /**
- * The "Not started" card — restored origin/main NotStartedCard. No plan yet, so
- * it's a button: the whole card (and its teal "Plan" chip) opens the scope chooser
- * for this curriculum slot.
+ * The "Not started" card — restored NotStartedCard. No plan yet, so it's a button:
+ * the whole card (and its teal "Plan" chip) opens the scope chooser for this
+ * curriculum lesson, defaulting it onto its natural day (the curriculum period).
  */
 export function NotStartedLessonCard({ card }: { card: EmptySlotCard }) {
   const { openChooser } = useScopeChooser();
   const open = () =>
-    openChooser({ lessonKey: card.lessonKey, year: card.year, dailyOutcome: card.dailyOutcome });
+    openChooser({
+      lessonKey: card.lessonKey,
+      year: card.year,
+      dailyOutcome: card.dailyOutcome,
+      weekday: card.weekday,
+      period: card.period,
+    });
   return (
     <button
       type="button"
       onClick={open}
-      className="flex items-center justify-between gap-2 rounded-[12px] border border-dashed border-border-strong bg-transparent px-[13px] py-[11px] text-left transition-colors hover:bg-surface-subtle"
+      className="flex items-center justify-between gap-2 rounded-[12px] border border-border bg-surface-subtle px-[13px] py-[11px] text-left transition-colors hover:bg-surface-cream"
     >
       <div className="min-w-0">
         <div className="text-[11px] font-semibold text-text-faint">{periodLabel(card.period)}</div>

@@ -23,6 +23,17 @@ export interface CreateScopedPlanInput {
   scope: PlanScope;
   /** Required for `class` scope — the class group the plan is for. */
   classId?: string;
+  /**
+   * The Mon–Fri column (1..5) to place the plan on. Defaults to the lesson's
+   * curriculum period (clamped) for callers that don't choose a day.
+   */
+  weekday?: number;
+  /**
+   * The day-ordinal position to write (next in the chosen day's stack). The board
+   * re-derives the displayed "Period N" from the sorted stack, so this is a sort
+   * hint; defaults to the curriculum period.
+   */
+  period?: number;
 }
 
 export type CreateScopedPlanResult =
@@ -64,7 +75,10 @@ export async function createScopedPlan(
   let schoolId: string | null = null;
   let subjectId: string | null = null;
   const year = coords.year;
-  const period = coords.period;
+  // Day placement: the chosen Mon–Fri column and day-ordinal, defaulting to the
+  // lesson's curriculum period (clamped to 1..5) when the caller doesn't choose.
+  const weekday = Math.min(5, Math.max(1, Math.trunc(input.weekday ?? coords.period)));
+  const period = input.period ?? coords.period;
 
   if (input.scope === 'class') {
     if (!input.classId) return { ok: false, error: 'Pick a class to plan for.' };
@@ -132,6 +146,7 @@ export async function createScopedPlan(
       school_id: schoolId,
       subject_id: subjectId,
       year,
+      weekday,
       period,
       lesson_date: null,
       status: 'in_progress',
