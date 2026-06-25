@@ -23,13 +23,12 @@ export interface ActivityBankItem {
 
 /**
  * The locked class context shown in the slim header. For `centre`/`org` scope
- * plans there is no single class, so `id`/`groupLabel` may be empty and `literacy`
+ * plans there is no single class, so `id` may be empty and `literacy`
  * defaults to `mixed`; the year/subject/centre come from the plan's own columns.
  */
 export interface EditorClassContext {
   id: string;
   year: number;
-  groupLabel: string;
   literacy: ClassLiteracy;
   schoolName: string;
   subjectName: string;
@@ -92,7 +91,6 @@ export interface EditorPlanData {
 interface RawClassJoin {
   id: string;
   year: number;
-  group_label: string;
   literacy: ClassLiteracy;
   school: { name: string } | { name: string }[] | null;
   subject: { id: string; name: string } | { id: string; name: string }[] | null;
@@ -131,7 +129,7 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 
 /**
  * Load a lesson plan for the editor through the auth'd client (RLS enforced):
- * the plan, its class (school/subject/year/group/literacy), the resolved
+ * the plan, its class (school/subject/year/literacy), the resolved
  * curriculum context, and the activity bank for the blocks that have one.
  *
  * Returns `null` when the plan does not exist or the user is not permitted to
@@ -155,7 +153,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
          smartt_objective, smartt_check, blocks, worksheet, required_materials, created_by,
          submitted_at, reviewed_at, review_note, created_at, updated_at,
          class:classes (
-           id, year, group_label, literacy,
+           id, year, literacy,
            school:schools ( name ),
            subject:subjects ( id, name )
          )`
@@ -171,7 +169,15 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
       .order('sort_order', { ascending: true }),
   ]);
 
-  if (error || !planRow) return null;
+  // A genuinely missing or RLS-forbidden row leaves `error` null and `planRow`
+  // null — that's a real 404. A query error (e.g. selecting a column that no
+  // longer exists) is a bug, NOT a missing plan: surface it loudly so it can
+  // never again silently masquerade as a 404.
+  if (error) {
+    console.error(`loadPlanForEditor: query failed for plan ${id}:`, error);
+    throw new Error(`Failed to load plan ${id}: ${error.message}`);
+  }
+  if (!planRow) return null;
 
   const row = planRow as unknown as RawPlanRow;
   const rawClass = one(row.class);
@@ -186,7 +192,6 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     classContext = {
       id: rawClass.id,
       year: rawClass.year,
-      groupLabel: rawClass.group_label,
       literacy: rawClass.literacy,
       schoolName: school?.name ?? '',
       subjectName: subject?.name ?? '',
@@ -194,7 +199,8 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
       scope: row.scope,
     };
   } else {
-    // Look up the subject + centre names from the plan's scope columns.
+    // Centre/org-scope plan: no single class. Look up the subject + centre
+    // names from the plan's scope columns.
     const [{ data: subjectRow }, schoolRes] = await Promise.all([
       row.subject_id
         ? supabase.from('subjects').select('id, name').eq('id', row.subject_id).maybeSingle()
@@ -208,7 +214,6 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     classContext = {
       id: '',
       year: row.year ?? 0,
-      groupLabel: '',
       literacy: 'mixed',
       schoolName: school?.name ?? '',
       subjectName: subject?.name ?? '',

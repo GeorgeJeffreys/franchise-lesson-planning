@@ -179,7 +179,6 @@ export interface ConsoleClassRow {
   schoolName: string | null;
   subjectName: string | null;
   year: number;
-  groupLabel: string;
   archivedAt: string | null;
   /** subject_membership count in this class's (centre, subject) space. */
   memberCount: number;
@@ -200,7 +199,7 @@ export async function getConsoleClasses(): Promise<ConsoleClassesData> {
     await Promise.all([
       supabase
         .from('classes')
-        .select('id, school_id, subject_id, year, group_label, archived_at, schools ( name ), subjects ( name )')
+        .select('id, school_id, subject_id, year, archived_at, schools ( name ), subjects ( name )')
         .order('year'),
       supabase.from('subject_membership').select('school_id, subject_id'),
       supabase.from('lesson_plans').select('class_id'),
@@ -213,7 +212,6 @@ export async function getConsoleClasses(): Promise<ConsoleClassesData> {
     school_id: string;
     subject_id: string;
     year: number;
-    group_label: string;
     archived_at: string | null;
     schools: { name: string } | null;
     subjects: { name: string } | null;
@@ -241,7 +239,6 @@ export async function getConsoleClasses(): Promise<ConsoleClassesData> {
       schoolName: c.schools?.name ?? null,
       subjectName: c.subjects?.name ?? null,
       year: c.year,
-      groupLabel: c.group_label,
       archivedAt: c.archived_at,
       memberCount: membersBySpace.get(spaceKey(c.school_id, c.subject_id)) ?? 0,
       activePlanCount: plansByClass.get(c.id) ?? 0,
@@ -261,7 +258,7 @@ export interface PersonMembership {
   schoolName: string | null;
   subjectName: string | null;
   role: MembershipRole;
-  /** Home class ("Year 1 · A") for this person in this space, when visible. */
+  /** Home class ("Year 1") for this person in this space, when visible. */
   homeClass: string | null;
 }
 
@@ -278,19 +275,19 @@ export interface AdminMembersData {
   subjects: Array<{ id: string; name: string }>;
 }
 
-/** Resolve a `teacher_id:school_id:subject_id` → "Year N · Group" home-class map
+/** Resolve a `teacher_id:school_id:subject_id` → "Year N" home-class map
  *  from the `class_teachers` rows the caller can see (RLS: own only, mostly). */
 function buildHomeClassMap(
   links: Array<{
     teacher_id: string;
-    classes: { school_id: string; subject_id: string; year: number; group_label: string } | null;
+    classes: { school_id: string; subject_id: string; year: number } | null;
   }>,
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const l of links) {
     if (!l.classes) continue;
     const k = `${l.teacher_id}:${l.classes.school_id}:${l.classes.subject_id}`;
-    if (!map.has(k)) map.set(k, `Year ${l.classes.year} · ${l.classes.group_label}`);
+    if (!map.has(k)) map.set(k, `Year ${l.classes.year}`);
   }
   return map;
 }
@@ -305,7 +302,7 @@ export async function getAdminMembers(): Promise<AdminMembersData> {
       supabase.from('profiles').select('id, full_name'),
       supabase
         .from('class_teachers')
-        .select('teacher_id, classes ( school_id, subject_id, year, group_label )'),
+        .select('teacher_id, classes ( school_id, subject_id, year )'),
       supabase.from('schools').select('id, name').is('archived_at', null).order('name'),
       supabase.from('subjects').select('id, name').is('archived_at', null).order('name'),
     ]);
@@ -389,7 +386,7 @@ export async function getCoordinatorMembers(): Promise<CoordSpaceMembers[]> {
     supabase.from('profiles').select('id, full_name'),
     supabase
       .from('class_teachers')
-      .select('teacher_id, classes ( school_id, subject_id, year, group_label )'),
+      .select('teacher_id, classes ( school_id, subject_id, year )'),
   ]);
 
   const membershipRows = (memberships ?? []) as Array<{

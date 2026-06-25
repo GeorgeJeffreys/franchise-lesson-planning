@@ -28,10 +28,9 @@ interface FormState {
   schoolId: string;
   subjectId: string;
   year: number | '';
-  groupLabel: string;
 }
 
-const EMPTY_FORM: FormState = { id: null, schoolId: '', subjectId: '', year: '', groupLabel: '' };
+const EMPTY_FORM: FormState = { id: null, schoolId: '', subjectId: '', year: '' };
 
 export function ClassesTab({ data }: { data: ConsoleClassesData }) {
   const router = useRouter();
@@ -76,27 +75,20 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
 
   // Live tuple-uniqueness for the form.
   const tupleClash = useMemo(() => {
-    if (!form || !form.schoolId || !form.subjectId || form.year === '' || !form.groupLabel.trim())
-      return null;
+    if (!form || !form.schoolId || !form.subjectId || form.year === '') return null;
     const hit = data.classes.find(
       (c) =>
         c.id !== form.id &&
         c.schoolId === form.schoolId &&
         c.subjectId === form.subjectId &&
-        c.year === Number(form.year) &&
-        c.groupLabel.toLowerCase() === form.groupLabel.trim().toLowerCase(),
+        c.year === Number(form.year),
     );
     if (!hit) return null;
-    return `${centreName(form.schoolId)} · ${subjectName(form.subjectId)} · Year ${form.year} · ${form.groupLabel.trim()} already exists.`;
+    return `${centreName(form.schoolId)} · ${subjectName(form.subjectId)} · Year ${form.year} already exists.`;
   }, [form, data.classes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formValid =
-    !!form &&
-    !!form.schoolId &&
-    !!form.subjectId &&
-    form.year !== '' &&
-    !!form.groupLabel.trim() &&
-    !tupleClash;
+    !!form && !!form.schoolId && !!form.subjectId && form.year !== '' && !tupleClash;
 
   function submitForm() {
     if (!form) return;
@@ -104,7 +96,6 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
       schoolId: form.schoolId,
       subjectId: form.subjectId,
       year: Number(form.year),
-      groupLabel: form.groupLabel,
     };
     run(
       () => (form.id ? updateClass({ id: form.id, ...payload }) : createClass(payload)),
@@ -163,7 +154,6 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
                 <Th>Centre</Th>
                 <Th>Subject</Th>
                 <Th>Year</Th>
-                <Th>Group</Th>
                 <Th className="text-right">Members</Th>
                 <Th className="text-right">Actions</Th>
               </tr>
@@ -183,7 +173,6 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
                   </Td>
                   <Td className="text-[#7A7068]">{c.subjectName ?? '—'}</Td>
                   <Td className="text-[#7A7068]">Year {c.year}</Td>
-                  <Td className="text-[#7A7068]">{c.groupLabel}</Td>
                   <Td className="text-right tabular-nums text-[#7A7068]">{c.memberCount}</Td>
                   <Td className="text-right">
                     {isArchived ? (
@@ -204,7 +193,6 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
                               schoolId: c.schoolId,
                               subjectId: c.subjectId,
                               year: c.year,
-                              groupLabel: c.groupLabel,
                             })
                           }
                         >
@@ -256,30 +244,18 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
                 ))}
               </select>
             </div>
-            <div className="flex gap-3">
-              <div className="w-[130px]">
-                <FieldLabel>Year</FieldLabel>
-                <select
-                  className={selectClass}
-                  value={form.year}
-                  onChange={(e) => setForm({ ...form, year: e.target.value === '' ? '' : Number(e.target.value) })}
-                >
-                  <option value="">Year…</option>
-                  {YEARS.map((y) => (
-                    <option key={y} value={y}>Year {y}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1">
-                <FieldLabel>Group</FieldLabel>
-                <input
-                  className={selectClass}
-                  value={form.groupLabel}
-                  onChange={(e) => setForm({ ...form, groupLabel: e.target.value })}
-                  placeholder="e.g. A"
-                  aria-label="Group"
-                />
-              </div>
+            <div className="w-[130px]">
+              <FieldLabel>Year</FieldLabel>
+              <select
+                className={selectClass}
+                value={form.year}
+                onChange={(e) => setForm({ ...form, year: e.target.value === '' ? '' : Number(e.target.value) })}
+              >
+                <option value="">Year…</option>
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>Year {y}</option>
+                ))}
+              </select>
             </div>
             {tupleClash ? (
               <p className="text-[12.5px] font-medium text-[#B23A2E]">{tupleClash}</p>
@@ -299,7 +275,7 @@ export function ClassesTab({ data }: { data: ConsoleClassesData }) {
       <Modal
         open={!!archiveTarget}
         onClose={() => setArchiveTarget(null)}
-        title={`Archive ${archiveTarget ? `Year ${archiveTarget.year} · ${archiveTarget.groupLabel}` : 'class'}?`}
+        title={`Archive ${archiveTarget ? `Year ${archiveTarget.year}` : 'class'}?`}
       >
         {archiveTarget ? (
           <>

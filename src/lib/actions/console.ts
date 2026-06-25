@@ -221,10 +221,11 @@ export async function restoreSubject(input: { id: string }): Promise<ConsoleResu
 
 // ── Classes ─────────────────────────────────────────────────────────────────
 
-/** Tuple-uniqueness check against (school, subject, year, group_label). */
+/** Tuple-uniqueness check against (school, subject, year) — a class is now
+ *  identified by that tuple alone (migration 0018 dropped the group). */
 async function classTupleTaken(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  t: { schoolId: string; subjectId: string; year: number; groupLabel: string },
+  t: { schoolId: string; subjectId: string; year: number },
   excludeId?: string,
 ): Promise<boolean> {
   const { data } = await supabase
@@ -232,8 +233,7 @@ async function classTupleTaken(
     .select('id')
     .eq('school_id', t.schoolId)
     .eq('subject_id', t.subjectId)
-    .eq('year', t.year)
-    .eq('group_label', t.groupLabel);
+    .eq('year', t.year);
   const rows = (data ?? []) as Array<{ id: string }>;
   return rows.some((r) => r.id !== excludeId);
 }
@@ -242,14 +242,12 @@ interface ClassInput {
   schoolId: string;
   subjectId: string;
   year: number;
-  groupLabel: string;
 }
 
 function validateClassInput(input: ClassInput): string | null {
   if (!input.schoolId) return 'Choose a centre.';
   if (!input.subjectId) return 'Choose a subject.';
   if (!Number.isInteger(input.year) || input.year < 0 || input.year > 6) return 'Choose a year.';
-  if (!input.groupLabel.trim()) return 'Enter a group.';
   return null;
 }
 
@@ -257,19 +255,17 @@ export async function createClass(input: ClassInput): Promise<ConsoleResult> {
   const guard = await requireAdmin();
   if (isFail(guard)) return guard;
 
-  const groupLabel = input.groupLabel.trim();
-  const validationError = validateClassInput({ ...input, groupLabel });
+  const validationError = validateClassInput(input);
   if (validationError) return fail(validationError);
 
   const supabase = await createClient();
-  const taken = await classTupleTaken(supabase, { ...input, groupLabel });
-  if (taken) return fail('That centre · subject · year · group already exists.');
+  const taken = await classTupleTaken(supabase, input);
+  if (taken) return fail('That centre · subject · year already exists.');
 
   const { error } = await supabase.from('classes').insert({
     school_id: input.schoolId,
     subject_id: input.subjectId,
     year: input.year,
-    group_label: groupLabel,
   });
   if (error) return fail(error.message);
   revalidateConsole();
@@ -280,13 +276,12 @@ export async function updateClass(input: ClassInput & { id: string }): Promise<C
   const guard = await requireAdmin();
   if (isFail(guard)) return guard;
 
-  const groupLabel = input.groupLabel.trim();
-  const validationError = validateClassInput({ ...input, groupLabel });
+  const validationError = validateClassInput(input);
   if (validationError) return fail(validationError);
 
   const supabase = await createClient();
-  const taken = await classTupleTaken(supabase, { ...input, groupLabel }, input.id);
-  if (taken) return fail('That centre · subject · year · group already exists.');
+  const taken = await classTupleTaken(supabase, input, input.id);
+  if (taken) return fail('That centre · subject · year already exists.');
 
   const { error } = await supabase
     .from('classes')
@@ -294,7 +289,6 @@ export async function updateClass(input: ClassInput & { id: string }): Promise<C
       school_id: input.schoolId,
       subject_id: input.subjectId,
       year: input.year,
-      group_label: groupLabel,
     })
     .eq('id', input.id);
   if (error) return fail(error.message);

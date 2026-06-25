@@ -41,7 +41,6 @@ function monthIndex(month: string): number {
 interface TaughtClassRow {
   id: string;
   year: number;
-  group_label: string;
   archived_at: string | null;
   school_id: string;
   subject_id: string;
@@ -138,7 +137,7 @@ export async function getBoardData(input: {
     supabase
       .from('class_teachers')
       .select(
-        'classes ( id, year, group_label, archived_at, school_id, subject_id, schools ( name ), subjects ( code, name ) )',
+        'classes ( id, year, archived_at, school_id, subject_id, schools ( name ), subjects ( code, name ) )',
       )
       .eq('teacher_id', user.id),
     supabase
@@ -234,7 +233,7 @@ export async function getBoardData(input: {
     if ((c.subjects?.code ?? '') !== subjectCode) continue;
     (myClassesByYear[c.year] ??= []).push({
       id: c.id,
-      label: `Year ${c.year} · ${c.group_label}`,
+      label: `Year ${c.year}`,
     });
   }
   for (const list of Object.values(myClassesByYear)) {

@@ -1,7 +1,7 @@
 // React-PDF documents for Alsama lesson plans.
 //
-// `LessonPlanPage` renders the body for ONE plan: a branded header (class, year/
-// group, date), the SMARTT objective, and every lesson block in order with its
+// `LessonPlanPage` renders the body for ONE plan: a branded header (class, year,
+// date), the SMARTT objective, and every lesson block in order with its
 // name, teaching phase (I do / We do / You do), allotted minutes, and planned
 // content. It reads only what `lesson_plans` carries today, and renders the
 // reserved attachment/worksheet slots (see ./types) only when present, so those
@@ -18,7 +18,7 @@ import { COLORS, phaseLabel, statusLabel, styles } from './theme';
 import type { PdfAttachment, PlanPdfModel } from './types';
 
 function classHeadline(c: PlanPdfModel['classContext']): string {
-  return `Year ${c.year} · ${c.groupLabel}`;
+  return `Year ${c.year}`;
 }
 
 function Header({ model }: { model: PlanPdfModel }) {

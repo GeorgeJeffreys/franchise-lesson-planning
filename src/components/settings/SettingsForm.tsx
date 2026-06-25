@@ -387,7 +387,7 @@ export function SettingsForm(props: SettingsFormProps) {
                         <span className="size-5 shrink-0 rounded-[6px] border-[1.5px] border-[#D8CFC2] bg-surface" />
                       )}
                       <span className="flex-1 text-[13.5px] font-semibold">
-                        Year {c.year} · {c.groupLabel}
+                        Year {c.year}
                       </span>
                       <SubjectChip>{c.subjectName ?? '—'}</SubjectChip>
                     </button>

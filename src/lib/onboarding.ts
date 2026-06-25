@@ -28,7 +28,6 @@ export interface ClassOption {
   subjectId: string;
   subjectName: string | null;
   year: number;
-  groupLabel: string;
   literacy: Literacy;
 }
 
@@ -53,7 +52,6 @@ interface ClassRow {
   school_id: string;
   subject_id: string;
   year: number;
-  group_label: string;
   literacy: Literacy;
   subjects: { name: string } | null;
 }
@@ -87,7 +85,7 @@ export async function getOnboardingData(): Promise<OnboardingData> {
       supabase.from('subjects').select('id, name').is('archived_at', null).order('name'),
       supabase
         .from('classes')
-        .select('id, school_id, subject_id, year, group_label, literacy, subjects ( name )')
+        .select('id, school_id, subject_id, year, literacy, subjects ( name )')
         .is('archived_at', null)
         .order('year'),
       supabase.from('subject_membership').select('school_id, subject_id'),
@@ -118,7 +116,6 @@ export async function getOnboardingData(): Promise<OnboardingData> {
       subjectId: c.subject_id,
       subjectName: c.subjects?.name ?? null,
       year: c.year,
-      groupLabel: c.group_label,
       literacy: c.literacy,
     })),
     teacherCounts,
@@ -132,7 +129,6 @@ export interface MyClass {
   subjectId: string;
   subjectName: string | null;
   year: number;
-  groupLabel: string;
   literacy: Literacy;
 }
 
@@ -147,7 +143,7 @@ export async function getMyClasses(): Promise<MyClass[]> {
   const { data } = await supabase
     .from('class_teachers')
     .select(
-      'class_id, classes ( id, school_id, subject_id, year, group_label, literacy, archived_at, subjects ( name ) )',
+      'class_id, classes ( id, school_id, subject_id, year, literacy, archived_at, subjects ( name ) )',
     )
     .eq('teacher_id', user.id);
 
@@ -161,7 +157,6 @@ export async function getMyClasses(): Promise<MyClass[]> {
       subjectId: c.subject_id,
       subjectName: c.subjects?.name ?? null,
       year: c.year,
-      groupLabel: c.group_label,
       literacy: c.literacy,
     }));
 }

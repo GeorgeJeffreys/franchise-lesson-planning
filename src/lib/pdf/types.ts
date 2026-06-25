@@ -13,7 +13,6 @@ import type { LessonPlan } from '@/types/lesson';
 /** Class identity shown in the PDF header. */
 export interface PdfClassContext {
   year: number;
-  groupLabel: string;
   schoolName: string;
   subjectName: string;
 }

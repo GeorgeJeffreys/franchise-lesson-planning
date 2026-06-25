@@ -42,16 +42,14 @@ export function EditorSubHeader({
   const totalColor = onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]';
   const totalStroke = onTarget ? '#2E7D5B' : '#B0651E';
 
-  // Scope-aware title suffix: a class plan names its group; centre/org plans name
-  // their reach instead (no single class group exists).
+  // Scope-aware title suffix: centre/org plans name their reach. A class plan has
+  // no further label — a class is identified by year alone (no group concept).
   const scopeSuffix =
     classContext.scope === 'centre'
       ? 'Whole centre'
       : classContext.scope === 'org'
         ? 'All centres'
-        : classContext.groupLabel
-          ? `Group ${classContext.groupLabel}`
-          : null;
+        : null;
 
   const dateLabel = formatDate(lessonDate);
   // The trailing line shows the date (when set) and centre, joined cleanly.

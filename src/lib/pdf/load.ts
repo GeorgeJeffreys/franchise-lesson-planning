@@ -27,7 +27,6 @@ export async function loadPlanPdfModel(id: string): Promise<PlanPdfModel | null>
     plan: data.plan,
     classContext: {
       year: data.classContext.year,
-      groupLabel: data.classContext.groupLabel,
       schoolName: data.classContext.schoolName,
       subjectName: data.classContext.subjectName,
     },
@@ -41,7 +40,6 @@ export async function loadPlanPdfModel(id: string): Promise<PlanPdfModel | null>
 interface RawClassJoin {
   id: string;
   year: number;
-  group_label: string;
   school: { name: string } | { name: string }[] | null;
   subject: { name: string } | { name: string }[] | null;
 }
@@ -102,7 +100,7 @@ export async function loadWeekPdfModels(
        smartt_objective, smartt_check, blocks, created_by, submitted_at,
        reviewed_at, review_note, created_at, updated_at,
        class:classes (
-         id, year, group_label,
+         id, year,
          school:schools ( name ),
          subject:subjects ( name )
        )`,
@@ -166,7 +164,6 @@ export async function loadWeekPdfModels(
         plan,
         classContext: {
           year: rawClass.year,
-          groupLabel: rawClass.group_label,
           schoolName: school?.name ?? '',
           subjectName: subject?.name ?? '',
         },

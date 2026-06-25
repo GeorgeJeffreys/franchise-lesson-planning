@@ -66,9 +66,7 @@ export function ReadOnlyPlan({ data }: { data: EditorPlanData }) {
       ? 'Whole centre'
       : classContext.scope === 'org'
         ? 'All centres'
-        : classContext.groupLabel
-          ? `Group ${classContext.groupLabel}`
-          : null;
+        : null;
   const context = [classContext.subjectName, classContext.schoolName].filter(Boolean).join(' · ');
 
   return (
