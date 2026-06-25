@@ -121,6 +121,30 @@
 }
 
 /*
+ * Curriculum sync — indeterminate progress bar. A sync run records only a final
+ * result (no parsed/total counts), so mid-run there's no percentage to show; this
+ * is the single "still working" indicator. A teal segment slides across a
+ * pale-teal track. Used by the Settings → Curriculum card's syncing state.
+ */
+@keyframes curriculum-sync-indeterminate {
+  0% {
+    left: -45%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+.curriculum-sync-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  border-radius: 9999px;
+  background: var(--color-teal);
+  animation: curriculum-sync-indeterminate 1.15s ease-in-out infinite;
+}
+
+/*
  * Diagonal stripe wash used on the login brand panel (from the Login design).
  * It's a painted texture, not a token, so it lives here as a utility.
  */
