@@ -1,9 +1,16 @@
 'use client';
 
+import { useState } from 'react';
+
 /**
- * A compact − value + minutes stepper, used in step headers and the Review
- * table to adjust a block's planned minutes. Matches the design's bordered,
- * cream-buttoned control.
+ * An inline, editable minutes value with a "min" suffix — used in the Review
+ * table to adjust a block's planned minutes. Click/tap to edit, type to set, or
+ * use the keyboard up/down arrows to step. The native number-spinner arrows are
+ * stripped (see `.time-field` in globals.css) for a clean inline look; the field
+ * carries a subtle teal focus state (teal = tools / actions).
+ *
+ * The read-only (non-creator) view renders minutes as plain static text and does
+ * not use this control.
  */
 export function TimeStepper({
   value,
@@ -20,30 +27,35 @@ export function TimeStepper({
   /** Slightly tighter sizing for the Review table. */
   small?: boolean;
 }) {
-  const btn = small ? 'h-[26px] w-[22px] text-[13px]' : 'h-[27px] w-6 text-[14px]';
-  const val = small ? 'px-[7px] text-[12.5px]' : 'px-[9px] text-[13px]';
+  // While focused, hold the raw text so the field can be cleared and retyped
+  // freely; commit valid numbers as they are typed and re-sync on blur.
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? String(value);
+
+  const num = small ? 'text-[12.5px]' : 'text-[13px]';
+  const suffix = small ? 'text-[11px]' : 'text-[12px]';
+
+  function handleChange(raw: string) {
+    setDraft(raw);
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n)) onChange(Math.max(min, n));
+  }
+
   return (
-    <div className="inline-flex items-center gap-[7px]">
-      {label ? <span className="text-[11px] text-neutral-700">{label}</span> : null}
-      <div className="inline-flex items-center overflow-hidden rounded-[8px] border border-border-strong bg-surface">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - 1))}
-          aria-label={label ? `Decrease ${label}` : 'Decrease minutes'}
-          className={`${btn} border-none bg-surface-subtle text-neutral-600 hover:text-ink`}
-        >
-          −
-        </button>
-        <span className={`${val} font-semibold`}>{value}</span>
-        <button
-          type="button"
-          onClick={() => onChange(value + 1)}
-          aria-label={label ? `Increase ${label}` : 'Increase minutes'}
-          className={`${btn} border-none bg-surface-subtle text-neutral-600 hover:text-ink`}
-        >
-          +
-        </button>
-      </div>
-    </div>
+    <span className="inline-flex items-baseline gap-[3px]">
+      {label ? <span className="self-center text-[11px] text-neutral-700">{label}</span> : null}
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        value={shown}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={() => setDraft(null)}
+        aria-label={label ? `${label} in minutes` : 'Minutes'}
+        className={`time-field w-[2.6em] cursor-text rounded-[6px] px-[3px] py-[2px] text-right font-semibold tabular-nums text-ink outline-none transition-colors hover:bg-surface-subtle focus:bg-teal-tint focus:ring-1 focus:ring-teal ${num}`}
+      />
+      <span className={`text-neutral-600 ${suffix}`}>min</span>
+    </span>
   );
 }
