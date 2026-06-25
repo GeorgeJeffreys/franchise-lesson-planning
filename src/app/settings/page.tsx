@@ -7,6 +7,7 @@ import { SettingsForm } from '@/components/settings/SettingsForm';
 import { SettingsConsole } from '@/components/settings/SettingsConsole';
 import {
   getActiveResourceGuideVersion,
+  getActiveSmarttGuideVersion,
   getAdminMembers,
   getCentres,
   getConsoleAccess,
@@ -20,6 +21,7 @@ import {
   type CoordSpaceMembers,
   type CurriculumSubjectStatus,
   type ResourceGuideVersion,
+  type SmarttGuideVersion,
   type SubjectRow,
 } from '@/lib/console';
 
@@ -71,16 +73,19 @@ export default async function SettingsPage() {
   let coordSpaces: CoordSpaceMembers[] | undefined;
   let curriculum: CurriculumSubjectStatus[] | undefined;
   let resourceGuide: ResourceGuideVersion | null | undefined;
+  let smarttGuide: SmarttGuideVersion | null | undefined;
 
   if (access.isAdmin) {
-    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide] = await Promise.all([
-      getCentres(),
-      getSubjects(),
-      getConsoleClasses(),
-      getAdminMembers(),
-      getCurriculumStatus(),
-      getActiveResourceGuideVersion(),
-    ]);
+    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide] =
+      await Promise.all([
+        getCentres(),
+        getSubjects(),
+        getConsoleClasses(),
+        getAdminMembers(),
+        getCurriculumStatus(),
+        getActiveResourceGuideVersion(),
+        getActiveSmarttGuideVersion(),
+      ]);
   } else if (access.isCoordinator) {
     const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
     [coordSpaces, curriculum] = await Promise.all([
@@ -112,6 +117,7 @@ export default async function SettingsPage() {
           coordSpaces={coordSpaces}
           curriculum={curriculum}
           resourceGuide={resourceGuide}
+          smarttGuide={smarttGuide}
         />
       </div>
     </AppShell>

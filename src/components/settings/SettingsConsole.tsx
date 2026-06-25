@@ -11,6 +11,7 @@ import type {
   CoordSpaceMembers,
   CurriculumSubjectStatus,
   ResourceGuideVersion,
+  SmarttGuideVersion,
   SubjectRow,
 } from '@/lib/console';
 import { CentresTab } from './console/CentresTab';
@@ -19,6 +20,7 @@ import { ClassesTab } from './console/ClassesTab';
 import { AdminMembersTab, CoordinatorMembersTab } from './console/MembersTab';
 import { CurriculumTab } from './console/CurriculumTab';
 import { AiGuideTab } from './console/AiGuideTab';
+import { SmarttGuideTab } from './console/SmarttGuideTab';
 
 const TAB_LABELS: Record<ConsoleTab, string> = {
   profile: 'Profile',
@@ -28,6 +30,7 @@ const TAB_LABELS: Record<ConsoleTab, string> = {
   members: 'Members & roles',
   curriculum: 'Curriculum',
   ai_guide: 'AI resource guide',
+  smartt_guide: 'SMARTT objective guide',
 };
 
 export interface SettingsConsoleProps {
@@ -41,6 +44,7 @@ export interface SettingsConsoleProps {
   coordSpaces?: CoordSpaceMembers[];
   curriculum?: CurriculumSubjectStatus[];
   resourceGuide?: ResourceGuideVersion | null;
+  smarttGuide?: SmarttGuideVersion | null;
 }
 
 export function SettingsConsole(props: SettingsConsoleProps) {
@@ -100,6 +104,9 @@ export function SettingsConsole(props: SettingsConsoleProps) {
         ) : null}
         {tab === 'ai_guide' && access.isAdmin ? (
           <AiGuideTab active={props.resourceGuide ?? null} />
+        ) : null}
+        {tab === 'smartt_guide' && access.isAdmin ? (
+          <SmarttGuideTab active={props.smarttGuide ?? null} />
         ) : null}
       </div>
     </div>

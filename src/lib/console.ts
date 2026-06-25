@@ -26,7 +26,8 @@ export type ConsoleTab =
   | 'classes'
   | 'members'
   | 'curriculum'
-  | 'ai_guide';
+  | 'ai_guide'
+  | 'smartt_guide';
 
 export interface CoordinatorSpace {
   schoolId: string;
@@ -49,7 +50,7 @@ export interface ConsoleAccess {
 /**
  * Resolve which console tabs the signed-in user gets and where they land.
  * Admin → Centres · Subjects · Classes · Members · Curriculum · AI resource guide
- * (+ Profile first).
+ * · SMARTT objective guide (+ Profile first).
  * Coordinator (non-admin, ≥1 coordinator membership) → Members · Curriculum.
  * Everyone has Profile. Teacher → Profile only.
  */
@@ -70,7 +71,7 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
   const tabs: ConsoleTab[] = ['profile'];
   let defaultTab: ConsoleTab = 'profile';
   if (isAdmin) {
-    tabs.push('centres', 'subjects', 'classes', 'members', 'curriculum', 'ai_guide');
+    tabs.push('centres', 'subjects', 'classes', 'members', 'curriculum', 'ai_guide', 'smartt_guide');
     defaultTab = 'centres';
   } else if (isCoordinator) {
     tabs.push('members', 'curriculum');
@@ -542,6 +543,57 @@ export async function getActiveResourceGuideVersion(): Promise<ResourceGuideVers
   const supabase = await createClient();
   const { data } = await supabase
     .from('ai_resource_guide')
+    .select('content, created_at, uploaded_by')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const row = data as
+    | { content: string; created_at: string; uploaded_by: string | null }
+    | null;
+  if (!row) return null;
+
+  let uploadedByName: string | null = null;
+  if (row.uploaded_by) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', row.uploaded_by)
+      .maybeSingle();
+    uploadedByName = (profile as { full_name: string | null } | null)?.full_name ?? null;
+  }
+
+  return { content: row.content, createdAt: row.created_at, uploadedByName };
+}
+
+// ── SMARTT objective guide (admin) ───────────────────────────────────────────
+
+/** The active SMARTT-objective-guide version, for the admin Settings preview. */
+export interface SmarttGuideVersion {
+  /** The full guide text (read-only preview). */
+  content: string;
+  /** When this version was uploaded. */
+  createdAt: string;
+  /** Display name of the uploader, best-effort (null if not resolvable). */
+  uploadedByName: string | null;
+}
+
+/**
+ * Load the active (latest) SMARTT-objective-guide version for the admin console.
+ * Returns null when no guide has been uploaded yet (the UI then notes that the
+ * built-in default guide is in use). Admin-only by RLS
+ * (`smartt_objective_guide_select_admin`); a non-admin read yields no rows → null.
+ *
+ * The uploader's name is best-effort: there is no admin-wide `profiles` SELECT
+ * policy (see the RLS note at the top of this file), so it resolves only when the
+ * admin shares a space with the uploader (commonly themselves). Falls back to null.
+ *
+ * Faithful clone of {@link getActiveResourceGuideVersion} — different table.
+ */
+export async function getActiveSmarttGuideVersion(): Promise<SmarttGuideVersion | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('smartt_objective_guide')
     .select('content, created_at, uploaded_by')
     .order('created_at', { ascending: false })
     .limit(1)
