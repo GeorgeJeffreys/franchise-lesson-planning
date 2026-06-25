@@ -18,7 +18,8 @@ interface PreviewModalProps {
   isYours: boolean;
   folders: Folder[];
   onClose: () => void;
-  onAddToLesson: (resource: ResourceWithTags) => Promise<boolean>;
+  /** Open the draft-lesson picker for this resource (handled by the parent). */
+  onAddToLesson: (resource: ResourceWithTags) => void;
   onSaveToFolder: (resource: ResourceWithTags, folderId: string) => Promise<boolean>;
   onOpenResource: (resource: ResourceWithTags) => Promise<void>;
   onEdit: (resource: ResourceWithTags) => void;
@@ -169,13 +170,7 @@ export function PreviewModal({
           <div className="mt-5 flex flex-wrap gap-[9px]">
             <button
               type="button"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const ok = await onAddToLesson(resource);
-                  if (ok) setMessage('Added — recorded as a use for this resource.');
-                })
-              }
+              onClick={() => onAddToLesson(resource)}
               className="inline-flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-teal px-3 py-[11px] text-[13.5px] font-semibold text-white hover:bg-[#1a6a5d] disabled:opacity-60"
             >
               <PlusIcon size={15} strokeWidth={2.2} /> Add to a lesson
