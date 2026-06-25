@@ -11,8 +11,9 @@
 // the project law: cream surfaces (#F5EDE5 / #FBF6EF) mean curriculum-provided,
 // read-only content.
 
-import type { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import type { WorksheetContext } from './context';
+import { useFitText } from './useFitText';
 
 const LockIcon = ({ stroke = '#A18A6E', size = 12 }: { stroke?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,6 +50,8 @@ export function MasterFrame({
   children: ReactNode;
 }) {
   const dailyOutcome = ctx.dailyOutcome.trim() || 'meet today’s learning outcome';
+  const title = titleLine(ctx);
+  const [titleColRef, titleTextRef, titleFontSize] = useFitText(title);
 
   return (
     <div
@@ -98,12 +101,35 @@ export function MasterFrame({
               Student worksheet
             </span>
           </div>
-          {/* Title is constrained to its column so a long subject·year·theme wraps
-              cleanly instead of running under the Master badge or off the page edge.
-              paddingTop keeps the first wrapped line clear of the badge above it. */}
-          <div style={{ textAlign: 'right', maxWidth: 340, minWidth: 0, paddingTop: 6 }}>
-            <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2, color: '#2A2422', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-              {titleLine(ctx)}
+          {/* Title column: definite width so the ResizeObserver measurement is
+              deterministic. paddingTop clears the Master badge (top:14, ~22px tall)
+              and paddingRight prevents text from reaching the page edge / badge.
+              The badge is absolutely positioned at right:16 inside the header and
+              is roughly 60px wide, so we reserve that space via paddingRight. */}
+          <div
+            ref={titleColRef}
+            style={{
+              textAlign: 'right',
+              width: 340,
+              minWidth: 0,
+              paddingTop: 6,
+              paddingRight: 70, // reserve Master badge width (≈60px) + 10px gap
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              ref={titleTextRef}
+              style={{
+                fontSize: titleFontSize,
+                fontWeight: 700,
+                lineHeight: 1.2,
+                color: '#2A2422',
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                textWrap: 'balance' as any,
+                overflowWrap: 'break-word',
+              }}
+            >
+              {title}
             </div>
             {ctx.centreName ? (
               <div style={{ fontSize: 12.5, color: '#93826B', marginTop: 2 }}>{ctx.centreName}</div>

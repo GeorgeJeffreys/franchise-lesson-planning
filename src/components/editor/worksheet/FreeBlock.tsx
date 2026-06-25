@@ -460,16 +460,16 @@ export function FreeBlock({
 
       {/* CHOICE STATE (only while the block is truly empty) */}
       {view === 'blank' ? (
-        <div style={{ background: '#fff', padding: '24px 48px 40px' }}>
+        <div style={{ background: '#fff', padding: '18px 36px 28px' }}>
           <ExerciseHeading index={index} />
-          <div style={{ minHeight: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-            <span style={{ width: 54, height: 54, borderRadius: 14, background: '#F3ECE2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ minHeight: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <span style={{ width: 38, height: 38, borderRadius: 10, background: '#F3ECE2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 7V5h16v2M9 5v14M7 19h4" />
               </svg>
             </span>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#5C544E' }}>Start your exercise</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#5C544E' }}>Start your exercise</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
               <button type="button" onClick={goWrite} style={choiceBtn}>
                 <PenIcon /> Write it yourself
               </button>
@@ -499,7 +499,7 @@ export function FreeBlock({
 
       {/* DOCUMENT + contained floating layer (the block is the positioning context) */}
       <div
-        style={{ position: 'relative', background: '#fff', padding: '24px 48px 38px', minHeight: docMinHeight, display: view === 'doc' ? 'block' : 'none' }}
+        style={{ position: 'relative', background: '#fff', padding: '18px 36px 28px', minHeight: docMinHeight, display: view === 'doc' ? 'block' : 'none' }}
       >
         <ExerciseHeading index={index} />
         {fromAI ? (
@@ -563,15 +563,15 @@ export function FreeBlock({
 
 const choiceBtn: React.CSSProperties = {
   fontFamily: 'inherit',
-  fontSize: 13,
+  fontSize: 11.5,
   fontWeight: 600,
   color: '#2A2422',
   background: '#fff',
   border: '1px solid #DDD4C8',
-  padding: '11px 16px',
-  borderRadius: 10,
+  padding: '8px 12px',
+  borderRadius: 8,
   cursor: 'pointer',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 8,
+  gap: 6,
 };

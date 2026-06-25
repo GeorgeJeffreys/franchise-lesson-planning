@@ -84,6 +84,8 @@ interface MembershipRow {
   school_id: string;
   subject_id: string;
   role: 'teacher' | 'coordinator';
+  schools: { name: string } | null;
+  subjects: { code: string; name: string } | null;
 }
 
 /** The empty board shown when there's no session or no teaching assignment. */
@@ -108,11 +110,13 @@ function emptyBoard(teacherName: string, subjectName = ''): BoardData {
  * Load the planning board for the signed-in teacher at a curriculum coordinate.
  *
  * `month`/`week` select the curriculum coordinate; when omitted (or out of range)
- * the first synced coordinate for the teacher's subject is used. The board shows
- * one band per year the teacher teaches (distinct `classes.year` via
- * `class_teachers`); each band carries the plans placed this week (laid out into
- * Mon–Fri columns by their `weekday`/`period`) and the curriculum lessons for the
- * coordinate (the "+ Add lesson" pool).
+ * the first synced coordinate for the teacher's subject is used.
+ *
+ * The board is driven by the teacher's SUBJECT SPACE (their `subject_membership`),
+ * NOT by their classes — so centre-, year-group- and org-scoped lessons render
+ * even when the teacher teaches no classes. The years shown come from the
+ * curriculum for that subject; each year carries the plans visible this week (laid
+ * out by curriculum period → weekday) and the week's curriculum lessons.
  */
 export async function getBoardData(input: {
   month?: string;
@@ -125,60 +129,82 @@ export async function getBoardData(input: {
   } = await supabase.auth.getUser();
   if (!user) return emptyBoard('there');
 
-  // Identity, the teacher's own classes (taught years + subject), and their
-  // memberships (coordinator spaces) depend only on the user id — fetch together.
-  const [{ data: profile }, { data: ctRows }, { data: memRows }] = await Promise.all([
+  // Identity, the teacher's subject spaces (the board's source of truth), and
+  // their classes (only for the "My class" option) depend on the user id — fetch
+  // together.
+  const [{ data: profile }, { data: memRows }, { data: ctRows }] = await Promise.all([
     supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('subject_membership')
+      .select('school_id, subject_id, role, schools ( name ), subjects ( code, name )')
+      .eq('profile_id', user.id),
     supabase
       .from('class_teachers')
       .select(
         'classes ( id, year, group_label, archived_at, school_id, subject_id, schools ( name ), subjects ( code, name ) )',
       )
       .eq('teacher_id', user.id),
-    supabase
-      .from('subject_membership')
-      .select('school_id, subject_id, role')
-      .eq('profile_id', user.id),
   ]);
 
   const teacherName =
     (profile as { full_name?: string | null } | null)?.full_name ?? user.email ?? 'there';
   const isAdmin = (profile as { role?: string } | null)?.role === 'admin';
 
-  // The teacher's (non-archived) classes — they define the taught years and the
-  // board's subject. Archived classes are removed from planning.
+  const memberships = (memRows ?? []) as unknown as MembershipRow[];
+
+  // The teacher's (non-archived) classes — kept ONLY for the "My class" scope
+  // choice (myClassesByYear). The board itself is never built from them.
   const taught = ((ctRows ?? []) as unknown as Array<{ classes: TaughtClassRow | null }>)
     .map((r) => r.classes)
     .filter((c): c is TaughtClassRow => !!c && !c.archived_at);
 
-  if (taught.length === 0) {
+  // Pick the board's (centre, subject) space. When the teacher belongs to several,
+  // prefer the subject they teach the most classes in (deterministic); otherwise
+  // the first space by name. A teacher with classes but no membership row falls
+  // back to their class-derived space so they still see a board.
+  const classSubjectCounts = new Map<string, number>();
+  for (const c of taught) {
+    const code = c.subjects?.code ?? '';
+    if (code) classSubjectCounts.set(code, (classSubjectCounts.get(code) ?? 0) + 1);
+  }
+  const preferredCode =
+    [...classSubjectCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  interface Space {
+    schoolId: string;
+    code: string;
+    name: string;
+    school: string;
+  }
+  const spaces: Space[] = memberships
+    .filter((m) => m.subjects?.code)
+    .map((m) => ({
+      schoolId: m.school_id,
+      code: m.subjects?.code ?? '',
+      name: m.subjects?.name ?? '',
+      school: m.schools?.name ?? '',
+    }));
+
+  if (spaces.length === 0 && taught.length > 0) {
+    const c = taught.find((t) => (t.subjects?.code ?? '') === preferredCode) ?? taught[0];
+    spaces.push({
+      schoolId: c.school_id,
+      code: c.subjects?.code ?? '',
+      name: c.subjects?.name ?? '',
+      school: c.schools?.name ?? '',
+    });
+  }
+
+  if (spaces.length === 0) {
     return emptyBoard(teacherName);
   }
 
-  // Board subject (English first). A teacher normally teaches one subject; if more
-  // than one, pick the one with the most classes (deterministic, name-tiebroken).
-  const subjectCounts = new Map<string, { code: string; name: string; school: string; n: number }>();
-  for (const c of taught) {
-    const code = c.subjects?.code ?? '';
-    const prev = subjectCounts.get(code);
-    subjectCounts.set(code, {
-      code,
-      name: c.subjects?.name ?? '',
-      school: c.schools?.name ?? '',
-      n: (prev?.n ?? 0) + 1,
-    });
-  }
-  const subject = [...subjectCounts.values()].sort(
-    (a, b) => b.n - a.n || a.name.localeCompare(b.name),
-  )[0];
-  const subjectCode = subject.code;
-  const subjectName = subject.name;
-  const context = [subject.school, subjectName].filter(Boolean).join(' · ') || null;
-
-  // Years the teacher teaches in this subject, ascending.
-  const years = [
-    ...new Set(taught.filter((c) => (c.subjects?.code ?? '') === subjectCode).map((c) => c.year)),
-  ].sort((a, b) => a - b);
+  const board =
+    spaces.find((s) => s.code === preferredCode) ??
+    [...spaces].sort((a, b) => a.name.localeCompare(b.name))[0];
+  const subjectCode = board.code;
+  const subjectName = board.name;
+  const context = [board.school, subjectName].filter(Boolean).join(' · ') || null;
 
   // The teacher's own classes in the board subject, grouped by year — the "My
   // class" choices in the scope chooser.
@@ -196,16 +222,24 @@ export async function getBoardData(input: {
 
   // The coordinator spaces the teacher belongs to — drives per-plan edit rights.
   const coordinatorSpaces = new Set(
-    ((memRows ?? []) as unknown as MembershipRow[])
+    memberships
       .filter((m) => m.role === 'coordinator')
       .map((m) => `${m.school_id}:${m.subject_id}`),
   );
 
-  // Build the ordered list of curriculum coordinates available across the taught
-  // years, so prev/next step through the scheme of work. Union the per-year navs.
-  const navs = await Promise.all(years.map((y) => getCurriculumNav(subjectCode, y)));
+  // Years come from the CURRICULUM for this subject (not from classes), so
+  // year-group lessons show with zero classes present. A candidate year is kept
+  // only if it has synced curriculum.
+  const CANDIDATE_YEARS = [0, 1, 2, 3, 4, 5, 6];
+  const candidateNavs = await Promise.all(
+    CANDIDATE_YEARS.map((y) => getCurriculumNav(subjectCode, y)),
+  );
+  const years = CANDIDATE_YEARS.filter((_, i) => candidateNavs[i].length > 0);
+
+  // Build the ordered list of curriculum coordinates available across those years,
+  // so prev/next step through the scheme of work. Union the per-year navs.
   const weeksByMonth = new Map<string, Set<number>>();
-  for (const nav of navs) {
+  for (const nav of candidateNavs) {
     for (const { month, weeks } of nav) {
       if (!weeksByMonth.has(month)) weeksByMonth.set(month, new Set());
       const set = weeksByMonth.get(month)!;

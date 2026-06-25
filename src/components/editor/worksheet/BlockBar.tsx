@@ -30,12 +30,12 @@ function TrashIcon() {
 }
 
 const ACTION_STYLE = {
-  width: 28,
-  height: 26,
+  width: 22,
+  height: 22,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 6,
+  borderRadius: 5,
   cursor: 'pointer',
   border: 'none',
   background: 'transparent',
@@ -58,8 +58,8 @@ export function BlockBar({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '9px 12px',
+        gap: 8,
+        padding: '6px 10px',
         background: '#FBF8F3',
         borderBottom: '1px solid #EFE8DD',
       }}

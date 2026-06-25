@@ -72,7 +72,7 @@ export function ResourceBlock({
           dragHandleProps={dragHandleProps}
         />
       )}
-      <div style={{ padding: chromeless ? 0 : '20px 24px' }}>
+      <div style={{ padding: chromeless ? 0 : '16px 20px' }}>
         <ExerciseHeading index={index} />
         {!resource ? (
           <div style={{ fontSize: 14, color: '#8A8178' }}>
@@ -80,8 +80,8 @@ export function ResourceBlock({
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 18, fontWeight: 700 }}>{resource.title}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{resource.title}</span>
               <span style={{ fontSize: 10, fontWeight: 700, color: colors.color, background: colors.bg, borderRadius: 5, padding: '2px 7px' }}>
                 {format}
               </span>
@@ -99,10 +99,10 @@ export function ResourceBlock({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 10,
                   border: '1px solid #E4DACB',
-                  borderRadius: 10,
-                  padding: '16px 18px',
+                  borderRadius: 8,
+                  padding: '12px 14px',
                   background: '#FBF8F3',
                 }}
               >

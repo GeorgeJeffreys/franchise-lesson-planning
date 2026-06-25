@@ -37,6 +37,9 @@ export function Stepper({
   return (
     <div className="border-b border-[#EFE8DD] px-[22px] py-[15px] lg:px-[30px]">
       <div className="flex items-center">
+        {/* Each stage cell is flex-1 so ALL five cells share equal width and
+            the layout is identical regardless of which step is active.
+            The connector lives inside the cell (except for the last stage). */}
         {WIZARD_STEPS.map((s, i) => {
           const no = i + 1;
           const isDone = step > no;
@@ -45,7 +48,7 @@ export function Stepper({
           return (
             <div
               key={s.label}
-              className={showConn ? 'flex min-w-0 flex-1 items-center' : 'flex shrink-0 items-center'}
+              className="flex min-w-0 flex-1 items-center"
             >
               <button
                 type="button"
@@ -84,7 +87,9 @@ export function Stepper({
           );
         })}
 
-        <div className="ml-5 flex shrink-0 gap-[9px]">
+        {/* Fixed-width action area so changing the button label / colour /
+            which button shows never causes the stages to reflow. */}
+        <div className="ml-5 flex w-[186px] shrink-0 justify-end gap-[9px]">
           {/* Always rendered so the cluster keeps an identical width on every
               step — on Step 1 it is hidden (but still occupies its box) and
               made inert, so the stepper band doesn't reflow at the 1 ↔ 2

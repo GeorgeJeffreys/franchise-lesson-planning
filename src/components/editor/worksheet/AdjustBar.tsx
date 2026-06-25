@@ -51,14 +51,14 @@ export function AdjustBar({
   return (
     <div
       style={{
-        marginTop: 18,
+        marginTop: 12,
         border: '1px solid #CFE6E0',
-        borderRadius: 12,
+        borderRadius: 10,
         background: '#F7FBFA',
-        padding: '13px 14px',
+        padding: '10px 12px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 11 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
         <span style={{ color: '#1F7A6C', display: 'inline-flex' }}>
           <Sparkle />
         </span>
@@ -88,7 +88,7 @@ export function AdjustBar({
         ) : null}
       </div>
 
-      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {CHIPS.map((chip) => (
           <button
             key={chip}
@@ -103,7 +103,7 @@ export function AdjustBar({
               background: '#E4F0ED',
               border: '1px solid #CFE6E0',
               borderRadius: 999,
-              padding: '5px 11px',
+              padding: '4px 9px',
               cursor: adjusting ? 'default' : 'pointer',
             }}
           >
@@ -133,7 +133,7 @@ export function AdjustBar({
             background: '#fff',
             border: '1px solid #CFE6E0',
             borderRadius: 9,
-            padding: '8px 11px',
+            padding: '6px 10px',
             outline: 'none',
           }}
         />
@@ -149,7 +149,7 @@ export function AdjustBar({
             background: '#1F7A6C',
             border: 'none',
             borderRadius: 9,
-            padding: '8px 15px',
+            padding: '6px 12px',
             cursor: adjusting || instruction.trim().length === 0 ? 'default' : 'pointer',
             opacity: adjusting || instruction.trim().length === 0 ? 0.6 : 1,
             whiteSpace: 'nowrap',
