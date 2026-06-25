@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CurriculumSubjectStatus } from '@/lib/console';
 import { importCurriculumAction } from '@/lib/curriculum/actions';
-import { ErrorText, GhostButton, MonoChip, SectionCard } from './ui';
+import { GhostButton, MonoChip, SectionCard } from './ui';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'never';
@@ -29,21 +29,26 @@ function hhmm(iso: string | null): string {
 }
 
 /**
- * Card state for one subject. The standing stats (Lessons / Unresolved /
- * Deactivated / Last synced) keep coming from the run summary; this union only
- * carries the state-specific extras.
+ * Card state for one subject — a discriminated union that renders EXACTLY ONE
+ * status indicator (one badge + at most one status element). The standing stats
+ * (Lessons / Unresolved / Deactivated / Last synced) keep coming from the run
+ * summary and sit outside this union.
  *
  * `idle` / `syncing` / `error` are derived from the persisted latest run
  * (`success`→idle, `running`→syncing, `error`→error). `success` is a transient
  * client-only state, entered only when an in-session upload transitions
  * running→done; on a full reload the latest run reads back as `success` →
- * derives to `idle`. (With no in-session trigger, `success` is unreachable.)
+ * derives to `idle`.
+ *
+ * `syncing` carries optional parsed/total ONLY for a future run that exposes
+ * them — `curriculum_sync_run` records no such counts today, so they stay
+ * undefined and the bar renders indeterminate (never a fabricated %).
  */
 type CurriculumSyncState =
   | { kind: 'idle' }
   | { kind: 'syncing'; parsed?: number; total?: number }
-  | { kind: 'success'; added: number }
-  | { kind: 'error'; at: string; lastGood?: string };
+  | { kind: 'success'; summary: string }
+  | { kind: 'error'; badgeAt: string; message: string };
 
 export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[] }) {
   if (statuses.length === 0) {
@@ -67,52 +72,51 @@ export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[
 function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Transient: set true when an in-session upload finishes successfully so the
-  // card shows the "Synced just now" success state until the next full reload.
-  const [justSynced, setJustSynced] = useState(false);
+  // Transient, in-session only. `success` holds the summary line after an upload
+  // succeeds; `clientError` holds an upload/validation failure with the moment it
+  // happened (for the "Sync failed · {HH:MM}" badge). Both clear on the next run
+  // and neither survives a full reload — the card then re-derives from the run.
+  const [success, setSuccess] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<{ message: string; at: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const run = status.latestRun;
-
-  // ── Derive the discriminated state ──
-  // In-flight upload wins; then the transient in-session success; otherwise map
-  // from the persisted latest run. A run that finished hours ago is `idle`.
-  const state: CurriculumSyncState = pending
-    ? { kind: 'syncing' } // no parsed/total: curriculum_sync_run records only a final result
-    : justSynced
-      ? // The schema has no rows-added delta column (only rows_upserted = total
-        // rows written this run, insert+update indistinguishable), so we carry
-        // the count for the union's shape but do not render a fabricated "+added".
-        { kind: 'success', added: run?.rowsUpserted ?? 0 }
-      : run?.status === 'running'
-        ? { kind: 'syncing' }
-        : run?.status === 'error'
-          ? {
-              kind: 'error',
-              at: run.finishedAt ?? run.startedAt ?? '',
-              lastGood: status.lastGoodAt ?? undefined,
-            }
-          : { kind: 'idle' };
-
   const lastSyncedIso = run?.finishedAt ?? run?.startedAt ?? null;
   const unresolved = run?.unresolved ?? 0;
 
+  // ── Derive the single discriminated state ──
+  // Precedence: in-flight upload → transient client result → persisted run. A run
+  // that finished hours ago is `idle`, not `success`.
+  const state: CurriculumSyncState = pending
+    ? { kind: 'syncing' } // no parsed/total in the schema → indeterminate bar
+    : clientError
+      ? { kind: 'error', badgeAt: clientError.at, message: clientError.message }
+      : success
+        ? { kind: 'success', summary: success }
+        : run?.status === 'running'
+          ? { kind: 'syncing' }
+          : run?.status === 'error'
+            ? {
+                kind: 'error',
+                badgeAt: run.finishedAt ?? run.startedAt ?? '',
+                message: `Couldn't reach the curriculum source. Last good sync was ${timeAgo(
+                  status.lastGoodAt,
+                )}.`,
+              }
+            : { kind: 'idle' };
+
   function onFile(file: File) {
-    setMessage(null);
-    setError(null);
-    setJustSynced(false);
+    setSuccess(null);
+    setClientError(null);
     const fd = new FormData();
     fd.set('subject_code', status.code);
     fd.set('file', file);
     startTransition(async () => {
       const res = await importCurriculumAction(null, fd);
       if (res.ok) {
-        setMessage(res.message);
-        setJustSynced(true);
+        setSuccess(res.message);
       } else {
-        setError(res.message);
+        setClientError({ message: res.message, at: new Date().toISOString() });
       }
       router.refresh();
     });
@@ -120,7 +124,7 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
 
   // No "re-pull from source" trigger exists (sync is n8n folder-watch driven, or
   // a manual file upload). Refresh now / Retry sync are rendered disabled until
-  // such a trigger lands — see the curriculum-sync brief, Gate / Phase 0 #4.
+  // such a trigger lands — see the curriculum-sync brief, Phase 0 #3.
   const noTrigger = true;
 
   return (
@@ -140,70 +144,65 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
           <Stat label="Last synced" value={timeAgo(lastSyncedIso)} />
         </div>
         <div className="flex items-center gap-3">
-          {state.kind === 'error' ? (
-            <GhostButton tone="teal" disabled={noTrigger}>
-              Retry sync
-            </GhostButton>
-          ) : state.kind === 'syncing' ? (
+          {state.kind === 'syncing' ? (
+            // Syncing: the badge + progress bar are the entire status; the only
+            // action is the disabled in-flight label.
             <GhostButton tone="teal" disabled>
               Refreshing…
             </GhostButton>
           ) : (
-            <GhostButton tone="teal" disabled={noTrigger}>
-              Refresh now
-            </GhostButton>
+            <>
+              {state.kind === 'error' ? (
+                <GhostButton tone="teal" disabled={noTrigger}>
+                  Retry sync
+                </GhostButton>
+              ) : (
+                <GhostButton tone="teal" disabled={noTrigger}>
+                  Refresh now
+                </GhostButton>
+              )}
+              {state.kind === 'success' && unresolved > 0 ? (
+                <GhostButton
+                  tone="teal"
+                  onClick={() => {
+                    // TODO: no unresolved-review surface exists yet — that's a
+                    // separate slice. Wire this to it when it lands.
+                  }}
+                >
+                  Review {unresolved} unresolved
+                </GhostButton>
+              ) : null}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onFile(f);
+                  e.target.value = '';
+                }}
+              />
+              <GhostButton tone="teal" onClick={() => fileRef.current?.click()}>
+                Upload .xlsx
+              </GhostButton>
+            </>
           )}
-          {state.kind === 'success' && unresolved > 0 ? (
-            <GhostButton
-              tone="teal"
-              onClick={() => {
-                // TODO: no unresolved-review surface exists yet — that's a
-                // separate slice. Wire this to it when it lands.
-              }}
-            >
-              Review {unresolved} unresolved
-            </GhostButton>
-          ) : null}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFile(f);
-              e.target.value = '';
-            }}
-          />
-          <GhostButton tone="teal" disabled={pending} onClick={() => fileRef.current?.click()}>
-            Upload .xlsx
-          </GhostButton>
         </div>
       </div>
 
+      {/* Exactly one status element below the stat row, driven by the state. */}
       {state.kind === 'syncing' ? (
-        <div className="px-[18px] pb-[14px]">
-          <p className="text-[12.5px] font-medium text-[#186155]">Syncing from source…</p>
-          <p className="mt-px text-[12px] text-[#A79E94]">Syncing…</p>
+        <div className="px-[18px] pb-[16px]">
+          <SyncProgress parsed={state.parsed} total={state.total} />
         </div>
-      ) : null}
-
-      {state.kind === 'error' ? (
+      ) : state.kind === 'success' ? (
         <div className="px-[18px] pb-[14px]">
-          <p className="text-[12.5px] font-medium text-[#B23A2E]">
-            Couldn&rsquo;t reach the curriculum source. Last good sync was {timeAgo(state.lastGood ?? null)}.
-          </p>
+          <p className="text-[12.5px] font-medium text-[#186155]">{state.summary}</p>
         </div>
-      ) : null}
-
-      {message ? (
+      ) : state.kind === 'error' ? (
         <div className="px-[18px] pb-[14px]">
-          <p className="text-[12.5px] font-medium text-[#186155]">{message}</p>
-        </div>
-      ) : null}
-      {error ? (
-        <div className="px-[18px] pb-[14px]">
-          <ErrorText>{error}</ErrorText>
+          <p className="text-[12.5px] font-medium text-[#B23A2E]">{state.message}</p>
         </div>
       ) : null}
     </SectionCard>
@@ -215,6 +214,41 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     <div>
       <div className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#A79E94]">{label}</div>
       <div className="mt-px text-[14px] font-semibold tabular-nums text-[#2A2422]">{value}</div>
+    </div>
+  );
+}
+
+/**
+ * The sync progress element. Determinate (teal fill + `{pct}% · {parsed} of
+ * ~{total}`) when the run exposes parsed/total; otherwise a single indeterminate
+ * teal bar with no text under it. The schema carries no counts today, so this
+ * renders indeterminate — numbers are never fabricated.
+ */
+function SyncProgress({ parsed, total }: { parsed?: number; total?: number }) {
+  const determinate = typeof total === 'number' && total > 0 && typeof parsed === 'number';
+  if (determinate) {
+    const pct = Math.min(100, Math.max(0, Math.round((parsed! / total!) * 100)));
+    return (
+      <div>
+        <div className="relative h-[6px] w-full overflow-hidden rounded-full bg-[#E4F0ED]">
+          <div
+            className="h-full rounded-full bg-[#1F7A6C] transition-[width] duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="mt-[7px] text-[12px] text-[#A79E94]">
+          {pct}% · {parsed} of ~{total}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="relative h-[6px] w-full overflow-hidden rounded-full bg-[#E4F0ED]"
+      role="progressbar"
+      aria-label="Syncing curriculum"
+    >
+      <span className="curriculum-sync-bar" />
     </div>
   );
 }
@@ -241,7 +275,7 @@ function StateBadge({
       break;
     case 'error':
       ({ bg, fg } = red);
-      label = `Sync failed · ${hhmm(state.at)}`;
+      label = `Sync failed · ${hhmm(state.badgeAt)}`;
       break;
     case 'idle':
     default:
