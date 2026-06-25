@@ -19,14 +19,45 @@ function PlusIcon() {
   );
 }
 
-/** Shared strip frame: a full-width bordered card with a title and its content. */
-function Strip({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * One labelled section inside the single Link-it card. The first section sits
+ * flush at the top; the rest are separated from the previous section by a hairline
+ * divider + spacing, so the three read as distinct parts of one coherent card.
+ */
+function Section({
+  title,
+  divider,
+  children,
+}: {
+  title: string;
+  divider?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-[14px] border border-border bg-surface px-[18px] py-[16px]">
+    <div className={divider ? 'mt-[18px] border-t border-border pt-[18px]' : ''}>
       <div className="text-[14px] font-bold uppercase tracking-[0.05em] text-neutral-700">
         {title}
       </div>
       <div className="mt-[12px]">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Read-only panel showing the previous lesson's daily outcome, above the recap
+ * field — so the teacher can see what was taught last lesson while writing the
+ * recap. Reuses the cream curriculum-panel tokens (cream = curriculum/locked,
+ * matching the DAILY OUTCOME panel on the Objective step).
+ */
+function PreviousOutcomePanel({ outcome }: { outcome: string }) {
+  return (
+    <div className="mb-[12px] rounded-[11px] border border-given-border bg-given px-[15px] py-[13px]">
+      <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-given-label">
+        Yesterday&apos;s learning outcome
+      </div>
+      <div className="mt-[6px] text-[15px] font-semibold leading-[1.4] text-neutral-900">
+        {outcome}
+      </div>
     </div>
   );
 }
@@ -126,14 +157,12 @@ function TechniqueRow({
   );
 }
 
-/** A technique strip: the title + Add, then a card per selected technique. */
-function TechniqueStrip({
-  title,
+/** A technique group: a card per selected technique, then the "+ Add" control. */
+function TechniqueGroup({
   activities,
   selected,
   onChange,
 }: {
-  title: string;
   activities: ActivityBankItem[];
   selected: LinkItTechnique[];
   onChange: (next: LinkItTechnique[]) => void;
@@ -146,46 +175,49 @@ function TechniqueStrip({
     onChange(selected.map((s) => (s.technique === id ? { ...s, note } : s)));
 
   return (
-    <Strip title={title}>
-      <div className="flex flex-col gap-[10px]">
-        {selected.map((s) => (
-          <TechniqueRow
-            key={s.technique}
-            name={nameById.get(s.technique) ?? 'Technique'}
-            note={s.note}
-            onNote={(note) => setNote(s.technique, note)}
-            onRemove={() => remove(s.technique)}
-          />
-        ))}
-        <div>
-          <AddTechnique activities={activities} selected={selected} onAdd={add} />
-        </div>
+    <div className="flex flex-col gap-[10px]">
+      {selected.map((s) => (
+        <TechniqueRow
+          key={s.technique}
+          name={nameById.get(s.technique) ?? 'Technique'}
+          note={s.note}
+          onNote={(note) => setNote(s.technique, note)}
+          onRemove={() => remove(s.technique)}
+        />
+      ))}
+      <div>
+        <AddTechnique activities={activities} selected={selected} onAdd={add} />
       </div>
-    </Strip>
+    </div>
   );
 }
 
 /**
- * Step 4 — "Link it together": three stacked strips. Recap is a single free-text
- * field; Check-for-understanding and Exit ticket each let the teacher add any
+ * Step 4 — "Link it together": ONE card holding three labelled sections. Recap is
+ * a single free-text field (with the previous lesson's outcome shown read-only
+ * above it); Check-for-understanding and Exit ticket each let the teacher add any
  * number of pre-approved techniques (from the real activity bank), each as a teal
- * chip with a pink note. Colour semantics: pink = teacher-editable, teal = the
- * technique selections/actions.
+ * chip with a pink note. Colour semantics: cream = curriculum/locked (the previous
+ * outcome), pink = teacher-editable, teal = the technique selections/actions.
  */
 export function LinkItStep({
   linkIt,
   cfuActivities,
   exitActivities,
+  previousDailyLO,
   onChange,
 }: {
   linkIt: LinkIt;
   cfuActivities: ActivityBankItem[];
   exitActivities: ActivityBankItem[];
+  /** Previous lesson's daily outcome; empty when there is no preceding lesson. */
+  previousDailyLO?: string;
   onChange: (next: LinkIt) => void;
 }) {
   return (
-    <div className="mt-[22px] flex flex-col gap-[14px]">
-      <Strip title="Recap">
+    <div className="mt-[22px] rounded-[14px] border border-border bg-surface px-[18px] py-[16px]">
+      <Section title="Recap">
+        {previousDailyLO ? <PreviousOutcomePanel outcome={previousDailyLO} /> : null}
         <textarea
           rows={3}
           value={linkIt.recap}
@@ -193,21 +225,23 @@ export function LinkItStep({
           placeholder="Write the recap…"
           className={`resize-y ${NOTE_FIELD}`}
         />
-      </Strip>
+      </Section>
 
-      <TechniqueStrip
-        title="Check for understanding"
-        activities={cfuActivities}
-        selected={linkIt.checkForUnderstanding}
-        onChange={(next) => onChange({ ...linkIt, checkForUnderstanding: next })}
-      />
+      <Section title="Check for understanding" divider>
+        <TechniqueGroup
+          activities={cfuActivities}
+          selected={linkIt.checkForUnderstanding}
+          onChange={(next) => onChange({ ...linkIt, checkForUnderstanding: next })}
+        />
+      </Section>
 
-      <TechniqueStrip
-        title="Exit ticket"
-        activities={exitActivities}
-        selected={linkIt.exitTicket}
-        onChange={(next) => onChange({ ...linkIt, exitTicket: next })}
-      />
+      <Section title="Exit ticket" divider>
+        <TechniqueGroup
+          activities={exitActivities}
+          selected={linkIt.exitTicket}
+          onChange={(next) => onChange({ ...linkIt, exitTicket: next })}
+        />
+      </Section>
     </div>
   );
 }

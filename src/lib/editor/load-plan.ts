@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getLessonById } from '@/lib/curriculumUtils';
+import { getLessonById, getPreviousLesson } from '@/lib/curriculumUtils';
 import { DEFAULT_BLOCKS } from '@/lib/blocks';
 import { getTagVocabulary, listFolders, getResourcesByIds } from '@/lib/resources';
 import type { Block, LessonBlockType, LessonPlan, PlanScope } from '@/types/lesson';
@@ -61,6 +61,13 @@ export interface EditorCurriculumContext {
   theme: string;
   /** Combined grammar + vocabulary focus shown in the cream context cell. */
   grammarVocab: string;
+  /**
+   * The previous lesson's daily outcome (the curriculum slot immediately before
+   * this plan's, within the same subject + year). Shown read-only in the Link-it
+   * Recap section so teachers see what was taught last lesson. Empty when this is
+   * the first lesson of its year.
+   */
+  previousDailyLO: string;
   /** The week-level knowledge objective ("This week ·" context under the daily outcome). */
   weekLO: string;
   /** The broader skill objective ("This month ·" context under the daily outcome). */
@@ -225,6 +232,12 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
   // Resolve the locked curriculum context from the Supabase-backed curriculum.
   const lookup = await getLessonById(row.curriculum_lesson_id);
   const lesson = Array.isArray(lookup) ? lookup[0] : lookup;
+  // The lesson taught immediately before this one (same subject + year), resolved
+  // from the curriculum sequence. Its daily outcome anchors the Link-it recap.
+  const previousLesson =
+    lesson && lesson.subject && lesson.week != null && lesson.periodNum != null
+      ? await getPreviousLesson(lesson.subject, lesson.yearNum ?? 0, lesson.week, lesson.periodNum)
+      : null;
   const grammarVocab = lesson
     ? [lesson.vocabFocus, lesson.grammarFocus].filter((s) => s && s.trim()).join(' · ')
     : '';
@@ -234,6 +247,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
         focusArea: lesson.linguisticSkill,
         theme: lesson.theme,
         grammarVocab,
+        previousDailyLO: previousLesson?.dailyLO ?? '',
         // The knowledge objective is the finer-grained (≈ weekly) target; the
         // skill objective is the broader (≈ monthly) one. Both are already
         // stem-cleaned by getLessonById.

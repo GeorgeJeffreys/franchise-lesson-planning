@@ -129,6 +129,36 @@ export async function getLessonById(
   return taxonomyHits.map(rowToLesson);
 }
 
+/**
+ * The curriculum lesson immediately preceding a given slot, within the same
+ * (subject, year). Lessons are ordered by (week, period): weeks are numbered
+ * globally across the school year (monotonically increasing across months — the
+ * month is only a label), so this is a clean total order with no duplicate slots.
+ * Month/week boundaries fall out of the ordering automatically. Returns null when
+ * the slot is the first lesson of its year (no in-year predecessor) or unknown.
+ */
+export async function getPreviousLesson(
+  subject: string,
+  year: number | string,
+  week: number,
+  period: number,
+): Promise<CurriculumLesson | null> {
+  const yn = resolveYearNum(year);
+  if (yn === null) return null;
+  const lessons = (await allLessons())
+    .filter(
+      (l) =>
+        l.subject === subject &&
+        l.yearNum === yn &&
+        l.week !== null &&
+        l.periodNum !== null,
+    )
+    .sort(byWeekThenPeriod);
+  const idx = lessons.findIndex((l) => l.week === week && l.periodNum === period);
+  if (idx <= 0) return null;
+  return lessons[idx - 1];
+}
+
 /** Every lesson for a year+week, sorted by period. */
 export async function getLessonsByWeek(
   year: number | string,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 export const WIZARD_STEPS: { label: string }[] = [
   { label: 'SMARTT objective' },
@@ -36,12 +36,12 @@ export function Stepper({
   const isLast = step === STEP_COUNT;
   return (
     <div className="border-b border-[#EFE8DD] px-[22px] py-[15px] lg:px-[30px]">
-      {/* Every stage is identical (same 30px circle, same fixed-width label box,
-          same connector treatment); connectors stretch (flex-1) to spread the row
-          evenly. Two things are pinned so the row never reflows as you step:
-          the label box has a FIXED width (so the active/bold label can't widen its
-          stage and shove the next one), and the action cluster has a FIXED width
-          (so swapping Next → Review → Submit never redistributes the connectors). */}
+      {/* Each stage is a shrink-0 cluster (30px circle + its label, sized to the
+          label so "SMARTT objective" shows in full — never truncated). The
+          connectors between stages are flex-1 SIBLINGS, so they each take an equal
+          share of the leftover width: the connector lines stay visible and evenly
+          spaced regardless of how wide any one label is. The action cluster keeps a
+          FIXED width so swapping Next → Review → Submit never reflows the row. */}
       <div className="flex items-center">
         {WIZARD_STEPS.map((s, i) => {
           const no = i + 1;
@@ -49,10 +49,7 @@ export function Stepper({
           const isCur = step === no;
           const showConn = i < STEP_COUNT - 1;
           return (
-            <div
-              key={s.label}
-              className={showConn ? 'flex min-w-0 flex-1 items-center' : 'flex shrink-0 items-center'}
-            >
+            <Fragment key={s.label}>
               <button
                 type="button"
                 onClick={() => onGo(no)}
@@ -72,7 +69,7 @@ export function Stepper({
                 </span>
                 <span
                   className={
-                    'hidden w-[116px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] sm:block ' +
+                    'hidden whitespace-nowrap text-[13px] sm:block ' +
                     (isCur ? 'font-semibold text-ink' : isDone ? 'font-medium text-neutral-800' : 'font-medium text-neutral-400')
                   }
                 >
@@ -87,7 +84,7 @@ export function Stepper({
                   }
                 />
               ) : null}
-            </div>
+            </Fragment>
           );
         })}
 

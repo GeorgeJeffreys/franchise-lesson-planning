@@ -328,6 +328,7 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
             linkIt={linkIt}
             cfuActivities={activitiesByBlock.cfu ?? []}
             exitActivities={activitiesByBlock.exit_ticket ?? []}
+            previousDailyLO={curriculum?.previousDailyLO ?? ''}
             onChange={onLinkItChange}
           />
         ) : null}
