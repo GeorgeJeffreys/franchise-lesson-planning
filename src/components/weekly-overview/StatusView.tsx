@@ -42,9 +42,17 @@ const NOT_STARTED_CAP = 8;
  * distance keeps a plain click navigating to the plan. "Not started" is excluded
  * from drag (no plan row → no status) and instead opens the scope chooser.
  */
-export function StatusView({ years, ownerId }: { years: BoardYear[]; ownerId: string | null }) {
-  const cards = planCardsForYears(years, ownerId);
-  const empties = emptySlotCards(years);
+export function StatusView({
+  years,
+  ownerId,
+  subject,
+}: {
+  years: BoardYear[];
+  ownerId: string | null;
+  subject: string;
+}) {
+  const cards = planCardsForYears(years, ownerId, subject);
+  const empties = emptySlotCards(years, subject);
 
   // Optimistic per-plan status overrides, keyed by plan id.
   const [overrides, setOverrides] = useState<Record<string, PlanStatus>>({});

@@ -84,9 +84,9 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
         ) : data.years.length === 0 || data.coordinate.month === '' ? (
           <EmptyCurriculum subjectName={data.subjectName} />
         ) : view === 'status' ? (
-          <StatusView years={data.years} ownerId={ownerId} />
+          <StatusView years={data.years} ownerId={ownerId} subject={data.subjectName} />
         ) : (
-          <CalendarView years={data.years} ownerId={ownerId} />
+          <CalendarView years={data.years} ownerId={ownerId} subject={data.subjectName} />
         )}
       </div>
     </ScopeChooserProvider>

@@ -14,9 +14,11 @@ import type { BoardSlot, BoardYear } from '@/types/weekly-overview';
 export function CalendarView({
   years,
   ownerId,
+  subject,
 }: {
   years: BoardYear[];
   ownerId: string | null;
+  subject: string;
 }) {
   return (
     <div className="flex flex-col gap-[26px]">
@@ -33,7 +35,7 @@ export function CalendarView({
               style={{ gridTemplateColumns: `repeat(${band.slots.length}, minmax(0, 1fr))` }}
             >
               {band.slots.map((slot) => (
-                <PeriodCell key={slot.lessonKey} slot={slot} ownerId={ownerId} />
+                <PeriodCell key={slot.lessonKey} slot={slot} ownerId={ownerId} subject={subject} />
               ))}
             </div>
           )}
@@ -43,7 +45,15 @@ export function CalendarView({
   );
 }
 
-function PeriodCell({ slot, ownerId }: { slot: BoardSlot; ownerId: string | null }) {
+function PeriodCell({
+  slot,
+  ownerId,
+  subject,
+}: {
+  slot: BoardSlot;
+  ownerId: string | null;
+  subject: string;
+}) {
   const { openChooser } = useScopeChooser();
   const visible = ownerId ? slot.plans.filter((p) => p.owner?.id === ownerId) : slot.plans;
   const covered = slot.plans.length > 0;
@@ -55,6 +65,7 @@ function PeriodCell({ slot, ownerId }: { slot: BoardSlot; ownerId: string | null
           card={{
             key: slot.lessonKey,
             lessonKey: slot.lessonKey,
+            subject,
             year: slot.year,
             period: slot.period,
             dailyOutcome: slot.dailyOutcome,
@@ -73,6 +84,7 @@ function PeriodCell({ slot, ownerId }: { slot: BoardSlot; ownerId: string | null
           card={{
             key: plan.id,
             planId: plan.id,
+            subject,
             year: slot.year,
             period: slot.period,
             status: plan.status,

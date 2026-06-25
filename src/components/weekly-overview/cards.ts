@@ -11,6 +11,8 @@ export interface PlanCard {
   /** Stable key — the plan id. */
   key: string;
   planId: string;
+  /** Board subject (English first) — the card's muted subtitle line. */
+  subject: string;
   year: number;
   period: number;
   status: PlanStatus;
@@ -26,15 +28,12 @@ export interface EmptySlotCard {
   /** Stable key — the slot's lesson key. */
   key: string;
   lessonKey: string;
+  /** Board subject (English first) — the card's muted subtitle line. */
+  subject: string;
   year: number;
   period: number;
   dailyOutcome: string;
   focusArea: string;
-}
-
-/** The "time" line shown on a card — the curriculum period. */
-export function periodLabel(period: number): string {
-  return `Period ${period}`;
 }
 
 /**
@@ -42,7 +41,11 @@ export function periodLabel(period: number): string {
  * filter hides only plan cards — it never turns a covered slot back into "Not
  * started" (a slot leaves Not started for everyone once any plan exists).
  */
-export function planCardsForYears(years: BoardYear[], ownerId: string | null): PlanCard[] {
+export function planCardsForYears(
+  years: BoardYear[],
+  ownerId: string | null,
+  subject: string,
+): PlanCard[] {
   const out: PlanCard[] = [];
   for (const band of years) {
     for (const slot of band.slots) {
@@ -51,6 +54,7 @@ export function planCardsForYears(years: BoardYear[], ownerId: string | null): P
         out.push({
           key: p.id,
           planId: p.id,
+          subject,
           year: slot.year,
           period: slot.period,
           status: p.status,
@@ -66,7 +70,7 @@ export function planCardsForYears(years: BoardYear[], ownerId: string | null): P
 }
 
 /** Slots with no plan of any scope (always unfiltered) → "Not started" cards. */
-export function emptySlotCards(years: BoardYear[]): EmptySlotCard[] {
+export function emptySlotCards(years: BoardYear[], subject: string): EmptySlotCard[] {
   const out: EmptySlotCard[] = [];
   for (const band of years) {
     for (const slot of band.slots) {
@@ -74,6 +78,7 @@ export function emptySlotCards(years: BoardYear[]): EmptySlotCard[] {
       out.push({
         key: slot.lessonKey,
         lessonKey: slot.lessonKey,
+        subject,
         year: slot.year,
         period: slot.period,
         dailyOutcome: slot.dailyOutcome,
