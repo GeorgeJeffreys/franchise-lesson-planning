@@ -99,10 +99,11 @@ export function WorksheetBuilder({
     zoomRef.current = zoom;
   }, [zoom]);
 
-  // ── Fullscreen ────────────────────────────────────────────────────────────
-  const [isFs, setIsFs] = useState(false); // native Fullscreen API
-  const [maximised, setMaximised] = useState(false); // CSS fallback
-  const fsActive = isFs || maximised;
+  // ── Full screen ───────────────────────────────────────────────────────────
+  // A CSS maximize overlay (fixed, full-viewport, high z-index) rather than the
+  // native Fullscreen API — it gives full control over the styling (app-neutral
+  // surface, pinned toolbar) and avoids the browser's native "press Esc" tooltip.
+  const [maximised, setMaximised] = useState(false);
 
   const shellRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -195,12 +196,12 @@ export function WorksheetBuilder({
     return () => ro.disconnect();
   }, []);
 
-  // Re-fit on fullscreen enter/exit (the available area changes a lot).
+  // Re-fit on full-screen enter/exit (the available area changes a lot).
   useEffect(() => {
     if (!initedRef.current) return;
     const id = requestAnimationFrame(() => setZoom(computeFit()));
     return () => cancelAnimationFrame(id);
-  }, [isFs, maximised, computeFit]);
+  }, [maximised, computeFit]);
 
   // ── Keyboard zoom (Cmd/Ctrl +/-/0) ────────────────────────────────────────
   useEffect(() => {
@@ -257,20 +258,6 @@ export function WorksheetBuilder({
       vp.removeEventListener('gesturestart', onGestureStart);
       vp.removeEventListener('gesturechange', onGestureChange);
       vp.removeEventListener('gestureend', onGestureEnd);
-    };
-  }, []);
-
-  // ── Fullscreen API ────────────────────────────────────────────────────────
-  useEffect(() => {
-    const onChangeFs = () => {
-      const d = document as Document & { webkitFullscreenElement?: Element };
-      setIsFs(Boolean(d.fullscreenElement || d.webkitFullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', onChangeFs);
-    document.addEventListener('webkitfullscreenchange', onChangeFs);
-    return () => {
-      document.removeEventListener('fullscreenchange', onChangeFs);
-      document.removeEventListener('webkitfullscreenchange', onChangeFs);
     };
   }, []);
 
@@ -417,13 +404,12 @@ export function WorksheetBuilder({
       ref={shellRef}
       className="ws-shell"
       style={{
-        background: fsActive ? '#241f1b' : 'var(--color-surface)',
+        background: 'var(--color-surface)',
         display: 'flex',
         flexDirection: 'column',
         ...(maximised
-          ? { position: 'fixed', inset: 0, zIndex: 120 }
+          ? { position: 'fixed', inset: 0, zIndex: 120, height: '100vh' }
           : null),
-        ...(fsActive ? { height: '100vh' } : null),
       }}
     >
       {/* ── CHROME (never zoom-scaled) ───────────────────────────────────── */}
@@ -474,6 +460,26 @@ export function WorksheetBuilder({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="3" width="12" height="6" rx="1" /><path d="M6 14h12v7H6z" /><path d="M6 14H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2" /></svg>
               Print preview
             </button>
+
+            {/* Full screen — CSS maximize overlay; teal "Exit" while active, Esc also leaves */}
+            <button
+              type="button"
+              onClick={() => setMaximised((m) => !m)}
+              title={maximised ? 'Exit full screen (Esc)' : 'Full screen'}
+              style={chromeButton(maximised)}
+            >
+              {maximised ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
+                  Exit full screen
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+                  Full screen
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -498,9 +504,9 @@ export function WorksheetBuilder({
           setActive(null);
         }}
         style={{
-          background: fsActive ? '#2A2320' : '#E8E1D6',
+          background: '#E8E1D6',
           overflow: 'auto',
-          ...(fsActive ? { flex: '1 1 auto' } : { height: 'clamp(420px, 64vh, 920px)' }),
+          ...(maximised ? { flex: '1 1 auto' } : { height: 'clamp(420px, 64vh, 920px)' }),
         }}
       >
         <div style={{ minWidth: '100%', width: 'fit-content', padding: '38px 20px 40px', boxSizing: 'border-box' }}>
