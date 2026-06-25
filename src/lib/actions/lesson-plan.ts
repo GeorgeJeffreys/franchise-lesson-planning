@@ -71,6 +71,48 @@ export async function saveLessonPlan(input: SavePlanInput): Promise<ActionResult
   return { ok: true, updated_at: data.updated_at };
 }
 
+/** One card's new placement on the day-column board. */
+export interface PlanPlacement {
+  id: string;
+  /** Mon–Fri column (1..5). */
+  weekday: number;
+  /** Day-ordinal position within that column (1..N). */
+  period: number;
+}
+
+/**
+ * Persist the new day-column placement of dragged cards — the write behind the
+ * Calendar board's drag-to-reorder. Each update sets a plan's `weekday` + `period`
+ * (its 1-based position in the day's stack). RLS scopes every write to a plan the
+ * caller may edit, so the client only ever sends its OWN cards (shared centre/org
+ * cards are not draggable and keep their creator's placement). A rejected write
+ * (RLS or otherwise) fails the whole call so the board can revert optimistically.
+ */
+export async function reorderPlans(updates: PlanPlacement[]): Promise<ActionResult> {
+  if (updates.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+
+  const results = await Promise.all(
+    updates.map((u) =>
+      supabase
+        .from('lesson_plans')
+        .update({ weekday: u.weekday, period: u.period })
+        .eq('id', u.id)
+        .select('id')
+        .maybeSingle(),
+    ),
+  );
+
+  for (const res of results) {
+    if (res.error) return { ok: false, error: res.error.message };
+    if (!res.data) return { ok: false, error: 'A card could not be moved (not permitted).' };
+  }
+
+  revalidatePath('/');
+  return { ok: true };
+}
+
 /**
  * Set a plan's workflow status directly — the write behind the Weekly Overview's
  * Status (kanban) board, where dragging a card between columns moves the plan to

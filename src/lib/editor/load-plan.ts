@@ -101,6 +101,7 @@ interface RawPlanRow {
   year: number | null;
   curriculum_lesson_id: string;
   lesson_date: string | null;
+  weekday: number | null;
   period: number | null;
   status: LessonPlan['status'];
   smartt_objective: string | null;
@@ -144,7 +145,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
       .from('lesson_plans')
       .select(
         `id, class_id, scope, school_id, subject_id, year,
-         curriculum_lesson_id, lesson_date, period, status,
+         curriculum_lesson_id, lesson_date, weekday, period, status,
          smartt_objective, smartt_check, blocks, worksheet, required_materials, created_by,
          submitted_at, reviewed_at, review_note, created_at, updated_at,
          class:classes (
@@ -276,6 +277,7 @@ export async function loadPlanForEditor(id: string): Promise<EditorPlanData | nu
     year: row.year,
     curriculum_lesson_id: row.curriculum_lesson_id,
     lesson_date: row.lesson_date,
+    weekday: row.weekday,
     period: row.period,
     status: row.status,
     smartt_objective: row.smartt_objective,

@@ -219,6 +219,18 @@ export interface LessonPlan {
    * (migration 0012_lesson_plan_scope made the column nullable).
    */
   lesson_date: string | null;
+  /**
+   * Mon–Fri column on the weekly board (1=Mon..5=Fri). Null on legacy rows
+   * (migration 0016_lesson_plans_weekday). See {@link period}.
+   */
+  weekday: number | null;
+  /**
+   * Day-ordinal: the plan's 1-based position within its (year, weekday) stack on
+   * the board. REPURPOSED by migration 0016 from the old "curriculum period" — the
+   * curriculum period is now recovered from {@link curriculum_lesson_id} when
+   * needed. The displayed "Period N" is re-derived from the sorted stack, so this
+   * is a sort hint, not an authoritative label.
+   */
   period: number | null;
   status: PlanStatus;
   smartt_objective: string | null;

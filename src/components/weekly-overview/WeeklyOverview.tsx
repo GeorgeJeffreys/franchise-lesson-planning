@@ -47,9 +47,7 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
     if (ownerId === null) return data.planCount;
     let n = 0;
     for (const band of data.years) {
-      for (const slot of band.slots) {
-        for (const p of slot.plans) if (p.owner?.id === ownerId) n++;
-      }
+      for (const p of band.plans) if (p.owner?.id === ownerId) n++;
     }
     return n;
   }, [data.years, data.planCount, ownerId]);

@@ -1,9 +1,9 @@
-// Data layer for the planning board — the curriculum-driven view of a teacher's
-// week. The board is anchored on CURRICULUM coordinates (month · week · period),
-// NOT on calendar dates: for each year the signed-in teacher teaches, every
-// curriculum period (P1..P5) of the selected (month, week) is a slot, and every
-// plan the teacher can see whose `curriculum_lesson_id` matches a slot key renders
-// as a card over it.
+// Data layer for the day-column planning board. The board is a per-year set of
+// Mon–Fri columns: a plan appears on the board once it exists, placed by its own
+// `weekday` (which column) and `period` (its position in that day's stack). The
+// curriculum lessons for the selected (month · week) are the POOL the "+ Add
+// lesson" picker draws from — the board groups plans by curriculum week via each
+// plan's `curriculum_lesson_id`, then lays them out by weekday.
 //
 // Everything goes through the auth'd, cookie-bound Supabase client, so RLS scopes
 // the reads: the teacher's own `class_teachers` rows, and the `lesson_plans` they
@@ -18,10 +18,10 @@ import type {
   BoardClass,
   BoardCoordinate,
   BoardData,
-  BoardSlot,
+  BoardLesson,
+  BoardPlan,
   BoardYear,
   PlanOwner,
-  SlotPlan,
 } from '@/types/weekly-overview';
 
 // Calendar-month order so the prev/next arrows step through the scheme of work in
@@ -57,9 +57,27 @@ interface PlanRow {
   school_id: string | null;
   subject_id: string | null;
   year: number | null;
+  weekday: number | null;
+  period: number | null;
   status: PlanStatus;
   review_note: string | null;
   created_by: string;
+}
+
+/** Clamp a value to the Mon–Fri (1–5) column range, defaulting to Monday. */
+function clampWeekday(n: number | null | undefined): number {
+  if (n == null || Number.isNaN(n)) return 1;
+  return Math.min(5, Math.max(1, Math.trunc(n)));
+}
+
+/** Order plans within a day stack: by stored ordinal, then scope, then owner. */
+const SCOPE_ORDER: Record<PlanScope, number> = { class: 0, centre: 1, org: 2 };
+function byDayOrder(a: BoardPlan, b: BoardPlan): number {
+  if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+  if (a.period !== b.period) return a.period - b.period;
+  const s = SCOPE_ORDER[a.scope] - SCOPE_ORDER[b.scope];
+  if (s !== 0) return s;
+  return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '');
 }
 
 interface MembershipRow {
@@ -86,22 +104,15 @@ function emptyBoard(teacherName: string, subjectName = ''): BoardData {
   };
 }
 
-/** Order plans within a slot: by scope (class → centre → org), then owner name. */
-const SCOPE_ORDER: Record<PlanScope, number> = { class: 0, centre: 1, org: 2 };
-function byScopeThenOwner(a: SlotPlan, b: SlotPlan): number {
-  const s = SCOPE_ORDER[a.scope] - SCOPE_ORDER[b.scope];
-  if (s !== 0) return s;
-  return (a.owner?.name ?? '').localeCompare(b.owner?.name ?? '');
-}
-
 /**
  * Load the planning board for the signed-in teacher at a curriculum coordinate.
  *
  * `month`/`week` select the curriculum coordinate; when omitted (or out of range)
  * the first synced coordinate for the teacher's subject is used. The board shows
  * one band per year the teacher teaches (distinct `classes.year` via
- * `class_teachers`), each with the P1..P5 curriculum slots for that coordinate and
- * every plan — at any scope the teacher can see — covering them.
+ * `class_teachers`); each band carries the plans placed this week (laid out into
+ * Mon–Fri columns by their `weekday`/`period`) and the curriculum lessons for the
+ * coordinate (the "+ Add lesson" pool).
  */
 export async function getBoardData(input: {
   month?: string;
@@ -213,7 +224,7 @@ export async function getBoardData(input: {
       ...emptyBoard(teacherName, subjectName),
       context,
       hasClasses: true,
-      years: years.map((year) => ({ year, slots: [] })),
+      years: years.map((year) => ({ year, plans: [], lessons: [] })),
       myClassesByYear,
     };
   }
@@ -225,24 +236,34 @@ export async function getBoardData(input: {
   const prev = index > 0 ? coords[index - 1] : null;
   const next = index < coords.length - 1 ? coords[index + 1] : null;
 
-  // The curriculum slots (P1..P5) for each taught year at the selected coordinate.
+  // The curriculum lessons (P1..P5) for each taught year at the selected
+  // coordinate — the "+ Add lesson" pool and the join target for the plans.
   const cellsByYear = await Promise.all(
     years.map((y) => getCurriculumWeekCells(subjectCode, y, coordinate.month, coordinate.week)),
   );
 
-  // Every slot key across the board — the join target for the visible plans.
+  // Every lesson key across the board — the join target for the visible plans, and
+  // a lookup from a plan's curriculum_lesson_id back to its curriculum period.
   const slotKeys = new Set<string>();
-  for (const cells of cellsByYear) for (const cell of cells) slotKeys.add(cell.lessonKey);
+  const periodByKey = new Map<string, number>();
+  const outcomeByKey = new Map<string, string>();
+  for (const cells of cellsByYear) {
+    for (const cell of cells) {
+      slotKeys.add(cell.lessonKey);
+      periodByKey.set(cell.lessonKey, cell.period);
+      outcomeByKey.set(cell.lessonKey, cell.dailyOutcome);
+    }
+  }
 
   // All plans (any scope) the teacher can see whose curriculum_lesson_id is one of
-  // the slot keys. RLS enforces visibility; legacy plans whose key matches no slot
-  // simply never load. Skip the query entirely when there are no slots.
+  // the week's lesson keys. RLS enforces visibility; legacy plans whose key matches
+  // no lesson simply never load. Skip the query entirely when there are no lessons.
   let planRows: PlanRow[] = [];
   if (slotKeys.size > 0) {
     const { data: plans } = await supabase
       .from('lesson_plans')
       .select(
-        'id, curriculum_lesson_id, scope, class_id, school_id, subject_id, year, status, review_note, created_by',
+        'id, curriculum_lesson_id, scope, class_id, school_id, subject_id, year, weekday, period, status, review_note, created_by',
       )
       .in('curriculum_lesson_id', [...slotKeys]);
     planRows = (plans ?? []) as unknown as PlanRow[];
@@ -269,33 +290,39 @@ export async function getBoardData(input: {
     isAdmin ||
     (!!p.school_id && !!p.subject_id && coordinatorSpaces.has(`${p.school_id}:${p.subject_id}`));
 
-  // Index plans by slot key.
-  const plansByKey = new Map<string, SlotPlan[]>();
+  // Turn each visible plan into a placed board card. `weekday` falls back to the
+  // lesson's curriculum period (clamped to Mon–Fri) for legacy rows that predate
+  // the column; `period` (the stored day-ordinal) likewise falls back. The
+  // displayed "Period N" is re-derived from the sorted stack on the client.
+  const plansByYear = new Map<number, BoardPlan[]>();
   for (const p of planRows) {
-    const card: SlotPlan = {
+    if (p.year == null) continue;
+    const curriculumPeriod = periodByKey.get(p.curriculum_lesson_id) ?? 1;
+    const plan: BoardPlan = {
       id: p.id,
+      lessonKey: p.curriculum_lesson_id,
+      year: p.year,
+      weekday: clampWeekday(p.weekday ?? curriculumPeriod),
+      period: p.period ?? curriculumPeriod,
       status: p.status,
       scope: p.scope,
       owner: ownerById.get(p.created_by) ?? null,
       canEdit: canEdit(p),
       reviewNote: p.review_note,
+      dailyOutcome: outcomeByKey.get(p.curriculum_lesson_id) ?? '',
     };
-    const list = plansByKey.get(p.curriculum_lesson_id);
-    if (list) list.push(card);
-    else plansByKey.set(p.curriculum_lesson_id, [card]);
+    (plansByYear.get(p.year) ?? plansByYear.set(p.year, []).get(p.year)!).push(plan);
   }
-  for (const list of plansByKey.values()) list.sort(byScopeThenOwner);
+  for (const list of plansByYear.values()) list.sort(byDayOrder);
 
   const yearBands: BoardYear[] = years.map((year, i) => {
-    const slots: BoardSlot[] = cellsByYear[i].map((cell) => ({
+    const lessons: BoardLesson[] = cellsByYear[i].map((cell) => ({
       lessonKey: cell.lessonKey,
-      year,
       period: cell.period,
       dailyOutcome: cell.dailyOutcome,
       focusArea: cell.focusArea,
-      plans: plansByKey.get(cell.lessonKey) ?? [],
     }));
-    return { year, slots };
+    return { year, plans: plansByYear.get(year) ?? [], lessons };
   });
 
   // Distinct owners across the board, for the people filter.
