@@ -106,6 +106,21 @@
 }
 
 /*
+ * Inline minutes field (TimeStepper): strip the native number-spinner arrows so
+ * the value reads as clean inline text. Increment still works via the keyboard
+ * up/down arrows; the visible chrome is just the number + a teal focus state.
+ */
+.time-field {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.time-field::-webkit-outer-spin-button,
+.time-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/*
  * Diagonal stripe wash used on the login brand panel (from the Login design).
  * It's a painted texture, not a token, so it lives here as a utility.
  */

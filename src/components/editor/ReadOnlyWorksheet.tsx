@@ -19,12 +19,20 @@ import type { WorksheetContext } from '@/components/editor/worksheet/context';
 
 const A4_WIDTH = 794;
 
-/** Scales an intrinsically `nativeWidth`-wide child down to fit its column,
- *  collapsing the layout box to the scaled height so nothing else is pushed. */
+// Upper bound on the inline preview scale. The worksheet builder opens its A4
+// canvas at 0.72 (its comfortable default zoom); matching it keeps a read-only
+// preview legible without letting a wide review column render the page at full
+// A4 size, which dwarfs the rest of the page. Narrower columns still fit-to-width
+// below this cap.
+const PREVIEW_MAX_SCALE = 0.72;
+
+/** Scales an intrinsically `nativeWidth`-wide child down to fit its column (and
+ *  no larger than PREVIEW_MAX_SCALE), collapsing the layout box to the scaled
+ *  height so nothing else is pushed. */
 function ScaledA4({ children }: { children: React.ReactNode }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(PREVIEW_MAX_SCALE);
   const [height, setHeight] = useState<number | undefined>(undefined);
 
   useLayoutEffect(() => {
@@ -32,7 +40,7 @@ function ScaledA4({ children }: { children: React.ReactNode }) {
     const inner = innerRef.current;
     if (!outer || !inner) return;
     const update = () => {
-      const s = Math.min(1, outer.clientWidth / A4_WIDTH);
+      const s = Math.min(PREVIEW_MAX_SCALE, outer.clientWidth / A4_WIDTH);
       setScale(s);
       setHeight(inner.offsetHeight * s);
     };
