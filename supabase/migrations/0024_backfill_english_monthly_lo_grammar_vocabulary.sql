@@ -1,4 +1,4 @@
--- 0023_backfill_english_monthly_lo_grammar_vocabulary.sql
+-- 0024_backfill_english_monthly_lo_grammar_vocabulary.sql
 --
 -- DATA BACKFILL (not a schema migration). Populates the curriculum_lesson
 -- `monthly_lo` and `grammar_vocabulary` columns for English, which were added by
