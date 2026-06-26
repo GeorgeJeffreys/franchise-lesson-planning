@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { signOut } from '@/lib/actions/auth';
 import { setLocale } from '@/app/actions/locale';
+import { setPseudoRtl } from '@/app/actions/pseudo-rtl';
 import { enabledLocales, type Locale } from '@/i18n/config';
 
 /** Native names for each locale — always shown in their own script. */
@@ -26,7 +27,19 @@ function initials(name: string): string {
  * opens a small menu (identity, profile link, sign out). Sign out posts to the
  * `signOut` server action, so the session is cleared server-side.
  */
-export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }) {
+export function UserMenu({
+  name,
+  subtitle,
+  pseudoRtlEnabled = false,
+  pseudoRtlActive = false,
+}: {
+  name: string;
+  subtitle?: string;
+  /** Dev: whether the "Force RTL" toggle is available (ENABLE_PSEUDO_RTL). */
+  pseudoRtlEnabled?: boolean;
+  /** Dev: whether pseudo-RTL is currently on. */
+  pseudoRtlActive?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
@@ -39,6 +52,12 @@ export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }
       return;
     }
     await setLocale(next);
+    window.location.reload();
+  }
+
+  // Dev: flip pseudo-RTL, then hard-reload so <html dir> re-evaluates.
+  async function togglePseudoRtl() {
+    await setPseudoRtl(!pseudoRtlActive);
     window.location.reload();
   }
 
@@ -131,6 +150,28 @@ export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }
               );
             })}
           </div>
+
+          {pseudoRtlEnabled ? (
+            <div className="mt-[2px] border-t border-neutral-100 pt-[6px]">
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={pseudoRtlActive}
+                onClick={togglePseudoRtl}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-[8px] px-3 py-[9px] text-left text-[13px] text-neutral-700 hover:bg-surface-subtle"
+              >
+                <span>Force RTL (dev)</span>
+                <span
+                  aria-hidden
+                  className={`inline-flex h-[18px] w-[30px] items-center rounded-full px-[2px] transition-colors ${
+                    pseudoRtlActive ? 'justify-end bg-teal' : 'justify-start bg-neutral-300'
+                  }`}
+                >
+                  <span className="size-[14px] rounded-full bg-white" />
+                </span>
+              </button>
+            </div>
+          ) : null}
 
           <form action={signOut} role="none">
             <button

@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { TopNav } from '@/components/app-shell/TopNav';
 import { UserMenu } from '@/components/app-shell/UserMenu';
 import { TestUserBar } from '@/components/app-shell/TestUserBar';
 import { isAdmin, getMyMemberships } from '@/lib/auth';
 import { getImpersonationState } from '@/lib/test-impersonation';
+import { isPseudoRtlEnabled, PSEUDO_RTL_COOKIE } from '@/i18n/pseudo-rtl';
 
 type AppShellProps = {
   /** The signed-in user's display name (full_name, falling back to email). */
@@ -31,6 +33,12 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
     getImpersonationState(),
   ]);
   const showSettings = admin || memberships.some((m) => m.role === 'coordinator');
+
+  // Dev-only "Force RTL" affordance: surfaced in the user menu only when the
+  // ENABLE_PSEUDO_RTL flag is set for this environment.
+  const pseudoRtlEnabled = isPseudoRtlEnabled();
+  const pseudoRtlActive =
+    pseudoRtlEnabled && (await cookies()).get(PSEUDO_RTL_COOKIE)?.value === '1';
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -66,7 +74,12 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
         {/* Right cluster: bell · user */}
         <div className="ml-auto flex items-center gap-[10px]">
           <NotificationBell />
-          <UserMenu name={name} subtitle={subtitle} />
+          <UserMenu
+            name={name}
+            subtitle={subtitle}
+            pseudoRtlEnabled={pseudoRtlEnabled}
+            pseudoRtlActive={pseudoRtlActive}
+          />
         </div>
       </header>
 
