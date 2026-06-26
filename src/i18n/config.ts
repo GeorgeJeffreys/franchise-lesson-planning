@@ -14,12 +14,11 @@ export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = 'en';
 
 /**
- * Locales a user can actually switch to from the UI. Arabic ships *disabled*
- * here and is switched on in its own branch; its catalog already loads if the
- * cookie is set manually (or via pseudo-RTL), so the rollout can be staged. The
- * language switcher renders only these.
+ * Locales a user can actually switch to from the UI. The language switcher
+ * renders only these. Arabic is enabled now that every surface is extracted and
+ * RTL-converted and the `messages/ar/*` catalogs are in place.
  */
-export const enabledLocales: readonly Locale[] = ['en'];
+export const enabledLocales: readonly Locale[] = ['en', 'ar'];
 
 /**
  * Endonyms for the switcher. A language always names itself in its own script,
