@@ -1,23 +1,42 @@
 import { AppShell } from '@/components/app-shell/AppShell';
-import { PlaceholderScreen } from '@/components/app-shell/PlaceholderScreen';
+import { CurriculumBrowse } from '@/components/curriculum/CurriculumBrowse';
+import { getCurriculumBrowseData } from '@/lib/curriculum-browse';
 import { getHeaderProfile } from '@/lib/profile';
 
-// Rendered per-request so the shell reflects the live session.
+// Rendered per-request so the shell reflects the live session and the selected
+// Subject / Year / Week (driven by URL search params, so the view is linkable).
 export const dynamic = 'force-dynamic';
 
+type SearchParams = { subject?: string; year?: string; month?: string; week?: string };
+
 /**
- * Curriculum route — a placeholder stub. It's in the nav but not designed in this
- * pass; this keeps the shell and the Curriculum nav pill rendering and routing.
+ * Curriculum browse — a read-only, single-week "zoomed-in" view of the curriculum
+ * table, navigated by Subject → Year → Week. All content is curriculum-provided
+ * (cream/locked); the only action is "Plan this lesson", which carries a slot into
+ * the existing create-from-curriculum flow. The proxy redirects signed-out users.
  */
-export default async function CurriculumPage() {
-  const { name, subtitle } = await getHeaderProfile();
+export default async function CurriculumPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const { subject, year, month, week } = await searchParams;
+  const yearNum = year ? Number(year) : undefined;
+  const weekNum = week ? Number(week) : undefined;
+
+  const [{ name, subtitle }, data] = await Promise.all([
+    getHeaderProfile(),
+    getCurriculumBrowseData({
+      subject: subject || undefined,
+      year: Number.isFinite(yearNum) ? yearNum : undefined,
+      month: month || undefined,
+      week: Number.isFinite(weekNum) ? weekNum : undefined,
+    }),
+  ]);
 
   return (
     <AppShell name={name} subtitle={subtitle}>
-      <PlaceholderScreen title="Curriculum">
-        The Curriculum view isn&apos;t designed yet. It&apos;ll show the scheme of
-        work behind each week&apos;s lessons here.
-      </PlaceholderScreen>
+      <CurriculumBrowse data={data} />
     </AppShell>
   );
 }

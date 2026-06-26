@@ -15,7 +15,7 @@ type NavItem = {
 /**
  * Primary navigation pills in the shared shell. The active item is derived from
  * the current pathname (teal text on a pale-teal pill). "Lesson Planning" also
- * owns the editor route (`/plan/...`); "Curriculum" is a placeholder stub for now.
+ * owns the editor route (`/plan/...`); "Curriculum" is the read-only browse view.
  */
 const ITEMS: NavItem[] = [
   { key: 'lessonPlanning', href: '/', isActive: (p) => p === '/' || p.startsWith('/plan') },

@@ -387,6 +387,36 @@ export async function getCurriculumWeekCells(
     }));
 }
 
+/** The distinct subject codes that have at least one active curriculum row. */
+export async function getCurriculumSubjectCodes(): Promise<string[]> {
+  const rows = await fetchActiveRows();
+  return [...new Set(rows.map((r) => r.subject_code))].sort();
+}
+
+/**
+ * The full active rows for one (subject_code, year, month, week), sorted by
+ * period. Unlike `getCurriculumWeekCells` (the picker's lean cell shape), this
+ * returns the complete `CurriculumLessonRow` so callers can read the weekly /
+ * monthly outcome fields and structured resources. Backed by the same cached read.
+ */
+export async function getCurriculumWeekRows(
+  subjectCode: string,
+  year: number,
+  month: string,
+  week: number,
+): Promise<CurriculumLessonRow[]> {
+  const rows = await fetchActiveRows();
+  return rows
+    .filter(
+      (r) =>
+        r.subject_code === subjectCode &&
+        r.year === year &&
+        r.month === month &&
+        r.week === week,
+    )
+    .sort((a, b) => (a.period ?? 0) - (b.period ?? 0));
+}
+
 /** A curriculum row's natural coordinates, resolved from its `lesson_key`. */
 export interface CurriculumKeyCoords {
   subjectCode: string;

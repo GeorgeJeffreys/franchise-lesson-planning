@@ -82,6 +82,28 @@
   --color-status-idle-bg: #efeae3;
   --color-status-idle-border: #e2dbd0;
 
+  /* ── Curriculum skill pills (categorical macro-skill colours) ──────────────
+   * Sampled from the Curriculum design's Skill column. These are CONTENT
+   * categories, not the editor's colour-meaning roles: in particular `speaking`
+   * is a rose that is deliberately NOT the editable-pink `--color-pink`
+   * (#b62a5c), so the read-only browse screen never implies an editable zone.
+   * `other` is the neutral cream-grey fallback for grammar terms / blank / mixed. */
+  --color-skill-reading: #1f7a6c;
+  --color-skill-reading-bg: #e4f0ed;
+  --color-skill-reading-border: #cfe6e0;
+  --color-skill-writing: #8a6a3a;
+  --color-skill-writing-bg: #f1ead9;
+  --color-skill-writing-border: #e7dcc4;
+  --color-skill-listening: #b0651e;
+  --color-skill-listening-bg: #f6ecda;
+  --color-skill-listening-border: #ecd9be;
+  --color-skill-speaking: #b8366b;
+  --color-skill-speaking-bg: #f6e4ec;
+  --color-skill-speaking-border: #eccdda;
+  --color-skill-other: #8a8178;
+  --color-skill-other-bg: #efeae3;
+  --color-skill-other-border: #e2dbd0;
+
   /* ── Radius ────────────────────────────────────────────────────────────── */
   --radius-badge: 6px;
   --radius-sm: 8px;

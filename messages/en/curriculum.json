@@ -1,0 +1,53 @@
+{
+  "curriculum": {
+    "title": "Curriculum",
+    "readOnly": "Read-only reference",
+    "subjectLabel": "Subject",
+    "yearLabel": "Year",
+    "year": "Year {n}",
+    "weekWithMonth": "Week {n} · <m>{month}</m>",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "monthlyOutcome": "Monthly outcome · {month}",
+    "weeklyOutcome": "Weekly outcome · Week {n}",
+    "knowledge": "Knowledge",
+    "skills": "Skills",
+    "empty": "—",
+    "table": {
+      "day": "Day",
+      "learningOutcome": "Learning outcome",
+      "skill": "Skill",
+      "topic": "Topic",
+      "resources": "Resources",
+      "sameTopic": "{range} · same topic"
+    },
+    "focus": {
+      "inFocus": "In focus · {day}",
+      "dailyOutcome": "Daily learning outcome",
+      "resources": "Resources",
+      "plan": "Plan this lesson",
+      "planning": "Starting…",
+      "notMember": "You can only plan lessons for subjects you teach.",
+      "genericError": "Couldn’t start a plan. Please try again."
+    },
+    "daysShort": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri"
+    },
+    "daysLong": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday"
+    },
+    "noLessons": "No lessons for this week.",
+    "emptyState": {
+      "title": "No curriculum synced yet",
+      "body": "There’s no curriculum to browse yet. Once a coordinator syncs it, the weekly view will appear here."
+    }
+  }
+}
