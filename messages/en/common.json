@@ -1,0 +1,12 @@
+{
+  "common": {
+    "appName": "Alsama Lesson Planner",
+    "brandAriaLabel": "Alsama — Lesson Planning",
+    "lockup": "Lesson Planning",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "signOut": "Sign out",
+    "language": "Language",
+    "forceRtlDev": "Force RTL (dev)"
+  }
+}
