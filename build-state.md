@@ -612,3 +612,58 @@ slice only reserves layout space for the sidebar).
 
 - "Return for changes" sets `needs_review` without a reason note in this slice
   (`review_note` untouched); a note input arrives with the comments sidebar.
+
+## Phase 8 — Submit → notify the coordinator in the bell ✅ (this phase)
+
+Goal: the teacher→coordinator direction of the review loop — submitting a plan
+must reliably move it to `submitted` AND surface it in the coordinator's bell as
+"awaiting review". Mirrors the existing coordinator→teacher path (`decidePlan`
+stamps `reviewed_at`; the teacher's bell shows the outcome) and slots into the
+SAME notifications machinery — the bell stays a single derived-from-plan-state
+feed, no parallel system.
+
+### Done
+
+- **Submit wiring (already mostly in place)** — the editor's Step-5 control
+  (`SubmitControl` → `LessonPlanEditor.handleSubmit` → `submitLessonPlan`) already
+  set `status='submitted'` + `submitted_at`. This phase adds **`reviewed_at = null`**
+  to that update (`src/lib/actions/lesson-plan.ts`) so a RESUBMISSION from
+  `needs_review` re-enters the queue without a stale "decided" mark. Harmless to
+  the teacher-facing outcome notification: that query filters `status in
+  ('approved','needs_review')`, so a `submitted` row is excluded regardless of
+  `reviewed_at`. `setPlanStatus` (board drag) and `decidePlan` untouched. The
+  post-submit UI (submitted badge / keep-editing / unsubmit) is unchanged.
+- **Coordinator bell notification** — `src/lib/notifications.ts` now exposes one
+  `getBellNotifications()` returning a discriminated union `NotificationItem =
+  OutcomeNotification | ReviewNotification`, merged most-recent-first:
+  - `outcome` (teacher-facing, unchanged behaviour) — the viewer's own
+    `approved`/`needs_review` plans; links to `/plan/{id}`.
+  - `review` (coordinator-facing, NEW) — each `submitted` plan in a (centre,
+    subject) space the viewer **coordinates**; links to `/plan/{id}/view` (the
+    review screen). Text: "**{author} submitted {Year · Subject} for review**" with
+    the `submitted_at` time. Derived: it appears on submit and clears itself when
+    the plan leaves `submitted` (approve/return) — no read-state, doubles as a live
+    review-queue badge. Coordinated spaces come from `getMyMemberships()` (role
+    `coordinator`); RLS (`lp_member_all` + role-agnostic `is_member_of_subject`)
+    returns in-space submitted plans, filtered app-side to coordinated spaces;
+    the viewer's own submissions are excluded; authors resolved via the co-member
+    profiles policy (0013).
+  - `NotificationBell` renders both kinds (`StatusChip` carries `submitted` for
+    review items) and navigates via each item's own `href`. `AppShell` swapped
+    `getMyNotifications` → `getBellNotifications`.
+
+### Migrations
+
+- **None.** `status` / `submitted_at` / `reviewed_at` all already exist; the bell
+  is derived from plan columns (no notifications table). RLS already grants
+  coordinators in-space read of submitted plans.
+
+### Verified
+
+- `npx tsc --noEmit` clean; `next build` (Next 16.2.9) passes; `eslint` clean.
+- Not exercised against a live DB in this workspace (no Docker daemon / Supabase
+  CLI / env, as in every prior phase). The four verify cases (teacher submit →
+  `submitted`; coordinator bell shows the awaiting-review item linking to
+  `/plan/[id]/view`; approve/return clears it while the teacher keeps their
+  outcome notification; resubmit re-adds it) need a seeded DB + the test accounts
+  to run.

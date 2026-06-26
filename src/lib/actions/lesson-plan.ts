@@ -282,6 +282,11 @@ export async function unsubmitLessonPlan(input: { id: string }): Promise<ActionR
  * Submit a plan for coordinator approval: persists the latest objective + blocks,
  * then sets status to `submitted` and stamps `submitted_at`. Guarded by a
  * non-empty objective (beyond the enforced stem).
+ *
+ * `reviewed_at` is cleared so a RESUBMISSION (from `needs_review`) re-enters the
+ * review queue cleanly without carrying a stale "coordinator decided" mark. The
+ * teacher-facing notification reads `status` (only `approved`/`needs_review`
+ * surface there), so clearing this column on a submit does not disturb it.
  */
 export async function submitLessonPlan(input: SavePlanInput): Promise<ActionResult> {
   if (!hasObjectiveContent(input.smartt_objective)) {
@@ -296,6 +301,7 @@ export async function submitLessonPlan(input: SavePlanInput): Promise<ActionResu
       ...buildPatch(input),
       status: 'submitted',
       submitted_at: new Date().toISOString(),
+      reviewed_at: null,
     })
     .eq('id', input.id)
     .select('updated_at')

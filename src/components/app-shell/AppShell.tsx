@@ -9,7 +9,7 @@ import { UserMenu } from '@/components/app-shell/UserMenu';
 import { NotificationBell } from '@/components/app-shell/NotificationBell';
 import { TestUserBar } from '@/components/app-shell/TestUserBar';
 import { isAdmin, getMyMemberships } from '@/lib/auth';
-import { getMyNotifications } from '@/lib/notifications';
+import { getBellNotifications } from '@/lib/notifications';
 import { getImpersonationState } from '@/lib/test-impersonation';
 
 type AppShellProps = {
@@ -24,8 +24,9 @@ type AppShellProps = {
  * The shared authenticated shell — the persistent top bar from the design
  * (wordmark + "LESSON PLANNING" lockup, primary nav, notification bell and the
  * signed-in user), wrapping a page body. Flat and border-delineated on white.
- * The bell lists the signed-in teacher's approved / returned lessons
- * (`getMyNotifications`); its unread dot shows only when that list is non-empty.
+ * The bell lists the signed-in user's decided lessons (approved / returned) plus,
+ * for a coordinator, the plans awaiting their review (`getBellNotifications`); its
+ * unread dot shows only when that list is non-empty.
  */
 export async function AppShell({ name, subtitle, children }: AppShellProps) {
   // The "Settings" nav link is shown to admins and coordinators (anyone with
@@ -35,7 +36,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
     isAdmin(),
     getMyMemberships(),
     getImpersonationState(),
-    getMyNotifications(),
+    getBellNotifications(),
   ]);
   const showSettings = admin || memberships.some((m) => m.role === 'coordinator');
 

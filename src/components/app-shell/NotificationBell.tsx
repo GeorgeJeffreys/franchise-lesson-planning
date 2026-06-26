@@ -8,12 +8,13 @@ import { formatDate } from '@/lib/format';
 import type { NotificationItem } from '@/lib/notifications';
 
 /**
- * The shell's notification bell. Opens a dropdown listing the signed-in teacher's
- * own lessons that were approved or returned with edits (`needs_review`) — see
- * `getMyNotifications`. Each row carries the outcome via the app's existing
- * {@link StatusChip} (status colour tokens — NOT the content-zone cream/pink/teal
- * semantics) and links to the lesson. The unread dot shows only when the list is
- * non-empty. This is a filtered view of the user's own outcomes — there is no
+ * The shell's notification bell. Opens a dropdown listing the signed-in user's
+ * decided lessons (approved / returned with edits) and — for a coordinator — the
+ * plans awaiting their review; see `getBellNotifications`. Each row carries its
+ * state via the app's existing {@link StatusChip} (status colour tokens — NOT the
+ * content-zone cream/pink/teal semantics) and links via its own `href` (the editor
+ * for outcomes, the review view for review items). The unread dot shows only when
+ * the list is non-empty. This is a derived view of plan state — there is no
  * read/unread or dismissal state.
  */
 export function NotificationBell({
@@ -80,9 +81,9 @@ export function NotificationBell({
           ) : (
             <ul className="max-h-[360px] divide-y divide-neutral-100 overflow-y-auto">
               {items.map((n) => (
-                <li key={n.planId}>
+                <li key={n.key}>
                   <Link
-                    href={`/plan/${n.planId}`}
+                    href={n.href}
                     role="menuitem"
                     onClick={() => setOpen(false)}
                     className="flex items-start gap-[10px] px-[14px] py-[11px] transition-colors hover:bg-surface-subtle"
@@ -90,12 +91,18 @@ export function NotificationBell({
                     <div className="min-w-0 flex-1">
                       <StatusChip status={n.status} />
                       <div className="mt-[6px] truncate text-[12.5px] font-medium text-neutral-900">
-                        {[n.yearLabel, n.lessonTitle].filter(Boolean).join(' · ') || 'Lesson'}
+                        {n.kind === 'review'
+                          ? `${n.author} submitted ${n.context || 'a lesson'} for review`
+                          : [n.yearLabel, n.lessonTitle].filter(Boolean).join(' · ') || 'Lesson'}
                       </div>
                       {n.at ? (
                         <div className="mt-px text-[11px] text-text-faint">
-                          {n.status === 'approved' ? 'Approved' : 'Returned with edits'} ·{' '}
-                          {formatDate(n.at, locale, { month: 'short' })}
+                          {n.kind === 'review'
+                            ? 'Submitted'
+                            : n.status === 'approved'
+                              ? 'Approved'
+                              : 'Returned with edits'}{' '}
+                          · {formatDate(n.at, locale, { month: 'short' })}
                         </div>
                       ) : null}
                     </div>
