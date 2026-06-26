@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { AppShell } from '@/components/app-shell/AppShell';
 import { getHeaderProfile } from '@/lib/profile';
 import { getMyMemberships } from '@/lib/auth';
@@ -38,6 +39,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SettingsPage() {
   const { name, subtitle } = await getHeaderProfile();
+  const t = await getTranslations('settings');
   const [access, data, memberships, myClasses] = await Promise.all([
     getConsoleAccess(),
     getOnboardingData(),
@@ -101,10 +103,10 @@ export default async function SettingsPage() {
           href="/"
           className="mb-[14px] inline-flex items-center gap-[6px] text-[12.5px] font-medium text-neutral-600 hover:text-text-muted"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rtl:-scale-x-100" aria-hidden>
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          Back to planning
+          {t('backToPlanning')}
         </Link>
 
         <SettingsConsole

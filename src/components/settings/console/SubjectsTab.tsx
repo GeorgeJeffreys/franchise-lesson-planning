@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import type { SubjectRow } from '@/lib/console';
+import { formatNumber } from '@/lib/format';
 import {
   archiveSubject,
   createSubject,
@@ -26,6 +28,8 @@ import {
 
 export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
   const router = useRouter();
+  const t = useTranslations('settings');
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +46,7 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
-        setError(res.error ?? 'Something went wrong.');
+        setError(res.error ?? t('common.somethingWrong'));
         return;
       }
       onDone?.();
@@ -56,10 +60,10 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
   return (
     <div className="space-y-[18px]">
       <SectionCard
-        title="Subjects"
+        title={t('subjects.title')}
         action={
           <PrimaryButton onClick={() => setAdding((v) => !v)}>
-            {adding ? 'Close' : '＋ New subject'}
+            {adding ? t('subjects.close') : t('subjects.new')}
           </PrimaryButton>
         }
       >
@@ -70,8 +74,8 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                 <PinkField
                   value={newName}
                   onChange={setNewName}
-                  placeholder="Subject name"
-                  aria-label="Subject name"
+                  placeholder={t('subjects.namePlaceholder')}
+                  aria-label={t('subjects.nameLabel')}
                   autoFocus
                 />
               </div>
@@ -84,27 +88,27 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                   })
                 }
               >
-                Create
+                {t('subjects.create')}
               </PrimaryButton>
-              <GhostButton onClick={() => setAdding(false)}>Cancel</GhostButton>
+              <GhostButton onClick={() => setAdding(false)}>{t('subjects.cancel')}</GhostButton>
             </div>
             <p className="mt-[10px] text-[12px] text-[#A79E94]">
-              A matching curriculum code is assigned automatically.
+              {t('subjects.autoCodeHint')}
             </p>
           </div>
         ) : null}
 
         {subjects.length === 0 ? (
-          <EmptyState>No subjects yet. Create the first one above.</EmptyState>
+          <EmptyState>{t('subjects.empty')}</EmptyState>
         ) : (
           <ConsoleTable
             head={
               <tr>
-                <Th>Name</Th>
-                <Th>Code</Th>
-                <Th className="text-right">Classes</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>{t('subjects.col.name')}</Th>
+                <Th>{t('subjects.col.code')}</Th>
+                <Th className="text-end">{t('subjects.col.classes')}</Th>
+                <Th>{t('subjects.col.status')}</Th>
+                <Th className="text-end">{t('subjects.col.actions')}</Th>
               </tr>
             }
           >
@@ -113,13 +117,13 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
               const editing = editId === s.id;
               return (
                 <tr key={s.id} className={isArchived ? 'opacity-55' : undefined}>
-                  <Td className="font-semibold text-[#2A2422]">
+                  <Td className="font-semibold text-[#2A2422]" dir="auto">
                     {editing ? (
                       <div className="max-w-[240px]">
                         <PinkField
                           value={editName}
                           onChange={setEditName}
-                          aria-label="Subject name"
+                          aria-label={t('subjects.nameLabel')}
                           autoFocus
                         />
                       </div>
@@ -130,11 +134,13 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                   <Td>
                     <MonoChip>{s.code}</MonoChip>
                   </Td>
-                  <Td className="text-right tabular-nums text-[#7A7068]">{s.activeClassCount}</Td>
+                  <Td className="text-end tabular-nums text-[#7A7068]">
+                    {formatNumber(s.activeClassCount, locale)}
+                  </Td>
                   <Td>
                     <StatusBadge archived={isArchived} />
                   </Td>
-                  <Td className="text-right">
+                  <Td className="text-end">
                     {editing ? (
                       <div className="flex items-center justify-end gap-3">
                         <GhostButton
@@ -147,9 +153,9 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                             )
                           }
                         >
-                          Save
+                          {t('subjects.save')}
                         </GhostButton>
-                        <GhostButton onClick={() => setEditId(null)}>Cancel</GhostButton>
+                        <GhostButton onClick={() => setEditId(null)}>{t('subjects.cancel')}</GhostButton>
                       </div>
                     ) : isArchived ? (
                       <GhostButton
@@ -157,7 +163,7 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                         disabled={pending}
                         onClick={() => run(() => restoreSubject({ id: s.id }))}
                       >
-                        Restore
+                        {t('subjects.restore')}
                       </GhostButton>
                     ) : (
                       <div className="flex items-center justify-end gap-3">
@@ -168,10 +174,10 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                             setEditName(s.name);
                           }}
                         >
-                          Edit
+                          {t('subjects.edit')}
                         </GhostButton>
                         <GhostButton tone="amber" onClick={() => setArchiveTarget(s)}>
-                          Archive
+                          {t('subjects.archive')}
                         </GhostButton>
                       </div>
                     )}
@@ -187,33 +193,33 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
       <Modal
         open={!!archiveTarget}
         onClose={() => setArchiveTarget(null)}
-        title={`Archive ${archiveTarget?.name ?? 'subject'}?`}
+        title={t('subjects.archiveTitle', {
+          name: archiveTarget?.name ?? t('subjects.archiveFallbackName'),
+        })}
       >
         {archiveTarget && archiveTarget.activeClassCount > 0 ? (
           <>
             <p className="text-[13.5px] leading-relaxed text-[#7A7068]">
-              {archiveTarget.activeClassCount}{' '}
-              {archiveTarget.activeClassCount === 1 ? 'class' : 'classes'} still reference this
-              subject. Reassign or archive those classes first.
+              {t('subjects.blocked', { count: archiveTarget.activeClassCount })}
             </p>
             <div className="mt-[18px] flex items-center justify-end gap-3">
-              <GhostButton onClick={() => setArchiveTarget(null)}>Close</GhostButton>
+              <GhostButton onClick={() => setArchiveTarget(null)}>{t('subjects.close')}</GhostButton>
               <button
                 type="button"
                 disabled
                 className="cursor-not-allowed rounded-[9px] bg-[#E7DECF] px-[15px] py-[8px] text-[13px] font-semibold text-[#A79E94]"
               >
-                Archive
+                {t('subjects.archive')}
               </button>
             </div>
           </>
         ) : (
           <>
             <p className="text-[13.5px] leading-relaxed text-[#7A7068]">
-              This subject will be hidden from planning. You can restore it at any time.
+              {t('subjects.archiveConfirm')}
             </p>
             <div className="mt-[18px] flex items-center justify-end gap-3">
-              <GhostButton onClick={() => setArchiveTarget(null)}>Cancel</GhostButton>
+              <GhostButton onClick={() => setArchiveTarget(null)}>{t('subjects.cancel')}</GhostButton>
               <button
                 type="button"
                 disabled={pending}
@@ -223,7 +229,7 @@ export function SubjectsTab({ subjects }: { subjects: SubjectRow[] }) {
                 className="rounded-[9px] px-[15px] py-[8px] text-[13px] font-semibold text-white disabled:opacity-50"
                 style={{ background: '#B0651E' }}
               >
-                Archive subject
+                {t('subjects.archiveAction')}
               </button>
             </div>
           </>

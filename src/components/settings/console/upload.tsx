@@ -7,20 +7,29 @@
 // look and feel. Colour tokens follow the curriculum card exactly.
 
 import type { ReactNode } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatNumber } from '@/lib/format';
 
-/** A relative "x ago" for the last-synced / last-uploaded line. */
-export function timeAgo(iso: string | null): string {
-  if (!iso) return 'never';
+type Translator = ReturnType<typeof useTranslations>;
+
+/**
+ * A relative "x ago" for the last-synced / last-uploaded line. The caller passes
+ * its `useTranslations('settings')` instance so this stays a plain function (no
+ * hook) usable inside derived label strings; the relative-time copy lives under
+ * `curriculum.timeAgo` and is shared by the sync card and the guide cards.
+ */
+export function timeAgo(iso: string | null, t: Translator): string {
+  if (!iso) return t('curriculum.timeAgo.never');
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return 'unknown';
+  if (Number.isNaN(then)) return t('curriculum.timeAgo.unknown');
   const secs = Math.round((Date.now() - then) / 1000);
-  if (secs < 60) return 'just now';
+  if (secs < 60) return t('curriculum.timeAgo.justNow');
   const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins} min ago`;
+  if (mins < 60) return t('curriculum.timeAgo.minutes', { count: mins });
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`;
+  if (hrs < 24) return t('curriculum.timeAgo.hours', { count: hrs });
   const days = Math.round(hrs / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  return t('curriculum.timeAgo.days', { count: days });
 }
 
 /** Local clock time as HH:MM (for the "… failed · {HH:MM}" badge). */
@@ -50,12 +59,15 @@ export function Stat({ label, value }: { label: string; value: ReactNode }) {
 export function UploadProgressBar({
   parsed,
   total,
-  label = 'Uploading',
+  label,
 }: {
   parsed?: number;
   total?: number;
+  /** Accessible label for the indeterminate bar; callers pass a translated string. */
   label?: string;
 }) {
+  const t = useTranslations('settings');
+  const locale = useLocale();
   const determinate = typeof total === 'number' && total > 0 && typeof parsed === 'number';
   if (determinate) {
     const pct = Math.min(100, Math.max(0, Math.round((parsed! / total!) * 100)));
@@ -68,7 +80,11 @@ export function UploadProgressBar({
           />
         </div>
         <p className="mt-[7px] text-[12px] text-[#A79E94]">
-          {pct}% · {parsed} of ~{total}
+          {t('curriculum.progressText', {
+            pct: formatNumber(pct, locale),
+            parsed: formatNumber(parsed!, locale),
+            total: formatNumber(total!, locale),
+          })}
         </p>
       </div>
     );

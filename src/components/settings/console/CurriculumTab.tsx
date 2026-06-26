@@ -2,8 +2,10 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import type { CurriculumSubjectStatus } from '@/lib/console';
 import { importCurriculumAction } from '@/lib/curriculum/actions';
+import { formatNumber } from '@/lib/format';
 import { GhostButton, MonoChip, SectionCard } from './ui';
 import { Stat, UploadProgressBar, UploadStatusBadge, hhmm, timeAgo } from './upload';
 
@@ -30,11 +32,12 @@ type CurriculumSyncState =
   | { kind: 'error'; badgeAt: string; message: string };
 
 export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[] }) {
+  const t = useTranslations('settings');
   if (statuses.length === 0) {
     return (
-      <SectionCard title="Curriculum">
+      <SectionCard title={t('curriculum.title')}>
         <div className="px-[18px] py-[34px] text-center text-[13px] text-[#A79E94]">
-          No subjects to sync.
+          {t('curriculum.empty')}
         </div>
       </SectionCard>
     );
@@ -50,6 +53,8 @@ export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[
 
 function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
   const router = useRouter();
+  const t = useTranslations('settings');
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   // Transient, in-session only. `success` holds the summary line after an upload
   // succeeds; `clientError` holds an upload/validation failure with the moment it
@@ -78,9 +83,9 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
             ? {
                 kind: 'error',
                 badgeAt: run.finishedAt ?? run.startedAt ?? '',
-                message: `Couldn't reach the curriculum source. Last good sync was ${timeAgo(
-                  status.lastGoodAt,
-                )}.`,
+                message: t('curriculum.errorReach', {
+                  ago: timeAgo(status.lastGoodAt, t),
+                }),
               }
             : { kind: 'idle' };
 
@@ -110,34 +115,45 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
     <SectionCard
       title={
         <span className="flex items-center gap-2">
-          {status.name} <MonoChip>{status.code}</MonoChip>
+          <span dir="auto">{status.name}</span> <MonoChip>{status.code}</MonoChip>
         </span>
       }
       action={<StateBadge state={state} lastSyncedIso={lastSyncedIso} />}
     >
       <div className="flex flex-wrap items-end justify-between gap-4 px-[18px] py-[16px]">
         <div className="flex flex-wrap gap-x-[28px] gap-y-2 text-[13px]">
-          <Stat label="Lessons" value={run?.rowsUpserted ?? '—'} />
-          <Stat label="Unresolved" value={run?.unresolved ?? '—'} />
-          <Stat label="Deactivated" value={run?.rowsDeactivated ?? '—'} />
-          <Stat label="Last synced" value={timeAgo(lastSyncedIso)} />
+          <Stat
+            label={t('curriculum.stat.lessons')}
+            value={run?.rowsUpserted != null ? formatNumber(run.rowsUpserted, locale) : t('common.dash')}
+          />
+          <Stat
+            label={t('curriculum.stat.unresolved')}
+            value={run?.unresolved != null ? formatNumber(run.unresolved, locale) : t('common.dash')}
+          />
+          <Stat
+            label={t('curriculum.stat.deactivated')}
+            value={
+              run?.rowsDeactivated != null ? formatNumber(run.rowsDeactivated, locale) : t('common.dash')
+            }
+          />
+          <Stat label={t('curriculum.stat.lastSynced')} value={timeAgo(lastSyncedIso, t)} />
         </div>
         <div className="flex items-center gap-3">
           {state.kind === 'syncing' ? (
             // Syncing: the badge + progress bar are the entire status; the only
             // action is the disabled in-flight label.
             <GhostButton tone="teal" disabled>
-              Refreshing…
+              {t('curriculum.action.refreshing')}
             </GhostButton>
           ) : (
             <>
               {state.kind === 'error' ? (
                 <GhostButton tone="teal" disabled={noTrigger}>
-                  Retry sync
+                  {t('curriculum.action.retry')}
                 </GhostButton>
               ) : (
                 <GhostButton tone="teal" disabled={noTrigger}>
-                  Refresh now
+                  {t('curriculum.action.refresh')}
                 </GhostButton>
               )}
               {state.kind === 'success' && unresolved > 0 ? (
@@ -148,7 +164,9 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
                     // separate slice. Wire this to it when it lands.
                   }}
                 >
-                  Review {unresolved} unresolved
+                  {t('curriculum.action.reviewUnresolved', {
+                    count: formatNumber(unresolved, locale),
+                  })}
                 </GhostButton>
               ) : null}
               <input
@@ -163,7 +181,7 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
                 }}
               />
               <GhostButton tone="teal" onClick={() => fileRef.current?.click()}>
-                Upload .xlsx
+                {t('curriculum.action.upload')}
               </GhostButton>
             </>
           )}
@@ -176,7 +194,7 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
           <UploadProgressBar
             parsed={state.parsed}
             total={state.total}
-            label="Syncing curriculum"
+            label={t('curriculum.progressAria')}
           />
         </div>
       ) : state.kind === 'success' ? (
@@ -199,15 +217,20 @@ function StateBadge({
   state: CurriculumSyncState;
   lastSyncedIso: string | null;
 }) {
+  const t = useTranslations('settings');
   switch (state.kind) {
     case 'syncing':
-      return <UploadStatusBadge tone="teal" label="Syncing…" />;
+      return <UploadStatusBadge tone="teal" label={t('curriculum.badge.syncing')} />;
     case 'success':
-      return <UploadStatusBadge tone="teal" label="Synced just now" />;
+      return <UploadStatusBadge tone="teal" label={t('curriculum.badge.syncedJustNow')} />;
     case 'error':
-      return <UploadStatusBadge tone="red" label={`Sync failed · ${hhmm(state.badgeAt)}`} />;
+      return (
+        <UploadStatusBadge tone="red" label={t('curriculum.badge.syncFailed', { time: hhmm(state.badgeAt) })} />
+      );
     case 'idle':
     default:
-      return <UploadStatusBadge tone="teal" label={`Synced ${timeAgo(lastSyncedIso)}`} />;
+      return (
+        <UploadStatusBadge tone="teal" label={t('curriculum.badge.synced', { ago: timeAgo(lastSyncedIso, t) })} />
+      );
   }
 }

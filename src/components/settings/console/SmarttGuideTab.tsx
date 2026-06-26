@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { SmarttGuideVersion } from '@/lib/console';
 import { GuideUploadCard } from './GuideUploadCard';
 
@@ -15,13 +16,14 @@ import { GuideUploadCard } from './GuideUploadCard';
  * default.
  */
 export function SmarttGuideTab({ active }: { active: SmarttGuideVersion | null }) {
+  const t = useTranslations('settings');
   return (
     <GuideUploadCard
-      title="SMARTT objective guide"
+      title={t('smarttGuide.title')}
       endpoint="/api/smartt-objective-guide"
       active={active}
-      successMessage="New guide version saved. It is now active for all objective checks."
-      uploadingLabel="Uploading objective guide"
+      successMessage={t('smarttGuide.successMessage')}
+      uploadingLabel={t('smarttGuide.uploadingLabel')}
     />
   );
 }

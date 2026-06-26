@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 
 // Shared presentational primitives for the settings console, ported from the
@@ -48,8 +49,21 @@ export function Th({ children, className }: { children?: ReactNode; className?: 
   );
 }
 
-export function Td({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={cn('px-[18px] py-[13px] align-middle text-[13.5px]', className)}>{children}</td>;
+export function Td({
+  children,
+  className,
+  dir,
+}: {
+  children?: ReactNode;
+  className?: string;
+  /** Pass `auto` for cells holding user/curriculum data so RTL names orient themselves. */
+  dir?: 'auto' | 'ltr' | 'rtl';
+}) {
+  return (
+    <td dir={dir} className={cn('px-[18px] py-[13px] align-middle text-[13.5px]', className)}>
+      {children}
+    </td>
+  );
 }
 
 /** Table with row dividers (#F0EAE1). */
@@ -66,39 +80,41 @@ export function ConsoleTable({ head, children }: { head: ReactNode; children: Re
 
 export type RoleKind = 'coordinator' | 'teacher' | 'no-access';
 
-const ROLE_STYLE: Record<RoleKind, { bg: string; fg: string; label: string }> = {
-  coordinator: { bg: '#E4F0ED', fg: '#186155', label: 'Coordinator' },
-  teacher: { bg: '#F3ECE2', fg: '#7A7068', label: 'Teacher' },
-  'no-access': { bg: '#F6ECDA', fg: '#B0651E', label: 'No access' },
+const ROLE_STYLE: Record<RoleKind, { bg: string; fg: string; key: string }> = {
+  coordinator: { bg: '#E4F0ED', fg: '#186155', key: 'coordinator' },
+  teacher: { bg: '#F3ECE2', fg: '#7A7068', key: 'teacher' },
+  'no-access': { bg: '#F6ECDA', fg: '#B0651E', key: 'noAccess' },
 };
 
 export function RolePill({ kind }: { kind: RoleKind }) {
+  const t = useTranslations('settings');
   const s = ROLE_STYLE[kind];
   return (
     <span
       className="inline-flex items-center rounded-full px-[10px] py-[3px] text-[11.5px] font-semibold"
       style={{ background: s.bg, color: s.fg }}
     >
-      {s.label}
+      {t(`roles.${s.key}`)}
     </span>
   );
 }
 
 /** Status chip for Active / Archived rows. */
 export function StatusBadge({ archived }: { archived: boolean }) {
+  const t = useTranslations('settings');
   return archived ? (
     <span
       className="inline-flex items-center rounded-full px-[10px] py-[3px] text-[11.5px] font-semibold"
       style={{ background: '#F6ECDA', color: '#B0651E' }}
     >
-      Archived
+      {t('status.archived')}
     </span>
   ) : (
     <span
       className="inline-flex items-center rounded-full px-[10px] py-[3px] text-[11.5px] font-semibold"
       style={{ background: '#E4F0ED', color: '#186155' }}
     >
-      Active
+      {t('status.active')}
     </span>
   );
 }

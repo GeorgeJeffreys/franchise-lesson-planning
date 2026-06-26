@@ -1,0 +1,169 @@
+{
+  "settings": {
+    "backToPlanning": "Back to planning",
+    "title": "Settings",
+    "subtitle": {
+      "admin": "Organisation administration · your profile",
+      "coordinator": "Your coordinator spaces · your profile",
+      "teacher": "Your profile"
+    },
+    "tabs": {
+      "profile": "Profile",
+      "centres": "Centres",
+      "subjects": "Subjects",
+      "classes": "Classes",
+      "members": "Members & roles",
+      "curriculum": "Curriculum",
+      "ai_guide": "AI resource guide",
+      "smartt_guide": "SMARTT objective guide"
+    },
+    "language": {
+      "label": "Language"
+    },
+    "common": {
+      "somethingWrong": "Something went wrong.",
+      "dash": "—",
+      "cancel": "Cancel",
+      "close": "Close",
+      "save": "Save",
+      "edit": "Edit",
+      "create": "Create",
+      "restore": "Restore"
+    },
+    "roles": {
+      "coordinator": "Coordinator",
+      "teacher": "Teacher",
+      "noAccess": "No access"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "members": {
+      "title": "Members & roles",
+      "empty": "No people to show.",
+      "col": {
+        "person": "Person",
+        "role": "Role",
+        "school": "School",
+        "subject": "Subject",
+        "class": "Class",
+        "actions": "Actions"
+      },
+      "edit": "Edit",
+      "remove": "Remove",
+      "assign": "Assign",
+      "you": "You",
+      "modal": {
+        "title": "Permissions · {name}",
+        "intro": "Access is granted per (centre × subject) space. Saving sets exactly the selected pairs at the chosen role and removes any de-selected ones.",
+        "role": "Role",
+        "roleOption": {
+          "teacher": "teacher",
+          "coordinator": "coordinator"
+        },
+        "centres": "Centres",
+        "subjects": "Subjects",
+        "noActiveCentres": "No active centres.",
+        "noActiveSubjects": "No active subjects.",
+        "cancel": "Cancel",
+        "save": "Save permissions"
+      },
+      "coordinator": {
+        "title": "Members & roles",
+        "empty": "You don’t coordinate any spaces.",
+        "spaceTitle": "{subject} at {school}",
+        "spaceMeta": "· Your space · {count, plural, one {# member} other {# members}}",
+        "promote": "Promote to coordinator",
+        "remove": "Remove",
+        "footnote": "To add a teacher who isn’t here yet, ask them to sign in and complete onboarding for this space, or have an admin assign them. Coordinators can’t browse the full people directory."
+      }
+    },
+    "subjects": {
+      "title": "Subjects",
+      "close": "Close",
+      "new": "＋ New subject",
+      "namePlaceholder": "Subject name",
+      "nameLabel": "Subject name",
+      "create": "Create",
+      "cancel": "Cancel",
+      "autoCodeHint": "A matching curriculum code is assigned automatically.",
+      "empty": "No subjects yet. Create the first one above.",
+      "col": {
+        "name": "Name",
+        "code": "Code",
+        "classes": "Classes",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "save": "Save",
+      "restore": "Restore",
+      "edit": "Edit",
+      "archive": "Archive",
+      "archiveTitle": "Archive {name}?",
+      "archiveFallbackName": "subject",
+      "blocked": "{count, plural, one {# class} other {# classes}} still reference this subject. Reassign or archive those classes first.",
+      "archiveConfirm": "This subject will be hidden from planning. You can restore it at any time.",
+      "archiveAction": "Archive subject"
+    },
+    "curriculum": {
+      "title": "Curriculum",
+      "empty": "No subjects to sync.",
+      "stat": {
+        "lessons": "Lessons",
+        "unresolved": "Unresolved",
+        "deactivated": "Deactivated",
+        "lastSynced": "Last synced"
+      },
+      "action": {
+        "refreshing": "Refreshing…",
+        "retry": "Retry sync",
+        "refresh": "Refresh now",
+        "reviewUnresolved": "Review {count} unresolved",
+        "upload": "Upload .xlsx"
+      },
+      "badge": {
+        "syncing": "Syncing…",
+        "syncedJustNow": "Synced just now",
+        "syncFailed": "Sync failed · {time}",
+        "synced": "Synced {ago}"
+      },
+      "errorReach": "Couldn't reach the curriculum source. Last good sync was {ago}.",
+      "progressAria": "Syncing curriculum",
+      "progressText": "{pct}% · {parsed} of ~{total}",
+      "timeAgo": {
+        "never": "never",
+        "unknown": "unknown",
+        "justNow": "just now",
+        "minutes": "{count} min ago",
+        "hours": "{count, plural, one {# hr ago} other {# hrs ago}}",
+        "days": "{count, plural, one {# day ago} other {# days ago}}"
+      }
+    },
+    "guide": {
+      "document": "Document",
+      "uploaded": "Uploaded",
+      "noGuide": "No guide uploaded — using the built-in default.",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "uploadFailed": "Upload failed. Please try again.",
+      "badge": {
+        "uploading": "Uploading…",
+        "failed": "Upload failed · {time}",
+        "saved": "Saved just now",
+        "uploaded": "Uploaded {ago}",
+        "none": "No guide yet"
+      }
+    },
+    "aiGuide": {
+      "title": "AI resource guide",
+      "successMessage": "New guide version saved. It is now active for all resource generation.",
+      "uploadingLabel": "Uploading resource guide"
+    },
+    "smarttGuide": {
+      "title": "SMARTT objective guide",
+      "successMessage": "New guide version saved. It is now active for all objective checks.",
+      "uploadingLabel": "Uploading objective guide"
+    }
+  }
+}

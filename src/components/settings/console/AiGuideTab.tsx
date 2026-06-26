@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { ResourceGuideVersion } from '@/lib/console';
 import { GuideUploadCard } from './GuideUploadCard';
 
@@ -14,13 +15,14 @@ import { GuideUploadCard } from './GuideUploadCard';
  * date (no text preview); when none exists the generator uses a built-in default.
  */
 export function AiGuideTab({ active }: { active: ResourceGuideVersion | null }) {
+  const t = useTranslations('settings');
   return (
     <GuideUploadCard
-      title="AI resource guide"
+      title={t('aiGuide.title')}
       endpoint="/api/ai-resource-guide"
       active={active}
-      successMessage="New guide version saved. It is now active for all resource generation."
-      uploadingLabel="Uploading resource guide"
+      successMessage={t('aiGuide.successMessage')}
+      uploadingLabel={t('aiGuide.uploadingLabel')}
     />
   );
 }

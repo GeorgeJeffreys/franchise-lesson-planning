@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { formatDate } from '@/lib/format';
 import { ErrorText, GhostButton, SectionCard } from './ui';
 import { Stat, UploadProgressBar, UploadStatusBadge, hhmm, timeAgo } from './upload';
@@ -48,6 +48,7 @@ export function GuideUploadCard({
   uploadingLabel: string;
 }) {
   const router = useRouter();
+  const t = useTranslations('settings');
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   // Transient, in-session only: a just-uploaded success flag, or an upload error
@@ -69,7 +70,7 @@ export function GuideUploadCard({
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as { error?: string } | null;
           setError({
-            message: data?.error ?? 'Upload failed. Please try again.',
+            message: data?.error ?? t('guide.uploadFailed'),
             at: new Date().toISOString(),
           });
           return;
@@ -77,7 +78,7 @@ export function GuideUploadCard({
         setJustUploaded(true);
         router.refresh();
       } catch {
-        setError({ message: 'Upload failed. Please try again.', at: new Date().toISOString() });
+        setError({ message: t('guide.uploadFailed'), at: new Date().toISOString() });
       }
     });
   }
@@ -85,15 +86,15 @@ export function GuideUploadCard({
   // ── Single header badge, derived with the curriculum card's precedence:
   // in-flight → transient result → the persisted active version. ──
   const badge = pending ? (
-    <UploadStatusBadge tone="teal" label="Uploading…" />
+    <UploadStatusBadge tone="teal" label={t('guide.badge.uploading')} />
   ) : error ? (
-    <UploadStatusBadge tone="red" label={`Upload failed · ${hhmm(error.at)}`} />
+    <UploadStatusBadge tone="red" label={t('guide.badge.failed', { time: hhmm(error.at) })} />
   ) : justUploaded ? (
-    <UploadStatusBadge tone="teal" label="Saved just now" />
+    <UploadStatusBadge tone="teal" label={t('guide.badge.saved')} />
   ) : active ? (
-    <UploadStatusBadge tone="teal" label={`Uploaded ${timeAgo(active.createdAt)}`} />
+    <UploadStatusBadge tone="teal" label={t('guide.badge.uploaded', { ago: timeAgo(active.createdAt, t) })} />
   ) : (
-    <UploadStatusBadge tone="teal" label="No guide yet" />
+    <UploadStatusBadge tone="teal" label={t('guide.badge.none')} />
   );
 
   return (
@@ -105,13 +106,19 @@ export function GuideUploadCard({
               {/* Filename is null on versions predating capture (0021) — fall back
                   to the date alone, never a broken/empty label. */}
               {active.originalFilename ? (
-                <Stat label="Document" value={active.originalFilename} />
+                <Stat
+                  label={t('guide.document')}
+                  value={<span dir="auto">{active.originalFilename}</span>}
+                />
               ) : null}
-              <Stat label="Uploaded" value={formatDate(active.createdAt, locale, { month: 'short' })} />
+              <Stat
+                label={t('guide.uploaded')}
+                value={formatDate(active.createdAt, locale, { month: 'short' })}
+              />
             </>
           ) : (
             <p className="text-[13px] text-[#A79E94]">
-              No guide uploaded — using the built-in default.
+              {t('guide.noGuide')}
             </p>
           )}
         </div>
@@ -129,7 +136,7 @@ export function GuideUploadCard({
             }}
           />
           <GhostButton tone="teal" disabled={pending} onClick={() => fileRef.current?.click()}>
-            {pending ? 'Uploading…' : 'Upload'}
+            {pending ? t('guide.uploading') : t('guide.upload')}
           </GhostButton>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import type { AdminMembersData, CoordSpaceMembers, Person } from '@/lib/console';
 import type { MembershipRole } from '@/lib/auth';
 import {
@@ -60,6 +61,7 @@ function flatten(people: Person[]): FlatRow[] {
 
 export function AdminMembersTab({ data }: { data: AdminMembersData }) {
   const router = useRouter();
+  const t = useTranslations('settings');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Person | null>(null);
@@ -69,7 +71,7 @@ export function AdminMembersTab({ data }: { data: AdminMembersData }) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
-        setError(res.error ?? 'Something went wrong.');
+        setError(res.error ?? t('common.somethingWrong'));
         return;
       }
       onDone?.();
@@ -78,22 +80,23 @@ export function AdminMembersTab({ data }: { data: AdminMembersData }) {
   }
 
   const rows = flatten(data.people);
+  const dash = t('common.dash');
 
   return (
     <div className="space-y-[18px]">
-      <SectionCard title="Members & roles">
+      <SectionCard title={t('members.title')}>
         {rows.length === 0 ? (
-          <EmptyState>No people to show.</EmptyState>
+          <EmptyState>{t('members.empty')}</EmptyState>
         ) : (
           <ConsoleTable
             head={
               <tr>
-                <Th>Person</Th>
-                <Th>Role</Th>
-                <Th>School</Th>
-                <Th>Subject</Th>
-                <Th>Class</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>{t('members.col.person')}</Th>
+                <Th>{t('members.col.role')}</Th>
+                <Th>{t('members.col.school')}</Th>
+                <Th>{t('members.col.subject')}</Th>
+                <Th>{t('members.col.class')}</Th>
+                <Th className="text-end">{t('members.col.actions')}</Th>
               </tr>
             }
           >
@@ -102,32 +105,34 @@ export function AdminMembersTab({ data }: { data: AdminMembersData }) {
                 <Td>
                   <div className="flex items-center gap-[10px]">
                     <Avatar name={r.person.name} />
-                    <span className="font-semibold text-[#2A2422]">{r.person.name}</span>
+                    <span className="font-semibold text-[#2A2422]" dir="auto">
+                      {r.person.name}
+                    </span>
                   </div>
                 </Td>
                 <Td>
                   <RolePill kind={r.role ?? 'no-access'} />
                 </Td>
-                <Td className="text-[#7A7068]">{r.schoolName ?? '—'}</Td>
-                <Td className="text-[#7A7068]">{r.subjectName ?? '—'}</Td>
-                <Td className="text-[#7A7068]">{r.homeClass ?? '—'}</Td>
-                <Td className="text-right">
+                <Td className="text-[#7A7068]" dir="auto">{r.schoolName ?? dash}</Td>
+                <Td className="text-[#7A7068]" dir="auto">{r.subjectName ?? dash}</Td>
+                <Td className="text-[#7A7068]" dir="auto">{r.homeClass ?? dash}</Td>
+                <Td className="text-end">
                   {r.membershipId ? (
                     <div className="flex items-center justify-end gap-3">
                       <GhostButton tone="teal" onClick={() => setEditing(r.person)}>
-                        Edit
+                        {t('members.edit')}
                       </GhostButton>
                       <GhostButton
                         tone="red"
                         disabled={pending}
                         onClick={() => run(() => removeMembership({ membershipId: r.membershipId! }))}
                       >
-                        Remove
+                        {t('members.remove')}
                       </GhostButton>
                     </div>
                   ) : (
                     <GhostButton tone="teal" onClick={() => setEditing(r.person)}>
-                      Assign
+                      {t('members.assign')}
                     </GhostButton>
                   )}
                 </Td>
@@ -174,6 +179,7 @@ function AssignModal({
     subjectIds: string[];
   }) => void;
 }) {
+  const t = useTranslations('settings');
   const seededRole: MembershipRole = person.memberships.some((m) => m.role === 'coordinator')
     ? 'coordinator'
     : 'teacher';
@@ -195,13 +201,12 @@ function AssignModal({
   const valid = schoolIds.size > 0 && subjectIds.size > 0;
 
   return (
-    <Modal open onClose={onClose} title={`Permissions · ${person.name}`} width={500}>
+    <Modal open onClose={onClose} title={t('members.modal.title', { name: person.name })} width={500}>
       <p className="-mt-[8px] mb-[16px] text-[12.5px] text-[#7A7068]">
-        Access is granted per (centre × subject) space. Saving sets exactly the selected pairs at
-        the chosen role and removes any de-selected ones.
+        {t('members.modal.intro')}
       </p>
 
-      <FieldLabel>Role</FieldLabel>
+      <FieldLabel>{t('members.modal.role')}</FieldLabel>
       <div className="mb-[18px] inline-flex rounded-[9px] border border-[#DDD4C8] p-[3px]">
         {(['teacher', 'coordinator'] as const).map((r) => (
           <button
@@ -213,17 +218,17 @@ function AssignModal({
               role === r ? 'bg-[#E4F0ED] text-[#186155]' : 'text-[#7A7068]',
             )}
           >
-            {r}
+            {t(`members.modal.roleOption.${r}`)}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <FieldLabel>Centres</FieldLabel>
+          <FieldLabel>{t('members.modal.centres')}</FieldLabel>
           <div className="space-y-[6px]">
             {centres.length === 0 ? (
-              <p className="text-[12.5px] text-[#A79E94]">No active centres.</p>
+              <p className="text-[12.5px] text-[#A79E94]">{t('members.modal.noActiveCentres')}</p>
             ) : (
               centres.map((c) => (
                 <CheckboxRow
@@ -237,10 +242,10 @@ function AssignModal({
           </div>
         </div>
         <div>
-          <FieldLabel>Subjects</FieldLabel>
+          <FieldLabel>{t('members.modal.subjects')}</FieldLabel>
           <div className="space-y-[6px]">
             {subjects.length === 0 ? (
-              <p className="text-[12.5px] text-[#A79E94]">No active subjects.</p>
+              <p className="text-[12.5px] text-[#A79E94]">{t('members.modal.noActiveSubjects')}</p>
             ) : (
               subjects.map((s) => (
                 <CheckboxRow
@@ -256,7 +261,7 @@ function AssignModal({
       </div>
 
       <div className="mt-[20px] flex items-center justify-end gap-3">
-        <GhostButton onClick={onClose}>Cancel</GhostButton>
+        <GhostButton onClick={onClose}>{t('members.modal.cancel')}</GhostButton>
         <PrimaryButton
           disabled={pending || !valid}
           onClick={() =>
@@ -268,7 +273,7 @@ function AssignModal({
             })
           }
         >
-          Save permissions
+          {t('members.modal.save')}
         </PrimaryButton>
       </div>
     </Modal>
@@ -288,7 +293,7 @@ function CheckboxRow({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-[10px] rounded-[8px] px-[8px] py-[6px] text-left hover:bg-[#FBF8F3]"
+      className="flex w-full items-center gap-[10px] rounded-[8px] px-[8px] py-[6px] text-start hover:bg-[#FBF8F3]"
     >
       <span
         className={cn(
@@ -302,7 +307,7 @@ function CheckboxRow({
           </svg>
         ) : null}
       </span>
-      <span className="text-[13.5px] font-medium text-[#2A2422]">{label}</span>
+      <span className="text-[13.5px] font-medium text-[#2A2422]" dir="auto">{label}</span>
     </button>
   );
 }
@@ -311,6 +316,7 @@ function CheckboxRow({
 
 export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] }) {
   const router = useRouter();
+  const t = useTranslations('settings');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -319,7 +325,7 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) {
-        setError(res.error ?? 'Something went wrong.');
+        setError(res.error ?? t('common.somethingWrong'));
         return;
       }
       router.refresh();
@@ -328,11 +334,13 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
 
   if (spaces.length === 0) {
     return (
-      <SectionCard title="Members & roles">
-        <EmptyState>You don’t coordinate any spaces.</EmptyState>
+      <SectionCard title={t('members.coordinator.title')}>
+        <EmptyState>{t('members.coordinator.empty')}</EmptyState>
       </SectionCard>
     );
   }
+
+  const dash = t('common.dash');
 
   return (
     <div className="space-y-[18px]">
@@ -340,11 +348,13 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
         <SectionCard
           key={`${space.schoolId}:${space.subjectId}`}
           title={
-            <span>
-              {space.subjectName} at {space.schoolName}
-              <span className="ml-2 text-[12.5px] font-medium text-[#A79E94]">
-                · Your space · {space.members.length}{' '}
-                {space.members.length === 1 ? 'member' : 'members'}
+            <span dir="auto">
+              {t('members.coordinator.spaceTitle', {
+                subject: space.subjectName ?? '',
+                school: space.schoolName ?? '',
+              })}
+              <span className="ms-2 text-[12.5px] font-medium text-[#A79E94]">
+                {t('members.coordinator.spaceMeta', { count: space.members.length })}
               </span>
             </span>
           }
@@ -352,10 +362,10 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
           <ConsoleTable
             head={
               <tr>
-                <Th>Person</Th>
-                <Th>Role</Th>
-                <Th>Class</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>{t('members.col.person')}</Th>
+                <Th>{t('members.col.role')}</Th>
+                <Th>{t('members.col.class')}</Th>
+                <Th className="text-end">{t('members.col.actions')}</Th>
               </tr>
             }
           >
@@ -364,10 +374,12 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
                 <Td>
                   <div className="flex items-center gap-[10px]">
                     <Avatar name={m.name} />
-                    <span className="font-semibold text-[#2A2422]">
+                    <span className="font-semibold text-[#2A2422]" dir="auto">
                       {m.name}
                       {m.isSelf ? (
-                        <span className="ml-2 text-[11.5px] font-semibold text-[#A79E94]">You</span>
+                        <span className="ms-2 text-[11.5px] font-semibold text-[#A79E94]">
+                          {t('members.you')}
+                        </span>
                       ) : null}
                     </span>
                   </div>
@@ -375,10 +387,10 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
                 <Td>
                   <RolePill kind={m.role} />
                 </Td>
-                <Td className="text-[#7A7068]">{m.homeClass ?? '—'}</Td>
-                <Td className="text-right">
+                <Td className="text-[#7A7068]" dir="auto">{m.homeClass ?? dash}</Td>
+                <Td className="text-end">
                   {m.isSelf ? (
-                    <span className="text-[12.5px] text-[#A79E94]">—</span>
+                    <span className="text-[12.5px] text-[#A79E94]">{dash}</span>
                   ) : (
                     <div className="flex items-center justify-end gap-3">
                       {m.role === 'teacher' ? (
@@ -387,7 +399,7 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
                           disabled={pending}
                           onClick={() => run(() => coordPromoteMember({ membershipId: m.membershipId }))}
                         >
-                          Promote to coordinator
+                          {t('members.coordinator.promote')}
                         </GhostButton>
                       ) : null}
                       <GhostButton
@@ -395,7 +407,7 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
                         disabled={pending}
                         onClick={() => run(() => coordRemoveMember({ membershipId: m.membershipId }))}
                       >
-                        Remove
+                        {t('members.coordinator.remove')}
                       </GhostButton>
                     </div>
                   )}
@@ -407,8 +419,7 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
       ))}
       <ErrorText>{error}</ErrorText>
       <p className="text-[12px] leading-relaxed text-[#A79E94]">
-        To add a teacher who isn’t here yet, ask them to sign in and complete onboarding for this
-        space, or have an admin assign them. Coordinators can’t browse the full people directory.
+        {t('members.coordinator.footnote')}
       </p>
     </div>
   );
