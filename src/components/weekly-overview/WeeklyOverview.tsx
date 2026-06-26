@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { CalendarView } from '@/components/weekly-overview/CalendarView';
 import { StatusView } from '@/components/weekly-overview/StatusView';
 import { WeekNav } from '@/components/weekly-overview/WeekNav';
 import { ViewToggle } from '@/components/weekly-overview/ViewToggle';
 import { PeopleFilter, EVERYONE } from '@/components/weekly-overview/PeopleFilter';
 import { ScopeChooserProvider } from '@/components/weekly-overview/ScopeChooser';
-import { formatMonthDayYear } from '@/lib/week';
+import { formatDate, formatNumber } from '@/lib/format';
 import type { BoardData } from '@/types/weekly-overview';
 
 type View = 'calendar' | 'status';
@@ -24,6 +25,8 @@ type View = 'calendar' | 'status';
  * curriculum week still navigates (it needs different data).
  */
 export function WeeklyOverview({ data, view: initialView }: { data: BoardData; view: View }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const [view, setView] = useState<View>(initialView);
   const [owner, setOwner] = useState<string>(EVERYONE);
 
@@ -65,10 +68,18 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
         {/* Header: context + filters + week nav + view toggle */}
         <div className="mb-[22px] flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[25px] font-semibold tracking-[-0.01em]">This week</h1>
+            <h1 className="text-[25px] font-semibold tracking-[-0.01em]">{t('title')}</h1>
             <p className="mt-1 text-[13.5px] text-neutral-600">
-              {data.context ? <>{data.context} · </> : null}
-              <b className="font-semibold text-neutral-800">{planCount}</b> planned this week
+              {data.context ? (
+                <>
+                  <span dir="auto">{data.context}</span> ·{' '}
+                </>
+              ) : null}
+              {t.rich('plannedThisWeek', {
+                count: planCount,
+                value: formatNumber(planCount, locale),
+                b: (chunks) => <b className="font-semibold text-neutral-800">{chunks}</b>,
+              })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-[14px]">
@@ -84,16 +95,18 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
             {/* §3 — the shown week's real Monday from `term_week`, or a neutral
                 placeholder while the table is empty (no fabricated dates). */}
             <span className="text-[13px] text-neutral-600">
-              {data.mondayDate ? (
-                <>
-                  Week of{' '}
-                  <b className="font-semibold text-neutral-800">
-                    {formatMonthDayYear(data.mondayDate)}
-                  </b>
-                </>
-              ) : (
-                'Week of —'
-              )}
+              {data.mondayDate
+                ? t.rich('weekOf', {
+                    date: formatDate(data.mondayDate, locale, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
+                    b: (chunks) => (
+                      <b className="font-semibold text-neutral-800">{chunks}</b>
+                    ),
+                  })
+                : t('weekOfEmpty')}
             </span>
             <ViewToggle view={view} onChange={changeView} />
           </div>
@@ -121,15 +134,18 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
 
 /** Shown when the signed-in teacher teaches no classes yet. */
 function EmptyClasses() {
+  const t = useTranslations('board');
   return (
     <div className="rounded-[14px] border border-border px-6 py-16 text-center">
-      <p className="text-[15px] font-semibold text-ink">No classes assigned yet</p>
+      <p className="text-[15px] font-semibold text-ink">{t('emptyClasses.title')}</p>
       <p className="mx-auto mt-2 max-w-[460px] text-[13.5px] text-text-muted">
-        Pick the classes you teach in{' '}
-        <a href="/settings" className="font-semibold text-teal underline underline-offset-2">
-          Settings
-        </a>{' '}
-        and your curriculum board will appear here — one section per year you teach.
+        {t.rich('emptyClasses.body', {
+          settings: (chunks) => (
+            <a href="/settings" className="font-semibold text-teal underline underline-offset-2">
+              {chunks}
+            </a>
+          ),
+        })}
       </p>
     </div>
   );
@@ -137,12 +153,16 @@ function EmptyClasses() {
 
 /** Shown when the teacher's subject/years have no synced curriculum yet. */
 function EmptyCurriculum({ subjectName }: { subjectName: string }) {
+  const t = useTranslations('board');
   return (
     <div className="rounded-[14px] border border-border px-6 py-16 text-center">
-      <p className="text-[15px] font-semibold text-ink">No curriculum synced yet</p>
+      <p className="text-[15px] font-semibold text-ink">{t('emptyCurriculum.title')}</p>
       <p className="mx-auto mt-2 max-w-[460px] text-[13.5px] text-text-muted">
-        {subjectName ? `${subjectName} has` : 'This subject has'} no curriculum lessons synced
-        for the years you teach. Once a coordinator syncs the curriculum, your board will fill in.
+        {t.rich('emptyCurriculum.body', {
+          hasSubject: subjectName ? 'yes' : 'no',
+          subject: subjectName,
+          s: (chunks) => <span dir="auto">{chunks}</span>,
+        })}
       </p>
     </div>
   );

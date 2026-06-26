@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import { LinkPending } from '@/components/ui/LinkPending';
+import { formatNumber } from '@/lib/format';
 import type { BoardCoordinate } from '@/types/weekly-overview';
 
 type View = 'calendar' | 'status';
@@ -32,19 +34,27 @@ export function WeekNav({
   next: BoardCoordinate | null;
   view: View;
 }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <div className="flex items-center gap-[6px]">
-      <NavButton href={prev ? href(prev, view) : null} label="Previous week" dir="left" />
+      <NavButton
+        href={prev ? href(prev, view) : null}
+        label={t('weekNav.previousWeek')}
+        dir="left"
+      />
       <span
         className="min-w-[150px] text-center text-[14px] font-semibold"
         title={coordinateLabel}
       >
-        {weekNo > 0 ? `Week ${weekNo}` : '—'}
+        {weekNo > 0
+          ? t('weekNav.weekNumber', { n: formatNumber(weekNo, locale) })
+          : t('weekNav.empty')}
         {isCurrent ? (
-          <span className="ml-[5px] font-normal text-neutral-500">· current</span>
+          <span className="ms-[5px] font-normal text-neutral-500">{t('weekNav.current')}</span>
         ) : null}
       </span>
-      <NavButton href={next ? href(next, view) : null} label="Next week" dir="right" />
+      <NavButton href={next ? href(next, view) : null} label={t('weekNav.nextWeek')} dir="right" />
     </div>
   );
 }
@@ -58,6 +68,7 @@ function NavButton({
   label: string;
   dir: 'left' | 'right';
 }) {
+  const t = useTranslations('board');
   const arrow = (
     <svg
       width="16"
@@ -69,6 +80,7 @@ function NavButton({
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
+      className="rtl:-scale-x-100"
     >
       {dir === 'left' ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
     </svg>
@@ -77,7 +89,7 @@ function NavButton({
   if (!href) {
     return (
       <span
-        aria-label={`${label} (unavailable)`}
+        aria-label={t('weekNav.unavailable', { label })}
         aria-disabled="true"
         className="inline-flex size-8 cursor-not-allowed items-center justify-center rounded-[8px] border border-border bg-surface text-text-faint opacity-40"
       >

@@ -21,8 +21,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { createScopedPlan } from '@/lib/actions/create-lesson';
 import { NewLessonModal } from '@/components/create-lesson/NewLessonModal';
+import { formatNumber } from '@/lib/format';
 import type { BoardClass, BoardCoordinate, BoardLesson } from '@/types/weekly-overview';
 
 /** A fixed curriculum lesson to plan, with the day placement to write. */
@@ -172,6 +174,7 @@ function DialogFooter({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useTranslations('board');
   return (
     <div className="mt-[16px] flex items-center justify-between border-t border-[#F0EAE1] px-[20px] py-[14px]">
       <button
@@ -179,7 +182,7 @@ function DialogFooter({
         onClick={onCancel}
         className="text-[13px] font-medium text-neutral-700 transition-colors hover:text-ink"
       >
-        Cancel
+        {t('confirm.cancel')}
       </button>
       <button
         type="button"
@@ -187,8 +190,8 @@ function DialogFooter({
         disabled={busy || disabled}
         className="inline-flex items-center gap-[7px] rounded-[10px] bg-teal px-[17px] py-[10px] text-[13.5px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(31,122,108,0.5)] transition-colors hover:bg-teal-deep disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {busy ? 'Starting…' : label}
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {busy ? t('confirm.starting') : label}
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </button>
@@ -202,6 +205,8 @@ function DialogFooter({
  * is nothing to ask — one confirm creates the centre-scoped plan and opens it.
  */
 function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose: () => void }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -225,12 +230,14 @@ function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose
   };
 
   return (
-    <Modal label="Plan this lesson" onClose={onClose}>
+    <Modal label={t('confirm.ariaLabel')} onClose={onClose}>
       <div className="px-[20px] pt-[18px]">
-        <h2 className="text-[17px] font-semibold tracking-[-0.01em]">Plan this lesson</h2>
-        <p className="mt-[5px] text-[12.5px] font-semibold text-text-muted">Year {target.year}</p>
+        <h2 className="text-[17px] font-semibold tracking-[-0.01em]">{t('confirm.title')}</h2>
+        <p className="mt-[5px] text-[12.5px] font-semibold text-text-muted">
+          {t('confirm.year', { n: formatNumber(target.year, locale) })}
+        </p>
         {target.dailyOutcome ? (
-          <p className="mt-[6px] line-clamp-2 text-[12.5px] leading-[1.45] text-text-muted">
+          <p dir="auto" className="mt-[6px] line-clamp-2 text-[12.5px] leading-[1.45] text-text-muted">
             {target.dailyOutcome}
           </p>
         ) : null}
@@ -242,7 +249,7 @@ function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose
         </p>
       ) : null}
 
-      <DialogFooter label="Start planning" busy={busy} onCancel={onClose} onConfirm={start} />
+      <DialogFooter label={t('confirm.start')} busy={busy} onCancel={onClose} onConfirm={start} />
     </Modal>
   );
 }

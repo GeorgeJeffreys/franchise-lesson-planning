@@ -1,0 +1,112 @@
+{
+  "board": {
+    "title": "This week",
+    "plannedThisWeek": "{count, plural, one {<b>{value}</b> planned this week} other {<b>{value}</b> planned this week}}",
+    "weekOf": "Week of <b>{date}</b>",
+    "weekOfEmpty": "Week of —",
+    "emptyClasses": {
+      "title": "No classes assigned yet",
+      "body": "Pick the classes you teach in <settings>Settings</settings> and your curriculum board will appear here — one section per year you teach."
+    },
+    "emptyCurriculum": {
+      "title": "No curriculum synced yet",
+      "body": "{hasSubject, select, yes {<s>{subject}</s> has} other {This subject has}} no curriculum lessons synced for the years you teach. Once a coordinator syncs the curriculum, your board will fill in."
+    },
+    "people": {
+      "everyone": "Everyone"
+    },
+    "weekNav": {
+      "previousWeek": "Previous week",
+      "nextWeek": "Next week",
+      "unavailable": "{label} (unavailable)",
+      "weekNumber": "Week {n}",
+      "current": "· current",
+      "empty": "—"
+    },
+    "viewToggle": {
+      "calendar": "Calendar",
+      "status": "Status"
+    },
+    "column": {
+      "periodWithDate": "Period {n} · {date}",
+      "period": "Period {n}",
+      "today": "Today"
+    },
+    "addLesson": "Add lesson",
+    "card": {
+      "year": "Year {n}",
+      "plan": "Plan"
+    },
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "submitted": "Submitted",
+      "needs_review": "Needs Review",
+      "approved": "Approved"
+    },
+    "scope": {
+      "class": "Class",
+      "centre": "Centre",
+      "org": "All centres"
+    },
+    "statusView": {
+      "none": "None",
+      "more": "{count, plural, one {+ {value} more} other {+ {value} more}}",
+      "moveError": "Could not move the lesson.",
+      "statusError": "Could not update status."
+    },
+    "confirm": {
+      "ariaLabel": "Plan this lesson",
+      "title": "Plan this lesson",
+      "year": "Year {n}",
+      "cancel": "Cancel",
+      "starting": "Starting…",
+      "start": "Start planning"
+    },
+    "modal": {
+      "ariaLabel": "New lesson",
+      "badge": "New lesson",
+      "close": "Close",
+      "tabClass": "Class",
+      "tabLesson": "Lesson",
+      "cancel": "Cancel",
+      "back": "Back",
+      "continue": "Continue",
+      "creating": "Creating…",
+      "create": "Create lesson",
+      "errors": {
+        "pickLesson": "Pick a lesson to plan.",
+        "pickClass": "Pick a class to plan for."
+      },
+      "classStep": {
+        "title": "Which class?",
+        "yearGroup": "Year group",
+        "year": "Year {n}",
+        "planFor": "Plan for",
+        "oneClass": "One class you teach",
+        "wholeCentre": "Whole centre",
+        "wholeCentreSub": "Every Year-group class at your centre",
+        "allCentres": "All centres",
+        "allCentresSub": "Shared across every centre"
+      },
+      "lessonStep": {
+        "title": "Which lesson?",
+        "breadcrumbYear": "Year {n}",
+        "breadcrumbWeek": "Week {n}",
+        "thisSubject": "this subject",
+        "week": "Week {n}",
+        "previousWeek": "Previous week",
+        "nextWeek": "Next week",
+        "emptyWithMonth": "No curriculum lessons synced for <s>{subject}</s>, Year {year}, <m>{month}</m> · Week {week}.",
+        "emptyNoMonth": "No curriculum lessons synced for <s>{subject}</s>, Year {year}."
+      },
+      "periodCard": {
+        "period": "Period {n}",
+        "untitled": "Untitled lesson",
+        "focus": "Focus · ",
+        "selected": "Selected",
+        "select": "Select"
+      }
+    }
+  }
+}

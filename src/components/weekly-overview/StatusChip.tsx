@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { STATUS_META } from '@/components/weekly-overview/status';
 import type { SlotStatus } from '@/types/weekly-overview';
@@ -7,6 +8,7 @@ import type { SlotStatus } from '@/types/weekly-overview';
  * status colour tokens. Flat (tint fill, no border, 6px radius) per the design.
  */
 export function StatusChip({ status }: { status: SlotStatus }) {
+  const t = useTranslations('board');
   const meta = STATUS_META[status];
   return (
     <span
@@ -16,7 +18,7 @@ export function StatusChip({ status }: { status: SlotStatus }) {
       )}
     >
       <span aria-hidden>{meta.glyph}</span>
-      {meta.label}
+      {t(`status.${status}`)}
     </span>
   );
 }

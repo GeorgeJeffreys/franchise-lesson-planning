@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import type { PlanOwner } from '@/types/weekly-overview';
 
@@ -21,6 +22,7 @@ export function PeopleFilter({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useTranslations('board');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,8 @@ export function PeopleFilter({
     return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  const label = value === EVERYONE ? 'Everyone' : owners.find((o) => o.id === value)?.name ?? 'Everyone';
+  const everyone = t('people.everyone');
+  const label = value === EVERYONE ? everyone : owners.find((o) => o.id === value)?.name ?? everyone;
 
   return (
     <div ref={ref} className="relative">
@@ -52,9 +55,9 @@ export function PeopleFilter({
         </svg>
       </button>
       {open ? (
-        <div className="absolute left-0 z-30 mt-[4px] max-h-[260px] min-w-[180px] overflow-y-auto rounded-[10px] border border-border bg-surface py-[4px] shadow-card">
+        <div className="absolute start-0 z-30 mt-[4px] max-h-[260px] min-w-[180px] overflow-y-auto rounded-[10px] border border-border bg-surface py-[4px] shadow-card">
           <Option
-            label="Everyone"
+            label={everyone}
             active={value === EVERYONE}
             onClick={() => {
               onChange(EVERYONE);
@@ -92,7 +95,7 @@ function Option({
       type="button"
       onClick={onClick}
       className={cn(
-        'block w-full px-[12px] py-[7px] text-left text-[12.5px] transition-colors hover:bg-surface-subtle',
+        'block w-full px-[12px] py-[7px] text-start text-[12.5px] transition-colors hover:bg-surface-subtle',
         active ? 'font-semibold text-teal-deep' : 'text-neutral-900',
       )}
     >

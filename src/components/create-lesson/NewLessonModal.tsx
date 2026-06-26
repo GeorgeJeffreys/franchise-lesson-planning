@@ -20,9 +20,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { createScopedPlan } from '@/lib/actions/create-lesson';
 import { loadPickerCells, loadPickerNav } from '@/lib/actions/lesson-picker';
+import { formatNumber } from '@/lib/format';
 import type { MonthNav, PickerCell } from '@/components/create-lesson/types';
 import type { AddYearOption } from '@/components/weekly-overview/ScopeChooser';
 import type { BoardClass } from '@/types/weekly-overview';
@@ -56,6 +58,7 @@ export function NewLessonModal({
   classesByYear,
   onClose,
 }: NewLessonModalProps) {
+  const t = useTranslations('board');
   const router = useRouter();
   const [step, setStep] = useState<Step>('class');
 
@@ -179,11 +182,11 @@ export function NewLessonModal({
 
   const create = async () => {
     if (!selectedLessonKey) {
-      setError('Pick a lesson to plan.');
+      setError(t('modal.errors.pickLesson'));
       return;
     }
     if (scope === 'class' && !classId) {
-      setError('Pick a class to plan for.');
+      setError(t('modal.errors.pickClass'));
       return;
     }
     setBusy(true);
@@ -207,7 +210,7 @@ export function NewLessonModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="New lesson"
+      aria-label={t('modal.ariaLabel')}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -219,12 +222,12 @@ export function NewLessonModal({
         <div className="px-[28px] pt-[22px]">
           <div className="flex items-start justify-between">
             <span className="rounded-[8px] bg-status-progress-bg px-[11px] py-[6px] text-[11.5px] font-bold uppercase tracking-[0.06em] text-status-progress">
-              New lesson
+              {t('modal.badge')}
             </span>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('modal.close')}
               className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-surface-subtle text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-ink"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -235,13 +238,13 @@ export function NewLessonModal({
 
           <div className="mt-[18px] flex items-center gap-[18px] border-b border-[#F0EAE1]">
             <TabHeader
-              label="Class"
+              label={t('modal.tabClass')}
               active={step === 'class'}
               complete={step === 'lesson'}
               onClick={() => setStep('class')}
             />
             <span className="mb-[10px] h-px w-[22px] bg-neutral-300" aria-hidden />
-            <TabHeader label="Lesson" active={step === 'lesson'} complete={false} />
+            <TabHeader label={t('modal.tabLesson')} active={step === 'lesson'} complete={false} />
           </div>
         </div>
 
@@ -297,7 +300,7 @@ export function NewLessonModal({
               onClick={onClose}
               className="text-[13.5px] font-medium text-neutral-700 transition-colors hover:text-ink"
             >
-              Cancel
+              {t('modal.cancel')}
             </button>
           ) : (
             <button
@@ -305,10 +308,10 @@ export function NewLessonModal({
               onClick={() => setStep('class')}
               className="inline-flex items-center gap-[7px] text-[13.5px] font-medium text-neutral-700 transition-colors hover:text-ink"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
                 <path d="M19 12H5M11 18l-6-6 6-6" />
               </svg>
-              Back
+              {t('modal.back')}
             </button>
           )}
 
@@ -318,7 +321,7 @@ export function NewLessonModal({
               onClick={() => setStep('lesson')}
               className="inline-flex items-center gap-[7px] rounded-[11px] bg-teal px-[20px] py-[11px] text-[14px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(31,122,108,0.5)] transition-colors hover:bg-teal-deep"
             >
-              Continue
+              {t('modal.continue')}
               <Arrow />
             </button>
           ) : (
@@ -328,7 +331,7 @@ export function NewLessonModal({
               disabled={busy || !selectedLessonKey}
               className="inline-flex items-center gap-[7px] rounded-[11px] bg-teal px-[22px] py-[12px] text-[14px] font-semibold text-white shadow-[0_4px_12px_-4px_rgba(31,122,108,0.5)] transition-colors hover:bg-teal-deep disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {busy ? 'Creating…' : 'Create lesson'}
+              {busy ? t('modal.creating') : t('modal.create')}
               <Arrow />
             </button>
           )}
@@ -376,7 +379,7 @@ function TabHeader({
 
 function Arrow() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
       <path d="M5 12h14M13 6l6 6-6 6" />
     </svg>
   );
@@ -404,15 +407,19 @@ function ClassStep({
   classId: string | null;
   onPickScope: (scope: PlanScope, classId: string | null) => void;
 }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <div>
-      <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-ink">Which class?</h2>
-      <p className="mt-[5px] text-[13.5px] text-text-muted">{context ?? subjectName}</p>
+      <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-ink">
+        {t('modal.classStep.title')}
+      </h2>
+      <p dir="auto" className="mt-[5px] text-[13.5px] text-text-muted">{context ?? subjectName}</p>
 
       {/* Year group */}
       <div className="mt-[22px]">
         <div className="mb-[9px] text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">
-          Year group
+          {t('modal.classStep.yearGroup')}
         </div>
         <div className="flex flex-wrap gap-[8px]">
           {years.map((y) => (
@@ -427,7 +434,7 @@ function ClassStep({
                   : 'border-given-border bg-given text-ink hover:bg-surface-subtle',
               )}
             >
-              Year {y.year}
+              {t('modal.classStep.year', { n: formatNumber(y.year, locale) })}
             </button>
           ))}
         </div>
@@ -436,27 +443,27 @@ function ClassStep({
       {/* Audience scope — a class you teach, the whole centre, or every centre. */}
       <div className="mt-[22px]">
         <div className="mb-[9px] text-[11.5px] font-semibold uppercase tracking-[0.05em] text-text-faint">
-          Plan for
+          {t('modal.classStep.planFor')}
         </div>
         <div className="grid grid-cols-1 gap-[8px] sm:grid-cols-2">
           {classes.map((c) => (
             <ScopeCard
               key={c.id}
               title={c.label}
-              subtitle="One class you teach"
+              subtitle={t('modal.classStep.oneClass')}
               selected={scope === 'class' && classId === c.id}
               onClick={() => onPickScope('class', c.id)}
             />
           ))}
           <ScopeCard
-            title="Whole centre"
-            subtitle="Every Year-group class at your centre"
+            title={t('modal.classStep.wholeCentre')}
+            subtitle={t('modal.classStep.wholeCentreSub')}
             selected={scope === 'centre'}
             onClick={() => onPickScope('centre', null)}
           />
           <ScopeCard
-            title="All centres"
-            subtitle="Shared across every centre"
+            title={t('modal.classStep.allCentres')}
+            subtitle={t('modal.classStep.allCentresSub')}
             selected={scope === 'org'}
             onClick={() => onPickScope('org', null)}
           />
@@ -483,7 +490,7 @@ function ScopeCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex flex-col items-start rounded-[12px] border px-[15px] py-[12px] text-left transition-colors',
+        'flex flex-col items-start rounded-[12px] border px-[15px] py-[12px] text-start transition-colors',
         selected
           ? 'border-[1.5px] border-teal bg-teal-tint'
           : 'border-given-border bg-given hover:bg-surface-subtle',
@@ -534,18 +541,31 @@ function LessonStep({
   selectedLessonKey: string | null;
   onSelect: (lessonKey: string) => void;
 }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-[14px]">
         <div className="min-w-0">
-          <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-ink">Which lesson?</h2>
+          <h2 className="text-[26px] font-semibold tracking-[-0.01em] text-ink">
+            {t('modal.lessonStep.title')}
+          </h2>
           <p className="mt-[5px] text-[13.5px] text-text-muted">
-            {subjectName ? `${subjectName} · ` : ''}Year {year}
+            {subjectName ? (
+              <>
+                <span dir="auto">{subjectName}</span> ·{' '}
+              </>
+            ) : (
+              ''
+            )}
+            {t('modal.lessonStep.breadcrumbYear', { n: formatNumber(year, locale) })}
             {month ? (
               <>
                 {' '}
-                <span className="text-neutral-400">›</span> {month}{' '}
-                <span className="text-neutral-400">›</span> Week {week}
+                <span className="text-neutral-400">›</span>{' '}
+                <span dir="auto">{month}</span>{' '}
+                <span className="text-neutral-400">›</span>{' '}
+                {t('modal.lessonStep.breadcrumbWeek', { n: formatNumber(week, locale) })}
               </>
             ) : null}
           </p>
@@ -557,7 +577,7 @@ function LessonStep({
             <select
               value={month}
               onChange={(e) => onChangeMonth(e.target.value)}
-              className="appearance-none rounded-[10px] border border-border-strong bg-surface py-[9px] pl-[14px] pr-[30px] text-[13.5px] font-semibold text-ink focus:border-teal focus:outline-none"
+              className="appearance-none rounded-[10px] border border-border-strong bg-surface py-[9px] ps-[14px] pe-[30px] text-[13.5px] font-semibold text-ink focus:border-teal focus:outline-none"
             >
               {nav.map((n) => (
                 <option key={n.month} value={n.month}>
@@ -575,7 +595,7 @@ function LessonStep({
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden
-              className="pointer-events-none absolute right-[10px] top-1/2 -translate-y-1/2 text-neutral-500"
+              className="pointer-events-none absolute end-[10px] top-1/2 -translate-y-1/2 text-neutral-500"
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
@@ -584,7 +604,7 @@ function LessonStep({
           <div className="flex items-center gap-[4px] rounded-[10px] border border-border-strong bg-surface px-[6px] py-[5px]">
             <StepBtn dir="prev" disabled={!canPrevWeek} onClick={onPrevWeek} />
             <span className="min-w-[64px] text-center text-[13.5px] font-semibold text-ink">
-              Week {week}
+              {t('modal.lessonStep.week', { n: formatNumber(week, locale) })}
             </span>
             <StepBtn dir="next" disabled={!canNextWeek} onClick={onNextWeek} />
           </div>
@@ -604,8 +624,20 @@ function LessonStep({
           </div>
         ) : cells.length === 0 ? (
           <div className="rounded-[14px] border border-border bg-surface-subtle px-[16px] py-[24px] text-center text-[13px] text-text-muted">
-            No curriculum lessons synced for {subjectName || 'this subject'}, Year {year}
-            {month ? `, ${month} · Week ${week}` : ''}.
+            {month
+              ? t.rich('modal.lessonStep.emptyWithMonth', {
+                  subject: subjectName || t('modal.lessonStep.thisSubject'),
+                  year: formatNumber(year, locale),
+                  month,
+                  week: formatNumber(week, locale),
+                  s: (chunks) => <span dir="auto">{chunks}</span>,
+                  m: (chunks) => <span dir="auto">{chunks}</span>,
+                })
+              : t.rich('modal.lessonStep.emptyNoMonth', {
+                  subject: subjectName || t('modal.lessonStep.thisSubject'),
+                  year: formatNumber(year, locale),
+                  s: (chunks) => <span dir="auto">{chunks}</span>,
+                })}
           </div>
         ) : (
           <div className="flex gap-[12px] overflow-x-auto pb-[4px]">
@@ -634,6 +666,8 @@ function PeriodCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <div
       className={cn(
@@ -647,16 +681,16 @@ function PeriodCard({
           selected ? 'text-teal-deep' : 'text-status-progress',
         )}
       >
-        Period {cell.period}
+        {t('modal.periodCard.period', { n: formatNumber(cell.period, locale) })}
       </div>
-      <p className="mt-[10px] text-[14px] font-medium leading-[1.4] text-ink">
-        {cell.dailyOutcome || 'Untitled lesson'}
+      <p dir="auto" className="mt-[10px] text-[14px] font-medium leading-[1.4] text-ink">
+        {cell.dailyOutcome || t('modal.periodCard.untitled')}
       </p>
       <div className="mt-[14px] flex flex-1 flex-col justify-end">
         {cell.focusArea ? (
           <p className="mb-[12px] text-[12.5px]">
-            <span className="text-text-muted">Focus · </span>
-            <span className={cn('font-medium', selected ? 'text-teal-deep' : 'text-status-progress')}>
+            <span className="text-text-muted">{t('modal.periodCard.focus')}</span>
+            <span dir="auto" className={cn('font-medium', selected ? 'text-teal-deep' : 'text-status-progress')}>
               {cell.focusArea}
             </span>
           </p>
@@ -678,10 +712,10 @@ function PeriodCard({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              Selected
+              {t('modal.periodCard.selected')}
             </>
           ) : (
-            'Select'
+            t('modal.periodCard.select')
           )}
         </button>
       </div>
@@ -699,15 +733,16 @@ function StepBtn({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations('board');
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={dir === 'prev' ? 'Previous week' : 'Next week'}
+      aria-label={dir === 'prev' ? t('modal.lessonStep.previousWeek') : t('modal.lessonStep.nextWeek')}
       className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-neutral-700 transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-30"
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
         {dir === 'prev' ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
       </svg>
     </button>

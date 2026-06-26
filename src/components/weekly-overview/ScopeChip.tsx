@@ -1,11 +1,12 @@
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import type { PlanScope } from '@/types/lesson';
 
-/** Short label + tint per scope. */
-const SCOPE_META: Record<PlanScope, { label: string; cls: string }> = {
-  class: { label: 'Class', cls: 'text-status-progress bg-status-progress-bg' },
-  centre: { label: 'Centre', cls: 'text-status-review bg-status-review-bg' },
-  org: { label: 'All centres', cls: 'text-status-approved bg-status-approved-bg' },
+/** Tint per scope (the label comes from the `board.scope.*` messages). */
+const SCOPE_CLS: Record<PlanScope, string> = {
+  class: 'text-status-progress bg-status-progress-bg',
+  centre: 'text-status-review bg-status-review-bg',
+  org: 'text-status-approved bg-status-approved-bg',
 };
 
 /**
@@ -13,15 +14,15 @@ const SCOPE_META: Record<PlanScope, { label: string; cls: string }> = {
  * multiple plans on one curriculum slot are distinguishable by owner + scope.
  */
 export function ScopeChip({ scope }: { scope: PlanScope }) {
-  const meta = SCOPE_META[scope];
+  const t = useTranslations('board');
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-badge px-[7px] py-[2px] text-[10px] font-bold uppercase tracking-[0.03em]',
-        meta.cls,
+        SCOPE_CLS[scope],
       )}
     >
-      {meta.label}
+      {t(`scope.${scope}`)}
     </span>
   );
 }

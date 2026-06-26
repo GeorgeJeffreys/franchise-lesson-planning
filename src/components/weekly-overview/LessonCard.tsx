@@ -13,18 +13,24 @@
 // day column + stack position, not repeated on the card. The small scope chip
 // stays on planned cards. Nothing else is restyled.
 
+import { useLocale, useTranslations } from 'next-intl';
 import { CardShell } from '@/components/weekly-overview/CardShell';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
 import { OwnerAvatar } from '@/components/weekly-overview/OwnerAvatar';
 import type { EmptySlotCard, PlanCard } from '@/components/weekly-overview/cards';
 import { useScopeChooser } from '@/components/weekly-overview/ScopeChooser';
+import { formatNumber } from '@/lib/format';
 
 /** Calendar-view planned card — restored CalendarCard (status badge + scope chip). */
 export function CalendarLessonCard({ card, subjectName }: { card: PlanCard; subjectName: string }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <CardShell planId={card.planId} canEdit={card.canEdit}>
-      <div className="text-[11.5px] font-semibold text-text-faint">{subjectName}</div>
-      <div className="mb-[9px] mt-[3px] text-[14px] font-semibold">Year {card.year}</div>
+      <div dir="auto" className="text-[11.5px] font-semibold text-text-faint">{subjectName}</div>
+      <div className="mb-[9px] mt-[3px] text-[14px] font-semibold">
+        {t('card.year', { n: formatNumber(card.year, locale) })}
+      </div>
       <div className="flex items-center justify-between gap-2">
         <StatusChip status={card.status} />
         {card.owner ? <OwnerAvatar owner={card.owner} /> : null}
@@ -35,12 +41,16 @@ export function CalendarLessonCard({ card, subjectName }: { card: PlanCard; subj
 
 /** Status-view planned card — restored StatusCard. */
 export function StatusLessonCard({ card, subjectName }: { card: PlanCard; subjectName: string }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   return (
     <CardShell planId={card.planId} canEdit={card.canEdit}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11.5px] font-semibold text-text-faint">{subjectName}</div>
-          <div className="mt-[3px] text-[14px] font-semibold">Year {card.year}</div>
+          <div dir="auto" className="text-[11.5px] font-semibold text-text-faint">{subjectName}</div>
+          <div className="mt-[3px] text-[14px] font-semibold">
+            {t('card.year', { n: formatNumber(card.year, locale) })}
+          </div>
         </div>
         {card.owner ? <OwnerAvatar owner={card.owner} size={21} /> : null}
       </div>
@@ -54,6 +64,8 @@ export function StatusLessonCard({ card, subjectName }: { card: PlanCard; subjec
  * curriculum lesson, defaulting it onto its natural day (the curriculum period).
  */
 export function NotStartedLessonCard({ card, subjectName }: { card: EmptySlotCard; subjectName: string }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const { openChooser } = useScopeChooser();
   const open = () =>
     openChooser({
@@ -67,17 +79,19 @@ export function NotStartedLessonCard({ card, subjectName }: { card: EmptySlotCar
     <button
       type="button"
       onClick={open}
-      className="flex items-center justify-between gap-2 rounded-[12px] border border-border bg-surface-subtle px-[13px] py-[11px] text-left transition-colors hover:bg-surface-cream"
+      className="flex items-center justify-between gap-2 rounded-[12px] border border-border bg-surface-subtle px-[13px] py-[11px] text-start transition-colors hover:bg-surface-cream"
     >
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold text-text-faint">{subjectName}</div>
-        <div className="mt-[2px] text-[14px] font-semibold">Year {card.year}</div>
+        <div dir="auto" className="text-[11px] font-semibold text-text-faint">{subjectName}</div>
+        <div className="mt-[2px] text-[14px] font-semibold">
+          {t('card.year', { n: formatNumber(card.year, locale) })}
+        </div>
       </div>
       <span className="inline-flex flex-shrink-0 items-center gap-[4px] rounded-badge border border-teal-tint-border bg-teal-tint px-[8px] py-[4px] text-[10.5px] font-bold text-teal">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M12 5v14M5 12h14" />
         </svg>
-        Plan
+        {t('card.plan')}
       </span>
     </button>
   );

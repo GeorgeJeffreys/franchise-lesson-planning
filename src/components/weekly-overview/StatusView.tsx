@@ -11,7 +11,9 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
 import { STATUS_COLUMN_ORDER, STATUS_META } from '@/components/weekly-overview/status';
 import {
   StatusLessonCard,
@@ -51,6 +53,7 @@ export function StatusView({
   ownerId: string | null;
   subjectName: string;
 }) {
+  const t = useTranslations('board');
   const cards = planCardsForYears(years, ownerId);
   const empties = emptySlotCards(years);
 
@@ -83,12 +86,12 @@ export function StatusView({
       .then((res) => {
         if (!res.ok) {
           setOverrides((prev) => ({ ...prev, [planId]: previous }));
-          setError(res.error ?? 'Could not update status.');
+          setError(res.error ?? t('statusView.statusError'));
         }
       })
       .catch(() => {
         setOverrides((prev) => ({ ...prev, [planId]: previous }));
-        setError('Could not update status.');
+        setError(t('statusView.statusError'));
       });
   };
 
@@ -135,19 +138,23 @@ function groupByStatus(
 }
 
 function ColumnHeader({ status, count }: { status: SlotStatus; count: number }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const meta = STATUS_META[status];
   return (
     <div className={cn('mb-[10px] flex items-center justify-between border-b-2 pb-[8px]', meta.rule)}>
       <span className={cn('inline-flex items-center gap-[6px] text-[12.5px] font-bold', meta.text)}>
-        <span aria-hidden>{meta.glyph}</span> {meta.label}
+        <span aria-hidden>{meta.glyph}</span> {t(`status.${status}`)}
       </span>
-      <span className="text-[12px] text-text-faint">{count}</span>
+      <span className="text-[12px] text-text-faint">{formatNumber(count, locale)}</span>
     </div>
   );
 }
 
 /** The "Not started" column: capped, never a drop target, cards never draggable. */
 function NotStartedColumn({ cards, subjectName }: { cards: EmptySlotCard[]; subjectName: string }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const visible = cards.slice(0, NOT_STARTED_CAP);
   const hidden = cards.length - visible.length;
 
@@ -159,10 +166,14 @@ function NotStartedColumn({ cards, subjectName }: { cards: EmptySlotCard[]; subj
           <NotStartedLessonCard key={card.key} card={card} subjectName={subjectName} />
         ))}
         {hidden > 0 ? (
-          <div className="py-[6px] text-center text-[11.5px] text-text-faint">+ {hidden} more</div>
+          <div className="py-[6px] text-center text-[11.5px] text-text-faint">
+            {t('statusView.more', { count: hidden, value: formatNumber(hidden, locale) })}
+          </div>
         ) : null}
         {cards.length === 0 ? (
-          <div className="py-[8px] text-center text-[11.5px] text-text-faint">None</div>
+          <div className="py-[8px] text-center text-[11.5px] text-text-faint">
+            {t('statusView.none')}
+          </div>
         ) : null}
       </div>
     </div>
@@ -179,6 +190,7 @@ function StatusColumn({
   cards: PlanCard[];
   subjectName: string;
 }) {
+  const t = useTranslations('board');
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
@@ -195,7 +207,9 @@ function StatusColumn({
           <DraggableStatusCard key={card.key} card={card} subjectName={subjectName} />
         ))}
         {cards.length === 0 ? (
-          <div className="py-[8px] text-center text-[11.5px] text-text-faint">None</div>
+          <div className="py-[8px] text-center text-[11.5px] text-text-faint">
+            {t('statusView.none')}
+          </div>
         ) : null}
       </div>
     </div>

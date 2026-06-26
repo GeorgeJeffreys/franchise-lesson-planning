@@ -37,7 +37,7 @@ export function CardShell({
       draggable={false}
       className={cn(BASE, 'relative transition-colors hover:bg-surface-subtle')}
     >
-      <LinkPending size={13} className="absolute right-[8px] top-[8px] text-teal" />
+      <LinkPending size={13} className="absolute end-[8px] top-[8px] text-teal" />
       {children}
     </Link>
   );

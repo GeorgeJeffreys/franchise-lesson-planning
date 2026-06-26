@@ -19,11 +19,13 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { CalendarLessonCard } from '@/components/weekly-overview/LessonCard';
 import { useScopeChooser, type AddYearOption } from '@/components/weekly-overview/ScopeChooser';
 import type { PlanCard } from '@/components/weekly-overview/cards';
-import { WEEKDAYS, addDays, formatWeekdayDate, todayISO } from '@/lib/week';
+import { WEEKDAYS, addDays, todayISO } from '@/lib/week';
+import { formatDate, formatNumber } from '@/lib/format';
 import { reorderPlans, type PlanPlacement } from '@/lib/actions/lesson-plan';
 import type { BoardPlan, BoardYear } from '@/types/weekly-overview';
 
@@ -57,6 +59,7 @@ export function CalendarView({
   /** The shown week's real Monday (`YYYY-MM-DD`) from `term_week`, or null when no row. */
   mondayDate: string | null;
 }) {
+  const t = useTranslations('board');
   const { openAdd } = useScopeChooser();
   const [byDay, setByDay] = useState<ByDay>(() => buildByDay(years));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -160,12 +163,12 @@ export function CalendarView({
       .then((res) => {
         if (!res.ok) {
           setByDay(prev);
-          setError(res.error ?? 'Could not move the lesson.');
+          setError(res.error ?? t('statusView.moveError'));
         }
       })
       .catch(() => {
         setByDay(prev);
-        setError('Could not move the lesson.');
+        setError(t('statusView.moveError'));
       });
   };
 
@@ -297,6 +300,8 @@ function DayColumn({
   dragEnabled: boolean;
   onAddLesson: () => void;
 }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
   const { setNodeRef, isOver } = useDroppable({ id: `day-${weekday}` });
 
   // §4 — the column's real date is the week's Monday + its weekday offset (Mon+0
@@ -304,7 +309,13 @@ function DayColumn({
   // just "Period {p}" (no fabricated date), and "Today" can't be proven either.
   const colDate = mondayDate ? addDays(mondayDate, weekday - 1) : null;
   const isToday = colDate !== null && colDate === todayISO();
-  const label = colDate ? `Period ${weekday} · ${formatWeekdayDate(colDate)}` : `Period ${weekday}`;
+  const period = formatNumber(weekday, locale);
+  const label = colDate
+    ? t('column.periodWithDate', {
+        n: period,
+        date: formatDate(colDate, locale, { weekday: 'short', month: 'short', day: 'numeric' }),
+      })
+    : t('column.period', { n: period });
 
   // The owner filter only hides cards (it never renumbers); `period` is already the
   // per-year ordinal from the normalised stack, so numbers stay stable.
@@ -317,7 +328,7 @@ function DayColumn({
         <span className="text-[13px] font-bold text-ink">{label}</span>
         {isToday ? (
           <span className="inline-flex items-center rounded-badge bg-teal px-[7px] py-[2px] text-[10px] font-bold uppercase tracking-[0.05em] text-white">
-            Today
+            {t('column.today')}
           </span>
         ) : null}
       </div>
@@ -348,7 +359,7 @@ function DayColumn({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Add lesson
+          {t('addLesson')}
         </button>
       </div>
     </div>
