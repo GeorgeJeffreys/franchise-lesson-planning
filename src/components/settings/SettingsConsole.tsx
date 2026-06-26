@@ -14,10 +14,12 @@ import type {
   ResourceGuideVersion,
   SmarttGuideVersion,
   SubjectRow,
+  TermRow,
 } from '@/lib/console';
 import { CentresTab } from './console/CentresTab';
 import { SubjectsTab } from './console/SubjectsTab';
 import { ClassesTab } from './console/ClassesTab';
+import { TermCalendarTab } from './console/TermCalendarTab';
 import { AdminMembersTab, CoordinatorMembersTab } from './console/MembersTab';
 import { CurriculumTab } from './console/CurriculumTab';
 import { AiGuideTab } from './console/AiGuideTab';
@@ -36,6 +38,7 @@ export interface SettingsConsoleProps {
   curriculum?: CurriculumSubjectStatus[];
   resourceGuide?: ResourceGuideVersion | null;
   smarttGuide?: SmarttGuideVersion | null;
+  terms?: TermRow[];
 }
 
 export function SettingsConsole(props: SettingsConsoleProps) {
@@ -89,6 +92,7 @@ export function SettingsConsole(props: SettingsConsoleProps) {
         {tab === 'centres' && props.centres ? <CentresTab centres={props.centres} /> : null}
         {tab === 'subjects' && props.subjects ? <SubjectsTab subjects={props.subjects} /> : null}
         {tab === 'classes' && props.classesData ? <ClassesTab data={props.classesData} /> : null}
+        {tab === 'calendar' && access.isAdmin ? <TermCalendarTab terms={props.terms ?? []} /> : null}
         {tab === 'members' ? (
           access.isAdmin && props.adminMembers ? (
             <AdminMembersTab data={props.adminMembers} />
