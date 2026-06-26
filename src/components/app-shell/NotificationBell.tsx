@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useLocale } from 'next-intl';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
-import { formatDayMonthYear } from '@/lib/dates';
+import { formatDate } from '@/lib/format';
 import type { NotificationItem } from '@/lib/notifications';
 
 /**
@@ -15,7 +16,15 @@ import type { NotificationItem } from '@/lib/notifications';
  * non-empty. This is a filtered view of the user's own outcomes — there is no
  * read/unread or dismissal state.
  */
-export function NotificationBell({ items }: { items: NotificationItem[] }) {
+export function NotificationBell({
+  items,
+  label,
+}: {
+  items: NotificationItem[];
+  /** Accessible label for the bell button (localised in the shell). */
+  label: string;
+}) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hasUnread = items.length > 0;
@@ -42,7 +51,7 @@ export function NotificationBell({ items }: { items: NotificationItem[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         className="relative inline-flex size-[38px] items-center justify-center rounded-[9px] border border-border bg-surface transition-colors hover:bg-surface-subtle"
@@ -51,14 +60,14 @@ export function NotificationBell({ items }: { items: NotificationItem[] }) {
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
         {hasUnread ? (
-          <span className="absolute right-[9px] top-[8px] size-[7px] rounded-full border-[1.5px] border-white bg-pink" />
+          <span className="absolute end-[9px] top-[8px] size-[7px] rounded-full border-[1.5px] border-white bg-pink" />
         ) : null}
       </button>
 
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[50px] z-20 w-[320px] overflow-hidden rounded-[12px] border border-border bg-surface shadow-card"
+          className="absolute end-0 top-[50px] z-20 w-[320px] overflow-hidden rounded-[12px] border border-border bg-surface shadow-card"
         >
           <div className="border-b border-neutral-100 px-[14px] py-[11px]">
             <div className="text-[13px] font-semibold">Notifications</div>
@@ -86,7 +95,7 @@ export function NotificationBell({ items }: { items: NotificationItem[] }) {
                       {n.at ? (
                         <div className="mt-px text-[11px] text-text-faint">
                           {n.status === 'approved' ? 'Approved' : 'Returned with edits'} ·{' '}
-                          {formatDayMonthYear(n.at)}
+                          {formatDate(n.at, locale, { month: 'short' })}
                         </div>
                       ) : null}
                     </div>
@@ -100,7 +109,7 @@ export function NotificationBell({ items }: { items: NotificationItem[] }) {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden
-                      className="mt-[2px] shrink-0"
+                      className="mt-[2px] shrink-0 rtl:-scale-x-100"
                     >
                       <path d="M9 18l6-6-6-6" />
                     </svg>

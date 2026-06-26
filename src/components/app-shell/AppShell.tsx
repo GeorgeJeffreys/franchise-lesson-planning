@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { getTranslations } from 'next-intl/server';
+import { PSEUDO_RTL_COOKIE } from '@/i18n/config';
 import { Wordmark } from '@/components/ui/Wordmark';
 import { TopNav } from '@/components/app-shell/TopNav';
 import { UserMenu } from '@/components/app-shell/UserMenu';
@@ -36,6 +39,16 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
   ]);
   const showSettings = admin || memberships.some((m) => m.role === 'coordinator');
 
+  // Dev-only RTL preview toggle, surfaced in the user menu. Gated on an explicit
+  // flag (NOT NODE_ENV) so it can be exercised in production, which doubles as
+  // the test environment.
+  const pseudoRtlEnabled = process.env.ENABLE_PSEUDO_RTL === 'true';
+  const pseudoRtlOn =
+    pseudoRtlEnabled &&
+    (await cookies()).get(PSEUDO_RTL_COOKIE)?.value === '1';
+
+  const t = await getTranslations('nav');
+
   return (
     <div className="flex min-h-screen flex-col">
       {impersonation.active ? (
@@ -55,22 +68,27 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
         {/* Brand — links home to the Weekly Overview */}
         <Link
           href="/"
-          aria-label="Alsama — Lesson Planning"
+          aria-label={t('brandAria')}
           className="flex items-center gap-[11px] rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
         >
           <Wordmark size="sm" tone="brand" className="leading-[0.7]" />
           <span className="h-[22px] w-px bg-neutral-200" />
           <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-neutral-600">
-            Lesson Planning
+            {t('lockup')}
           </span>
         </Link>
 
         <TopNav showSettings={showSettings} />
 
         {/* Right cluster: bell · user */}
-        <div className="ml-auto flex items-center gap-[10px]">
-          <NotificationBell items={notifications} />
-          <UserMenu name={name} subtitle={subtitle} />
+        <div className="ms-auto flex items-center gap-[10px]">
+          <NotificationBell items={notifications} label={t('notifications')} />
+          <UserMenu
+            name={name}
+            subtitle={subtitle}
+            pseudoRtlEnabled={pseudoRtlEnabled}
+            pseudoRtlOn={pseudoRtlOn}
+          />
         </div>
       </header>
 

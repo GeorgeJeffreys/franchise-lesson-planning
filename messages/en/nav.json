@@ -1,0 +1,15 @@
+{
+  "nav": {
+    "brandAria": "Alsama — Lesson Planning",
+    "lockup": "Lesson Planning",
+    "lessonPlanning": "Lesson Planning",
+    "curriculum": "Curriculum",
+    "resources": "Resources",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "signOut": "Sign out",
+    "weeklyOverview": "Weekly Overview",
+    "language": "Language",
+    "forceRtlDev": "Force RTL (dev)"
+  }
+}

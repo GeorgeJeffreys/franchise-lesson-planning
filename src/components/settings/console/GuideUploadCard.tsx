@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatDayMonthYear } from '@/lib/dates';
+import { useLocale } from 'next-intl';
+import { formatDate } from '@/lib/format';
 import { ErrorText, GhostButton, SectionCard } from './ui';
 import { Stat, UploadProgressBar, UploadStatusBadge, hhmm, timeAgo } from './upload';
 
@@ -47,6 +48,7 @@ export function GuideUploadCard({
   uploadingLabel: string;
 }) {
   const router = useRouter();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   // Transient, in-session only: a just-uploaded success flag, or an upload error
   // with the moment it happened (for the "Upload failed · {HH:MM}" badge). Both
@@ -105,7 +107,7 @@ export function GuideUploadCard({
               {active.originalFilename ? (
                 <Stat label="Document" value={active.originalFilename} />
               ) : null}
-              <Stat label="Uploaded" value={formatDayMonthYear(active.createdAt)} />
+              <Stat label="Uploaded" value={formatDate(active.createdAt, locale, { month: 'short' })} />
             </>
           ) : (
             <p className="text-[13px] text-[#A79E94]">
