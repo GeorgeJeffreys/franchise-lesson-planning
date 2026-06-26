@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { signOut } from '@/lib/actions/auth';
+import { LocaleSwitcher } from '@/components/app-shell/LocaleSwitcher';
 
 /** Up-to-two-letter initials for the avatar, derived from the display name. */
 function initials(name: string): string {
@@ -82,6 +83,9 @@ export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }
           >
             Settings
           </Link>
+          <div className="my-1 border-t border-neutral-100" />
+          <LocaleSwitcher onSelect={() => setOpen(false)} />
+          <div className="my-1 border-t border-neutral-100" />
           <form action={signOut} role="none">
             <button
               type="submit"
