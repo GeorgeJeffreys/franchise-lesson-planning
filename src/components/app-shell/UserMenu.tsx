@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useLocale } from 'next-intl';
 import { signOut } from '@/lib/actions/auth';
+import { setLocale } from '@/app/actions/locale';
+import { enabledLocales, type Locale } from '@/i18n/config';
+
+/** Native names for each locale — always shown in their own script. */
+const LOCALE_LABELS: Record<Locale, string> = {
+  en: 'English',
+  ar: 'العربية',
+};
 
 /** Up-to-two-letter initials for the avatar, derived from the display name. */
 function initials(name: string): string {
@@ -20,6 +29,18 @@ function initials(name: string): string {
 export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const locale = useLocale();
+
+  // Persist the chosen locale, then hard-reload so the root layout re-evaluates
+  // <html lang>/dir (router.refresh alone would not re-render <html>).
+  async function chooseLocale(next: Locale) {
+    if (next === locale) {
+      setOpen(false);
+      return;
+    }
+    await setLocale(next);
+    window.location.reload();
+  }
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -82,6 +103,35 @@ export function UserMenu({ name, subtitle }: { name: string; subtitle?: string }
           >
             Settings
           </Link>
+
+          {/* Language switcher — renders only the enabled locales. Arabic is
+              switched on (added to enabledLocales) in its own branch. */}
+          <div className="mt-[2px] border-t border-neutral-100 pt-[6px]">
+            <div className="px-3 pb-[4px] pt-[2px] text-[11px] font-semibold uppercase tracking-[0.04em] text-neutral-500">
+              Language
+            </div>
+            {enabledLocales.map((loc) => {
+              const active = loc === locale;
+              return (
+                <button
+                  key={loc}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => chooseLocale(loc)}
+                  aria-current={active ? 'true' : undefined}
+                  className="flex w-full cursor-pointer items-center justify-between rounded-[8px] px-3 py-[9px] text-left text-[13px] text-neutral-900 hover:bg-surface-subtle"
+                >
+                  <span>{LOCALE_LABELS[loc]}</span>
+                  {active ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-teal" aria-hidden>
+                      <path d="M5 12l4 4 10-11" />
+                    </svg>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
           <form action={signOut} role="none">
             <button
               type="submit"
