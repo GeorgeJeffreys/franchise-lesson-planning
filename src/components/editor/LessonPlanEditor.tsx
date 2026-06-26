@@ -33,6 +33,8 @@ import { PractiseStep } from '@/components/editor/PractiseStep';
 import type { WorksheetContext } from '@/components/editor/worksheet/context';
 import { LinkItStep } from '@/components/editor/LinkItStep';
 import { ReviewStep } from '@/components/editor/ReviewStep';
+import { TeacherCommentsNotice } from '@/components/review/TeacherCommentsNotice';
+import type { PlanComment } from '@/lib/review/comments';
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -60,7 +62,14 @@ function SaveIndicator({ state }: { state: SaveState }) {
   );
 }
 
-export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
+export function LessonPlanEditor({
+  data,
+  comments = [],
+}: {
+  data: EditorPlanData;
+  /** Coordinator review comments on this plan, read-only on the author side. */
+  comments?: PlanComment[];
+}) {
   const { plan, classContext, curriculum, activitiesByBlock, resourceBank } = data;
   const t = useTranslations('wizard');
 
@@ -275,6 +284,12 @@ export function LessonPlanEditor({ data }: { data: EditorPlanData }) {
         actions={<SaveIndicator state={saveState} />}
         showTotal={step === STEP_COUNT}
       />
+
+      {comments.length > 0 ? (
+        <div className="px-[22px] pt-[18px] lg:px-[30px]">
+          <TeacherCommentsNotice status={status} comments={comments} />
+        </div>
+      ) : null}
 
       <Stepper
         step={step}
