@@ -1,4 +1,4 @@
--- 0024_term_calendar.sql
+-- 0025_term_calendar.sql
 --
 -- The admin-defined academic-year term calendar ("Option B" timeline). Admins
 -- lay out the school's terms as editable bands; the planning board then shows
