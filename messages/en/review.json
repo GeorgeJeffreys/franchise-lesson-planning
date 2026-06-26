@@ -9,6 +9,14 @@
         "body": "Add feedback for the teacher. They'll see your comments when you return the plan."
       },
       "coordinatorChip": "Coordinator",
+      "teacherNotice": {
+        "changesRequested": "Changes requested",
+        "changesBody": "Your coordinator returned this plan with feedback. Read their comments, make the changes, and resubmit.",
+        "notes": "Coordinator notes",
+        "notesBody": "Your coordinator left comments on this plan.",
+        "show": "Show",
+        "hide": "Hide"
+      },
       "composer": {
         "placeholder": "Add a comment on this plan…",
         "hint": "Comments are shared with the teacher when you return the plan.",

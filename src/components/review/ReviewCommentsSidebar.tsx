@@ -18,8 +18,8 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { APP_TIME_ZONE, formatDate, formatNumber } from '@/lib/format';
-import { initialsOf } from '@/components/weekly-overview/avatar';
+import { APP_TIME_ZONE, formatDate } from '@/lib/format';
+import { CommentThread } from '@/components/review/CommentThread';
 import { addPlanComment } from '@/lib/actions/plan-comments';
 import { decidePlan } from '@/lib/actions/lesson-plan';
 import type { PlanComment } from '@/lib/review/comments';
@@ -103,31 +103,12 @@ export function ReviewCommentsSidebar({
       aria-label={t('comments.title')}
       className="flex flex-col overflow-hidden rounded-[16px] border border-border bg-surface lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-border px-[18px] py-[14px]">
-        <h2 className="text-[15px] font-semibold text-ink">{t('comments.title')}</h2>
-        <span className="inline-flex min-w-[22px] items-center justify-center rounded-badge bg-surface-subtle px-[8px] py-[2px] text-[12px] font-bold text-text-muted">
-          {formatNumber(comments.length, locale)}
-        </span>
-      </div>
-
-      {/* Thread */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-[16px]">
-        {hasComments ? (
-          <ul className="flex flex-col gap-[14px]">
-            {comments.map((c) => (
-              <CommentCard key={c.id} comment={c} chipLabel={t('comments.coordinatorChip')} locale={locale} />
-            ))}
-          </ul>
-        ) : (
-          <div className="py-[18px] text-center">
-            <p className="text-[13.5px] font-semibold text-ink">{t('comments.empty.title')}</p>
-            <p className="mx-auto mt-[5px] max-w-[260px] text-[12.5px] leading-[1.5] text-text-muted">
-              {t('comments.empty.body')}
-            </p>
-          </div>
-        )}
-      </div>
+      <CommentThread
+        comments={comments}
+        title={t('comments.title')}
+        chipLabel={t('comments.coordinatorChip')}
+        empty={{ title: t('comments.empty.title'), body: t('comments.empty.body') }}
+      />
 
       {/* Composer */}
       <div className="border-t border-border px-[18px] py-[14px]">
@@ -187,50 +168,6 @@ export function ReviewCommentsSidebar({
         />
       ) : null}
     </section>
-  );
-}
-
-/** One comment: pink avatar, author name, "Coordinator" chip, timestamp, dir="auto" body. */
-function CommentCard({
-  comment,
-  chipLabel,
-  locale,
-}: {
-  comment: PlanComment;
-  chipLabel: string;
-  locale: string;
-}) {
-  const name = comment.authorName || chipLabel;
-  return (
-    <li className="flex gap-[10px]">
-      <span
-        aria-hidden
-        className="mt-[1px] flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
-        style={{ background: '#FBEFF3', color: '#B62A5C' }}
-      >
-        {initialsOf(name)}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[2px]">
-          <span dir="auto" className="text-[13px] font-semibold text-ink">{name}</span>
-          <span className="rounded-badge bg-[#FBEFF3] px-[7px] py-[1px] text-[10px] font-bold uppercase tracking-[0.04em] text-[#B62A5C]">
-            {chipLabel}
-          </span>
-        </div>
-        <div className="mt-[1px] text-[11px] text-text-faint">
-          {formatDate(comment.createdAt, locale, {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: APP_TIME_ZONE,
-          })}
-        </div>
-        <p dir="auto" className="mt-[5px] whitespace-pre-wrap text-[13px] leading-[1.5] text-neutral-800">
-          {comment.body}
-        </p>
-      </div>
-    </li>
   );
 }
 
