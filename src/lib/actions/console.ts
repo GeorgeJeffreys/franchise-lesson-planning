@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentProfile } from '@/lib/auth';
 import type { MembershipRole } from '@/lib/auth';
+import { isValidISODate, mondayOf } from '@/lib/week';
+import type { TermRow } from '@/lib/console';
 
 export interface ConsoleResult {
   ok: boolean;
@@ -421,6 +423,97 @@ export async function coordPromoteMember(input: { membershipId: string }): Promi
     .from('subject_membership')
     .update({ role: 'coordinator' })
     .eq('id', input.membershipId);
+  if (error) return fail(error.message);
+  revalidateConsole();
+  return ok();
+}
+
+// ── Term calendar (admin) ─────────────────────────────────────────────────────
+// Autosave-on-settle writes for the Option B timeline. The UI mutates optimistically
+// and calls these only when an interaction settles (pointer-up after a move/resize,
+// a stepper click, a debounced date change) — never on every pointermove tick. Each
+// write snaps the start to a Monday and clamps weeks to 1–40 so a malformed payload
+// (or one bypassing the UI) can't persist an off-grid term; the `term` CHECKs are the
+// final backstop. Admin-only via `requireAdmin` + the `term_*` RLS policies.
+
+const MIN_WEEKS = 1;
+const MAX_WEEKS = 40;
+
+function clampWeeks(n: number): number {
+  if (!Number.isFinite(n)) return MIN_WEEKS;
+  return Math.min(MAX_WEEKS, Math.max(MIN_WEEKS, Math.trunc(n)));
+}
+
+export interface TermMutationResult extends ConsoleResult {
+  term?: TermRow;
+}
+
+export async function createTerm(input: {
+  name: string;
+  startsOn: string;
+  numWeeks: number;
+}): Promise<TermMutationResult> {
+  const guard = await requireAdmin();
+  if (isFail(guard)) return guard;
+
+  if (!isValidISODate(input.startsOn)) return fail('Pick a valid start date.');
+  const starts_on = mondayOf(input.startsOn);
+  const name = input.name.trim() || 'New term';
+  const num_weeks = clampWeeks(input.numWeeks);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('term')
+    .insert({ name, starts_on, num_weeks })
+    .select('id, name, starts_on, num_weeks')
+    .single();
+  if (error) return fail(error.message);
+
+  const row = data as { id: string; name: string; starts_on: string; num_weeks: number };
+  revalidateConsole();
+  return {
+    ok: true,
+    term: { id: row.id, name: row.name, startsOn: row.starts_on, numWeeks: row.num_weeks },
+  };
+}
+
+export async function updateTerm(input: {
+  id: string;
+  name?: string;
+  startsOn?: string;
+  numWeeks?: number;
+}): Promise<ConsoleResult> {
+  const guard = await requireAdmin();
+  if (isFail(guard)) return guard;
+
+  const patch: { name?: string; starts_on?: string; num_weeks?: number } = {};
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) return fail('Enter a term name.');
+    patch.name = name;
+  }
+  if (input.startsOn !== undefined) {
+    if (!isValidISODate(input.startsOn)) return fail('Pick a valid start date.');
+    patch.starts_on = mondayOf(input.startsOn);
+  }
+  if (input.numWeeks !== undefined) {
+    patch.num_weeks = clampWeeks(input.numWeeks);
+  }
+  if (Object.keys(patch).length === 0) return ok();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('term').update(patch).eq('id', input.id);
+  if (error) return fail(error.message);
+  revalidateConsole();
+  return ok();
+}
+
+export async function deleteTerm(input: { id: string }): Promise<ConsoleResult> {
+  const guard = await requireAdmin();
+  if (isFail(guard)) return guard;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('term').delete().eq('id', input.id);
   if (error) return fail(error.message);
   revalidateConsole();
   return ok();

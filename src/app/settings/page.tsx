@@ -16,6 +16,7 @@ import {
   getCoordinatorMembers,
   getCurriculumStatus,
   getSubjects,
+  getTerms,
   type AdminMembersData,
   type CentreRow,
   type ConsoleClassesData,
@@ -24,6 +25,7 @@ import {
   type ResourceGuideVersion,
   type SmarttGuideVersion,
   type SubjectRow,
+  type TermRow,
 } from '@/lib/console';
 
 // Per-request: reflects the live session, memberships and org structure.
@@ -76,9 +78,10 @@ export default async function SettingsPage() {
   let curriculum: CurriculumSubjectStatus[] | undefined;
   let resourceGuide: ResourceGuideVersion | null | undefined;
   let smarttGuide: SmarttGuideVersion | null | undefined;
+  let terms: TermRow[] | undefined;
 
   if (access.isAdmin) {
-    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide] =
+    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide, terms] =
       await Promise.all([
         getCentres(),
         getSubjects(),
@@ -87,6 +90,7 @@ export default async function SettingsPage() {
         getCurriculumStatus(),
         getActiveResourceGuideVersion(),
         getActiveSmarttGuideVersion(),
+        getTerms(),
       ]);
   } else if (access.isCoordinator) {
     const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
@@ -120,6 +124,7 @@ export default async function SettingsPage() {
           curriculum={curriculum}
           resourceGuide={resourceGuide}
           smarttGuide={smarttGuide}
+          terms={terms}
         />
       </div>
     </AppShell>

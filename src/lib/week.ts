@@ -148,6 +148,33 @@ export function formatMonthDayYear(iso: string): string {
   return `${MONTHS_SHORT[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
+/** Whole days from `fromISO` to `toISO` (negative if `to` precedes `from`). 0 for malformed input. */
+export function daysBetween(fromISO: string, toISO: string): number {
+  const a = parseISO(fromISO);
+  const b = parseISO(toISO);
+  if (!a || !b) return 0;
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+/** "Mon 7 Sep 2026" — short weekday + day + abbreviated month + year. For the term calendar. */
+export function formatShortWeekdayDate(iso: string): string {
+  const date = parseISO(iso);
+  if (!date) return iso;
+  return `${WEEKDAYS_SHORT[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS_SHORT[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+/**
+ * The academic year a date belongs to, as the anchoring September's calendar year.
+ * Sep–Dec → that year; Jan–Aug → the previous year (e.g. 2027-02-01 → 2026, the
+ * "2026 / 27" year anchored at September 2026). Falls back to the date's own year.
+ */
+export function academicYearOf(iso: string): number {
+  const date = parseISO(iso);
+  if (!date) return new Date().getUTCFullYear();
+  const year = date.getUTCFullYear();
+  return date.getUTCMonth() >= 8 ? year : year - 1;
+}
+
 /** Which weekday a `YYYY-MM-DD` date falls on, or null for weekends. */
 export function weekdayOf(iso: string): Weekday | null {
   const date = parseISO(iso);

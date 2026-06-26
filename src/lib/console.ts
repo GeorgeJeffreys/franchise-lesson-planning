@@ -24,6 +24,7 @@ export type ConsoleTab =
   | 'centres'
   | 'subjects'
   | 'classes'
+  | 'calendar'
   | 'members'
   | 'curriculum'
   | 'ai_guide'
@@ -71,7 +72,7 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
   const tabs: ConsoleTab[] = ['profile'];
   let defaultTab: ConsoleTab = 'profile';
   if (isAdmin) {
-    tabs.push('centres', 'subjects', 'classes', 'members', 'curriculum', 'ai_guide', 'smartt_guide');
+    tabs.push('centres', 'subjects', 'classes', 'calendar', 'members', 'curriculum', 'ai_guide', 'smartt_guide');
     defaultTab = 'centres';
   } else if (isCoordinator) {
     tabs.push('members', 'curriculum');
@@ -595,4 +596,42 @@ export async function getActiveSmarttGuideVersion(): Promise<SmarttGuideVersion 
   if (!row) return null;
 
   return { originalFilename: row.original_filename, createdAt: row.created_at };
+}
+
+// ── Term calendar (admin) ─────────────────────────────────────────────────────
+
+export interface TermRow {
+  id: string;
+  name: string;
+  /** The Monday (`YYYY-MM-DD`) of the term's Week 1. */
+  startsOn: string;
+  /** Whole weeks the term spans (1–40). */
+  numWeeks: number;
+}
+
+/**
+ * All terms for the (org-wide v1) calendar, in start-date order — the bands of the
+ * admin timeline and the source the board's `term_week` view derives from. Reads
+ * via the auth'd client; `term_read` lets every authenticated user see the shared
+ * calendar, while only admins may write it.
+ */
+export async function getTerms(): Promise<TermRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('term')
+    .select('id, name, starts_on, num_weeks')
+    .order('starts_on', { ascending: true });
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    name: string;
+    starts_on: string;
+    num_weeks: number;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    startsOn: r.starts_on,
+    numWeeks: r.num_weeks,
+  }));
 }
