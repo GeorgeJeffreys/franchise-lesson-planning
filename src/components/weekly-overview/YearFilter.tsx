@@ -48,7 +48,7 @@ export function YearFilter({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={t('yearFilter.label')}
-        className="inline-flex items-center gap-[7px] rounded-[9px] border border-border-strong bg-surface px-[12px] py-[8px] text-[12.5px] font-semibold text-neutral-900 transition-colors hover:bg-surface-subtle"
+        className="inline-flex items-center gap-[7px] rounded-[9px] px-[12px] py-[8px] text-[12.5px] font-semibold text-neutral-900 transition-colors hover:bg-surface-subtle"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A8178" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <rect x="3" y="4" width="18" height="5" rx="1.5" />

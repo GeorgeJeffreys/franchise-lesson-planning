@@ -202,7 +202,11 @@ export function ReadOnlyPlan({
           // `top` clears the full fixed chrome (header + TEST MODE bar when present)
           // via the --app-chrome-height token set in AppShell, plus a 16px gap, so the
           // "Coordinator comments" title sits fully below the nav and is never clipped.
-          <aside className="mt-6 lg:sticky lg:top-[calc(var(--app-chrome-height,64px)+16px)] lg:mt-[22px] lg:w-[360px] lg:flex-shrink-0 lg:self-start">
+          // NOTE: the underscores are REQUIRED — Tailwind v4 mis-parses a `+` with no
+          // surrounding whitespace inside calc() (it emitted a bogus `top` here, which
+          // is why the pane rode up under the nav); `_` becomes a literal space so the
+          // calc is valid CSS: `calc(var(--app-chrome-height,64px) + 16px)`.
+          <aside className="mt-6 lg:sticky lg:top-[calc(var(--app-chrome-height,64px)_+_16px)] lg:mt-[22px] lg:w-[360px] lg:flex-shrink-0 lg:self-start">
             {rightRail}
           </aside>
         ) : null}

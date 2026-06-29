@@ -317,19 +317,18 @@ function DayColumn({
   const colDate = mondayDate ? addDays(mondayDate, weekday - 1) : null;
   const isToday = colDate !== null && colDate === todayISO();
   const period = formatNumber(weekday, locale);
-  const label = colDate
-    ? t('column.periodWithDate', {
-        n: period,
-        // No year in the column header — `year: undefined` overrides formatDate's
-        // default so it reads "Mon, Dec 15" rather than "Mon, Dec 15, 2025".
-        date: formatDate(colDate, locale, {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          year: undefined,
-        }),
+  // No year in the column header — `year: undefined` overrides formatDate's default
+  // so it reads "Mon, Dec 15" rather than "Mon, Dec 15, 2025". The date rides on its
+  // OWN line above "Period N" in the picker's thin secondary weight (not inline/bold).
+  const dateLabel = colDate
+    ? formatDate(colDate, locale, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: undefined,
       })
-    : t('column.period', { n: period });
+    : null;
+  const periodLabel = t('column.period', { n: period });
 
   // The owner filter only hides cards (it never renumbers); `period` is already the
   // per-year ordinal from the normalised stack, so numbers stay stable.
@@ -339,7 +338,12 @@ function DayColumn({
   return (
     <div className="flex min-w-0 flex-col">
       <div className="mb-[12px] flex items-center gap-[8px] border-b border-border pb-[10px]">
-        <span className="text-[13px] font-bold text-ink">{label}</span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          {dateLabel ? (
+            <span className="text-[11px] font-normal text-neutral-500">{dateLabel}</span>
+          ) : null}
+          <span className="text-[13px] font-bold text-ink">{periodLabel}</span>
+        </span>
         {isToday ? (
           <span className="inline-flex items-center rounded-badge bg-teal px-[7px] py-[2px] text-[10px] font-bold uppercase tracking-[0.05em] text-white">
             {t('column.today')}

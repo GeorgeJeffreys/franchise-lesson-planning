@@ -217,19 +217,26 @@ function stripBullet(line: string): string {
  * honoured:
  *  1. The source's line-leading ". " bullet (cleanLO strips only the first), so
  *     distinct LOs are delimited by a newline introducing a fresh ". "-led outcome.
- *  2. A ";" between LOs (confirmed in UI-fixes r5, e.g. Tue: "…tracking it; greet
- *     the teacher by saying 'hello'/'goodbye'."), which the old data baked into one
- *     line. This overrides the r4 choice to keep ";" joined.
+ *  2. A semicolon between LOs (confirmed in UI-fixes r5, e.g. Tue: "…tracking it;
+ *     greet the teacher by saying 'hello'/'goodbye'."), which the old data baked
+ *     into one line. This overrides the r4 choice to keep ";" joined.
+ *
+ * The semicolon class is deliberately broad: the curriculum is bilingual and the
+ * Excel import carries whatever was typed, so an LO boundary can be an ASCII ";",
+ * an Arabic semicolon "؛" (U+061B), or a fullwidth "；" (U+FF1B). Splitting on only
+ * the ASCII form left non-ASCII-delimited days rendering as one run-on paragraph.
  *
  * Each segment is trimmed and empty segments (trailing/double ";" or newline) are
  * dropped, so no orphan/empty bullets are emitted. A single segment renders as
  * plain text upstream (DailyOutcome).
  */
+const LO_SEPARATOR = /[;؛；]/;
+
 function splitDailyLOs(text: string): string[] {
   if (!text) return [];
   return text
     .split(/\n(?=\s*\.\s)/)
-    .flatMap((s) => s.split(';'))
+    .flatMap((s) => s.split(LO_SEPARATOR))
     .map((s) => stripBullet(s.trim()))
     .filter(Boolean);
 }
