@@ -33,6 +33,8 @@
       "today": "اليوم"
     },
     "addLesson": "إضافة درس",
+    "downloadWeek": "تنزيل الأسبوع",
+    "downloadWeekTitle": "تنزيل جميع خطط هذا الأسبوع بصيغة PDF",
     "card": {
       "year": "السنة {n}",
       "plan": "تخطيط",

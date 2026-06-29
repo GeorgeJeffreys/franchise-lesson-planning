@@ -46,6 +46,27 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
 
   const ownerId = owner === EVERYONE ? null : owner;
 
+  // "Download week" target: the board's currently-viewed coordinate, passed to the
+  // /api/pdf/week route exactly as state the board already holds (subject space,
+  // resolved years, month/week, and the teaching-week number for the date header).
+  // No new state, no coordinate picker — it mirrors what's on screen.
+  const weekPdfHref = useMemo(() => {
+    const params = new URLSearchParams({
+      subject: data.subjectCode,
+      subjectName: data.subjectName,
+      years: data.years.map((band) => band.year).join(','),
+      month: data.coordinate.month,
+      week: String(data.coordinate.week),
+      weekNo: String(data.weekNo),
+    });
+    return `/api/pdf/week?${params.toString()}`;
+  }, [data.subjectCode, data.subjectName, data.years, data.coordinate, data.weekNo]);
+
+  // Only offer the export when the board has a real coordinate with year bands to
+  // export (otherwise there is nothing on screen to download).
+  const canDownloadWeek =
+    data.hasClasses && data.coordinate.month !== '' && data.years.length > 0;
+
   // Plans shown after the owner filter (Not started cards are unaffected).
   const planCount = useMemo(() => {
     if (ownerId === null) return data.planCount;
@@ -109,6 +130,30 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
                 : t('weekOfEmpty')}
             </span>
             <ViewToggle view={view} onChange={changeView} />
+            {canDownloadWeek ? (
+              <a
+                href={weekPdfHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t('downloadWeekTitle')}
+                className="inline-flex items-center gap-1.5 rounded-[9px] border border-border bg-surface px-[14px] py-[7px] text-[13px] font-medium text-neutral-700 transition-colors hover:text-ink"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 1.5v8.5M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11" />
+                </svg>
+                {t('downloadWeek')}
+              </a>
+            ) : null}
           </div>
         </div>
 

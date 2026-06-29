@@ -8,15 +8,10 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { loadPlanForEditor } from '@/lib/editor/load-plan';
-import { getLessonById } from '@/lib/curriculumUtils';
-import { DEFAULT_BLOCKS } from '@/lib/blocks';
 import { normalizeLinkIt, resolveTechniques, techniqueLabelMap } from '@/lib/editor/link-it';
-import { mondayOf, weekdayDates } from '@/lib/week';
-import type { Block, LessonPlan } from '@/types/lesson';
-import type { PdfCurriculumContext, PdfLinkIt, PlanPdfModel } from './types';
-
-/** A Supabase client as returned by createClient (untyped project schema). */
-type Db = Awaited<ReturnType<typeof createClient>>;
+import { resolveWeekSlotKeys, selectWeekPlanRows } from '@/lib/weekly-overview-selection';
+import type { Block } from '@/types/lesson';
+import type { PdfLinkIt, PlanPdfModel } from './types';
 
 /** Resolve a plan's blocks into the PDF Link-it model using a technique-label map. */
 function buildLinkIt(blocks: Block[], labels: Map<string, string>): PdfLinkIt {
@@ -26,15 +21,6 @@ function buildLinkIt(blocks: Block[], labels: Map<string, string>): PdfLinkIt {
     cfu: resolveTechniques(linkIt.checkForUnderstanding, labels),
     exitTicket: resolveTechniques(linkIt.exitTicket, labels),
   };
-}
-
-/** Load the cfu/exit technique id → display-name map from the activity bank. */
-async function loadTechniqueLabels(supabase: Db): Promise<Map<string, string>> {
-  const { data } = await supabase
-    .from('activity_bank')
-    .select('id, name')
-    .in('block_type', ['cfu', 'exit_ticket']);
-  return techniqueLabelMap((data ?? []) as { id: string; name: string }[]);
 }
 
 /**
@@ -64,146 +50,48 @@ export async function loadPlanPdfModel(id: string): Promise<PlanPdfModel | null>
   };
 }
 
-// Joined-row shapes for the week query. The generated Database type is still a
-// placeholder, so the client can't infer nested selects — narrow by hand, as
-// the editor and overview loaders do.
-interface RawClassJoin {
-  id: string;
-  year: number;
-  school: { name: string } | { name: string }[] | null;
-  subject: { name: string } | { name: string }[] | null;
-}
-
-interface RawWeekPlanRow {
-  id: string;
-  class_id: string | null;
-  scope: LessonPlan['scope'];
-  school_id: string | null;
-  subject_id: string | null;
-  year: number | null;
-  curriculum_lesson_id: string;
-  lesson_date: string | null;
-  weekday: number | null;
-  period: number | null;
-  status: LessonPlan['status'];
-  smartt_objective: string | null;
-  smartt_check: LessonPlan['smartt_check'];
-  blocks: unknown;
-  created_by: string;
-  submitted_at: string | null;
-  reviewed_at: string | null;
-  review_note: string | null;
-  created_at: string;
-  updated_at: string;
-  class: RawClassJoin | RawClassJoin[] | null;
-}
-
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? v[0] ?? null : v ?? null;
-}
-
-async function resolveCurriculum(curriculumLessonId: string): Promise<PdfCurriculumContext | null> {
-  const lookup = await getLessonById(curriculumLessonId);
-  const lesson = Array.isArray(lookup) ? lookup[0] : lookup;
-  if (!lesson) return null;
-  return { dailyLO: lesson.dailyLO, focusArea: lesson.linguisticSkill, theme: lesson.theme };
+/** The board coordinate a weekly export mirrors — one subject space, one week. */
+export interface WeekPdfCoordinate {
+  /** The board's subject `code` (e.g. "english"). */
+  subjectCode: string;
+  /** The year groups in scope (the board's taught/curriculum years). */
+  years: number[];
+  /** Curriculum month, e.g. "March". */
+  month: string;
+  /** Curriculum week within the month (1-based). */
+  week: number;
 }
 
 /**
- * Load every plan for one class within a week (Mon–Fri), ordered for printing
- * (by date, then period). `week` is any date in the target week; it is
- * normalised to that week's Monday. RLS limits visibility to plans the user may
- * see. Returns an empty array when the class has no plans that week.
+ * Load every plan visible at a board coordinate as PDF models — the same set the
+ * planning board shows for `(subject space · years · month · week)`. Selection
+ * goes through the board's shared `resolveWeekSlotKeys` → `WHERE
+ * curriculum_lesson_id IN (...)` path (no class filter, no date filter; RLS does
+ * the scoping), so the export can never diverge from the board.
+ *
+ * Each plan is resolved through `loadPlanPdfModel`, so every page inherits Part
+ * A's single-plan fidelity (objective, link-it strips, block minutes, and the
+ * centre/org class context for plans with no single class). Nothing is dropped:
+ * the returned list is every plan the user may see for the coordinate; the
+ * document places `weekday`-bearing plans into their day and appends the rest as
+ * the unscheduled section. Returns an empty array when the week has no plans.
  */
 export async function loadWeekPdfModels(
-  classId: string,
-  week: string,
+  coordinate: WeekPdfCoordinate,
 ): Promise<PlanPdfModel[]> {
   const supabase = await createClient();
-  const dates = weekdayDates(mondayOf(week));
 
-  const { data, error } = await supabase
-    .from('lesson_plans')
-    .select(
-      `id, class_id, scope, school_id, subject_id, year,
-       curriculum_lesson_id, lesson_date, weekday, period, status,
-       smartt_objective, smartt_check, blocks, created_by, submitted_at,
-       reviewed_at, review_note, created_at, updated_at,
-       class:classes (
-         id, year,
-         school:schools ( name ),
-         subject:subjects ( name )
-       )`,
-    )
-    .eq('class_id', classId)
-    .gte('lesson_date', dates.mon)
-    .lte('lesson_date', dates.fri)
-    .order('lesson_date', { ascending: true })
-    .order('period', { ascending: true, nullsFirst: true });
+  const { slotKeys } = await resolveWeekSlotKeys(
+    coordinate.subjectCode,
+    coordinate.years,
+    coordinate.month,
+    coordinate.week,
+  );
 
-  if (error || !data) return [];
-
-  const rows = data as unknown as RawWeekPlanRow[];
-
-  // Resolve curriculum context for every plan up front (the build below is
-  // synchronous). Reads are cached and deduped per curriculum id. The technique
-  // labels are a small fixed set, fetched once for the whole week.
-  const curriculumByKey = new Map<string, PdfCurriculumContext | null>();
-  const [, techniqueLabels] = await Promise.all([
-    Promise.all(
-      [...new Set(rows.map((r) => r.curriculum_lesson_id))].map(async (id) => {
-        curriculumByKey.set(id, await resolveCurriculum(id));
-      }),
-    ),
-    loadTechniqueLabels(supabase),
-  ]);
-
-  return rows.flatMap((row): PlanPdfModel[] => {
-    const rawClass = one(row.class);
-    if (!rawClass) return [];
-
-    const school = one(rawClass.school);
-    const subject = one(rawClass.subject);
-
-    const blocks: Block[] =
-      Array.isArray(row.blocks) && row.blocks.length > 0
-        ? (row.blocks as Block[])
-        : DEFAULT_BLOCKS;
-
-    const plan: LessonPlan = {
-      id: row.id,
-      class_id: row.class_id,
-      scope: row.scope,
-      subject_id: row.subject_id,
-      school_id: row.school_id,
-      year: row.year,
-      curriculum_lesson_id: row.curriculum_lesson_id,
-      lesson_date: row.lesson_date,
-      weekday: row.weekday,
-      period: row.period,
-      status: row.status,
-      smartt_objective: row.smartt_objective,
-      smartt_check: row.smartt_check,
-      blocks,
-      created_by: row.created_by,
-      submitted_at: row.submitted_at,
-      reviewed_at: row.reviewed_at,
-      review_note: row.review_note,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    };
-
-    return [
-      {
-        plan,
-        classContext: {
-          year: rawClass.year,
-          schoolName: school?.name ?? '',
-          subjectName: subject?.name ?? '',
-        },
-        curriculum: curriculumByKey.get(row.curriculum_lesson_id) ?? null,
-        linkIt: buildLinkIt(blocks, techniqueLabels),
-      },
-    ];
-  });
+  // The plan ids for the coordinate (RLS-scoped). Resolve each through the
+  // single-plan loader concurrently; a plan that disappears between the id read
+  // and its load resolves to null and is dropped.
+  const rows = await selectWeekPlanRows<{ id: string }>(supabase, slotKeys, 'id');
+  const models = await Promise.all(rows.map((r) => loadPlanPdfModel(r.id)));
+  return models.filter((m): m is PlanPdfModel => m !== null);
 }

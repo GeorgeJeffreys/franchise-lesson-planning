@@ -33,6 +33,8 @@
       "today": "Today"
     },
     "addLesson": "Add lesson",
+    "downloadWeek": "Download week",
+    "downloadWeekTitle": "Download every plan for this week as a PDF",
     "card": {
       "year": "Year {n}",
       "plan": "Plan",
