@@ -38,6 +38,12 @@
       "today": "Today"
     },
     "addLesson": "Add lesson",
+    "add": {
+      "chooseYear": "Choose a year group",
+      "noLesson": "No lesson",
+      "opening": "Opening…",
+      "moreOptions": "More options…"
+    },
     "downloadWeek": "Download week",
     "downloadWeekTitle": "Download every plan for this week as a PDF",
     "card": {
