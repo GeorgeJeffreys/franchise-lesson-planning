@@ -91,19 +91,12 @@
       "creating": "Creating…",
       "create": "Create lesson",
       "errors": {
-        "pickLesson": "Pick a lesson to plan.",
-        "pickClass": "Pick a class to plan for."
+        "pickLesson": "Pick a lesson to plan."
       },
       "classStep": {
         "title": "Which class?",
         "yearGroup": "Year group",
-        "year": "Year {n}",
-        "planFor": "Plan for",
-        "oneClass": "One class you teach",
-        "wholeCentre": "Whole centre",
-        "wholeCentreSub": "Every Year-group class at your centre",
-        "allCentres": "All centres",
-        "allCentresSub": "Shared across every centre"
+        "year": "Year {n}"
       },
       "lessonStep": {
         "title": "Which lesson?",
