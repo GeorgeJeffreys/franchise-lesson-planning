@@ -84,19 +84,12 @@
       "creating": "جارٍ الإنشاء…",
       "create": "إنشاء الدرس",
       "errors": {
-        "pickLesson": "اختر درساً لتخطيطه.",
-        "pickClass": "اختر صفاً لتخطّط له."
+        "pickLesson": "اختر درساً لتخطيطه."
       },
       "classStep": {
         "title": "أي صف؟",
         "yearGroup": "السنة الدراسية",
-        "year": "السنة {n}",
-        "planFor": "التخطيط لـ",
-        "oneClass": "صف واحد تُدرّسه",
-        "wholeCentre": "المركز بأكمله",
-        "wholeCentreSub": "كل صف لكل سنة في مركزك",
-        "allCentres": "كل المراكز",
-        "allCentresSub": "مشترَك بين جميع المراكز"
+        "year": "السنة {n}"
       },
       "lessonStep": {
         "title": "أي درس؟",
