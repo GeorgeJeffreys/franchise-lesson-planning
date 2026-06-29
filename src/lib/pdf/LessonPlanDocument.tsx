@@ -176,11 +176,23 @@ function AttachmentList({
 }
 
 /** The printable body for a single plan; reused by both Document wrappers. */
-function LessonPlanPage({ model }: { model: PlanPdfModel }) {
+function LessonPlanPage({
+  model,
+  sectionLabel,
+}: {
+  model: PlanPdfModel;
+  /** Optional band above the header (the weekly export's unscheduled section). */
+  sectionLabel?: string;
+}) {
   const total = inSessionMinutes(model.plan.blocks);
 
   return (
     <Page size="A4" style={styles.page} wrap>
+      {sectionLabel ? (
+        <View style={styles.sectionBand}>
+          <Text style={styles.sectionBandText}>{sectionLabel}</Text>
+        </View>
+      ) : null}
       <Header model={model} />
       <ObjectiveSection model={model} />
 
@@ -226,16 +238,40 @@ export function LessonPlanDocument({ model }: { model: PlanPdfModel }) {
   );
 }
 
-/** Many lesson plans, one per page, for batch printing a class's week. */
+/**
+ * Order scheduled plans for printing: by day column (Mon→Fri), then by the
+ * stored day-ordinal within that column. Only called on plans with a `weekday`.
+ */
+function byWeekdayPeriod(a: PlanPdfModel, b: PlanPdfModel): number {
+  const wa = a.plan.weekday ?? 0;
+  const wb = b.plan.weekday ?? 0;
+  if (wa !== wb) return wa - wb;
+  const pa = a.plan.period ?? 0;
+  const pb = b.plan.period ?? 0;
+  if (pa !== pb) return pa - pb;
+  return a.plan.id.localeCompare(b.plan.id);
+}
+
+const UNSCHEDULED_SECTION_LABEL = 'Centre-wide / unscheduled';
+
+/**
+ * Every plan visible at a board coordinate, one page per plan, for batch printing
+ * a subject's week. Plans carrying a `weekday` are placed in day order
+ * (weekday → period); plans with no `weekday` (centre-wide / dateless) are
+ * appended as a clearly-marked unscheduled section. Nothing is dropped.
+ */
 export function WeekLessonPlansDocument({
   models,
   weekLabel,
+  subjectLabel,
 }: {
   models: PlanPdfModel[];
   weekLabel: string;
+  /** The subject-space label shown in the header / title (e.g. "English"). */
+  subjectLabel?: string;
 }) {
-  const className = models[0] ? classHeadline(models[0].classContext) : 'Class';
-  const title = `Lesson Plans — ${className} — ${weekLabel}`;
+  const heading = [subjectLabel, weekLabel].filter(Boolean).join(' · ');
+  const title = `Lesson Plans${heading ? ` — ${heading}` : ''}`;
 
   if (models.length === 0) {
     return (
@@ -243,20 +279,35 @@ export function WeekLessonPlansDocument({
         <Page size="A4" style={styles.page}>
           <View style={styles.header}>
             <Text style={styles.brand}>Alsama · Lesson Plans</Text>
-            <Text style={styles.classTitle}>{weekLabel}</Text>
+            {subjectLabel ? <Text style={styles.classTitle}>{subjectLabel}</Text> : null}
+            <Text style={[styles.metaItem, { marginTop: 2 }]}>{weekLabel}</Text>
           </View>
           <Text style={[styles.empty, { color: COLORS.muted }]}>
-            No lesson plans found for this class in the selected week.
+            No lesson plans found for this week.
           </Text>
         </Page>
       </Document>
     );
   }
 
+  // Scheduled plans (a real day column) first, in day order; the rest — centre-
+  // wide or dateless plans with no `weekday` — appended as the unscheduled section.
+  const scheduled = models.filter((m) => m.plan.weekday != null).sort(byWeekdayPeriod);
+  const unscheduled = models.filter((m) => m.plan.weekday == null);
+
   return (
     <Document title={title} author="Alsama" subject="Lesson plans">
-      {models.map((model) => (
+      {scheduled.map((model) => (
         <LessonPlanPage key={model.plan.id} model={model} />
+      ))}
+      {unscheduled.map((model) => (
+        // Every unscheduled page carries the section band, so the section reads
+        // correctly however the PDF is later split or reordered.
+        <LessonPlanPage
+          key={model.plan.id}
+          model={model}
+          sectionLabel={UNSCHEDULED_SECTION_LABEL}
+        />
       ))}
     </Document>
   );

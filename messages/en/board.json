@@ -21,7 +21,11 @@
       "unavailable": "{label} (unavailable)",
       "weekNumber": "Week {n}",
       "current": "· current",
-      "empty": "—"
+      "empty": "—",
+      "picker": {
+        "month": "Month",
+        "week": "Week"
+      }
     },
     "viewToggle": {
       "calendar": "Calendar",
@@ -33,6 +37,8 @@
       "today": "Today"
     },
     "addLesson": "Add lesson",
+    "downloadWeek": "Download week",
+    "downloadWeekTitle": "Download every plan for this week as a PDF",
     "card": {
       "year": "Year {n}",
       "plan": "Plan",
@@ -52,7 +58,8 @@
     },
     "statusView": {
       "none": "None",
-      "more": "{count, plural, one {+ {value} more} other {+ {value} more}}",
+      "showAll": "Show all",
+      "showLess": "Show less",
       "moveError": "Could not move the lesson.",
       "statusError": "Could not update status.",
       "openPlan": "Open the plan",

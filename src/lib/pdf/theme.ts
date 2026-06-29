@@ -233,4 +233,22 @@ export const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.pink,
   },
+
+  // ---- Weekly export: section band above an unscheduled plan's header ------
+  sectionBand: {
+    marginBottom: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    backgroundColor: COLORS.cream,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.teal,
+  },
+  sectionBandText: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 9,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    color: COLORS.teal,
+  },
 });

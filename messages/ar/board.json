@@ -21,7 +21,11 @@
       "unavailable": "{label} (غير متاح)",
       "weekNumber": "الأسبوع {n}",
       "current": "· الحالي",
-      "empty": "—"
+      "empty": "—",
+      "picker": {
+        "month": "الشهر",
+        "week": "الأسبوع"
+      }
     },
     "viewToggle": {
       "calendar": "التقويم",
@@ -33,6 +37,8 @@
       "today": "اليوم"
     },
     "addLesson": "إضافة درس",
+    "downloadWeek": "تنزيل الأسبوع",
+    "downloadWeekTitle": "تنزيل جميع خطط هذا الأسبوع بصيغة PDF",
     "card": {
       "year": "السنة {n}",
       "plan": "تخطيط",
@@ -52,7 +58,8 @@
     },
     "statusView": {
       "none": "لا شيء",
-      "more": "{count, plural, other {+ {value} أخرى}}",
+      "showAll": "عرض الكل",
+      "showLess": "عرض أقل",
       "moveError": "تعذّر نقل الدرس.",
       "statusError": "تعذّر تحديث الحالة.",
       "openPlan": "افتح الخطة",

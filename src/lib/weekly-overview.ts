@@ -12,7 +12,8 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { resolveTermWeek } from '@/lib/term-week';
-import { getCurriculumNav, getCurriculumWeekCells } from '@/lib/curriculumUtils';
+import { getCurriculumNav } from '@/lib/curriculumUtils';
+import { resolveWeekSlotKeys, selectWeekPlanRows } from '@/lib/weekly-overview-selection';
 import { initialsOf } from '@/components/weekly-overview/avatar';
 import type { PlanScope, PlanStatus } from '@/types/lesson';
 import type {
@@ -21,6 +22,7 @@ import type {
   BoardData,
   BoardLesson,
   BoardPlan,
+  BoardWeekOption,
   BoardYear,
   PlanOwner,
 } from '@/types/weekly-overview';
@@ -102,6 +104,7 @@ function emptyBoard(teacherName: string, subjectName = '', subjectCode = ''): Bo
     isCurrent: false,
     prev: null,
     next: null,
+    weeks: [],
     years: [],
     owners: [],
     planCount: 0,
@@ -296,6 +299,15 @@ export async function getBoardData(input: {
     };
   }
 
+  // The month → week picker's options: every coordinate in scheme-of-work order,
+  // each tagged with its flat teaching-week number (position + 1). This is the
+  // SAME ordering that derives `weekNo` below, so picker and arrows never disagree.
+  const weeks: BoardWeekOption[] = coords.map((c, i) => ({
+    month: c.month,
+    week: c.week,
+    weekNo: i + 1,
+  }));
+
   // Resolve the selected coordinate from the params (snap to a real one).
   let index = coords.findIndex((c) => c.month === input.month && c.week === input.week);
   if (index === -1) index = 0;
@@ -311,37 +323,24 @@ export async function getBoardData(input: {
   const { mondayDate, isCurrent } = await resolveTermWeek(supabase, weekNo);
 
   // The curriculum lessons (P1..P5) for each taught year at the selected
-  // coordinate — the "+ Add lesson" pool and the join target for the plans.
-  const cellsByYear = await Promise.all(
-    years.map((y) => getCurriculumWeekCells(subjectCode, y, coordinate.month, coordinate.week)),
+  // coordinate — the "+ Add lesson" pool and the join target for the plans. The
+  // coordinate → lesson-key expansion is shared with the weekly PDF export
+  // (resolveWeekSlotKeys) so the two never diverge on a coordinate's plan set.
+  const { slotKeys, periodByKey, outcomeByKey, cellsByYear } = await resolveWeekSlotKeys(
+    subjectCode,
+    years,
+    coordinate.month,
+    coordinate.week,
   );
-
-  // Every lesson key across the board — the join target for the visible plans, and
-  // a lookup from a plan's curriculum_lesson_id back to its curriculum period.
-  const slotKeys = new Set<string>();
-  const periodByKey = new Map<string, number>();
-  const outcomeByKey = new Map<string, string>();
-  for (const cells of cellsByYear) {
-    for (const cell of cells) {
-      slotKeys.add(cell.lessonKey);
-      periodByKey.set(cell.lessonKey, cell.period);
-      outcomeByKey.set(cell.lessonKey, cell.dailyOutcome);
-    }
-  }
 
   // All plans (any scope) the teacher can see whose curriculum_lesson_id is one of
   // the week's lesson keys. RLS enforces visibility; legacy plans whose key matches
   // no lesson simply never load. Skip the query entirely when there are no lessons.
-  let planRows: PlanRow[] = [];
-  if (slotKeys.size > 0) {
-    const { data: plans } = await supabase
-      .from('lesson_plans')
-      .select(
-        'id, curriculum_lesson_id, scope, class_id, school_id, subject_id, year, weekday, period, status, review_note, created_by',
-      )
-      .in('curriculum_lesson_id', [...slotKeys]);
-    planRows = (plans ?? []) as unknown as PlanRow[];
-  }
+  const planRows = await selectWeekPlanRows<PlanRow>(
+    supabase,
+    slotKeys,
+    'id, curriculum_lesson_id, scope, class_id, school_id, subject_id, year, weekday, period, status, review_note, created_by',
+  );
 
   // Resolve plan owners (avatar + people filter). One read for the distinct
   // creators; the co-member profiles policy (0013) lets a teammate's id + name be
@@ -414,6 +413,7 @@ export async function getBoardData(input: {
     isCurrent,
     prev,
     next,
+    weeks,
     years: yearBands,
     owners,
     planCount: planRows.length,

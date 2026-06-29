@@ -1,39 +1,69 @@
-// GET /api/pdf/week?classId=...&week=YYYY-MM-DD
+// GET /api/pdf/week?subject=<code>&subjectName=<label>&years=2,3&month=March&week=2&weekNo=12
 //
-// Every plan for one class in a week (Mon–Fri), one per page, as a single inline
-// PDF for batch printing. `week` may be any date in the target week; it is
-// normalised to that week's Monday. Plans are loaded through the auth'd server
-// client (RLS). Needs the Node runtime for react-pdf and per-request rendering.
+// Every plan visible at a board coordinate — one subject space, one curriculum
+// week — one plan per page, as a single inline PDF for batch printing. This
+// mirrors what the planning board shows right now: selection runs through the
+// board's shared `(subject space · years · month · week) → curriculum_lesson
+// keys → WHERE curriculum_lesson_id IN (...)` path (RLS scopes class/centre/org
+// visibility; there is no class or date filter). Needs the Node runtime for
+// react-pdf and per-request rendering.
 
 import { createElement } from 'react';
+import { createClient } from '@/lib/supabase/server';
 import { WeekLessonPlansDocument } from '@/lib/pdf/LessonPlanDocument';
 import { loadWeekPdfModels } from '@/lib/pdf/load';
 import { pdfResponse } from '@/lib/pdf/render';
-import { formatWeekRange, isValidISODate, mondayOf } from '@/lib/week';
+import { resolveTermWeek } from '@/lib/term-week';
+import { formatWeekRange } from '@/lib/week';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** Parse a "2,3,4" year list to distinct, sorted year numbers (0–6). */
+function parseYears(raw: string | null): number[] {
+  if (!raw) return [];
+  const years = raw
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  return [...new Set(years)].sort((a, b) => a - b);
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const classId = searchParams.get('classId');
-  const week = searchParams.get('week');
+  const subjectCode = searchParams.get('subject');
+  const subjectName = searchParams.get('subjectName') ?? '';
+  const month = searchParams.get('month');
+  const week = Number(searchParams.get('week'));
+  const weekNo = Number(searchParams.get('weekNo'));
+  const years = parseYears(searchParams.get('years'));
 
-  if (!classId) {
-    return new Response('Missing required query param: classId', { status: 400 });
+  if (!subjectCode) {
+    return new Response('Missing required query param: subject', { status: 400 });
   }
-  if (!week || !isValidISODate(week)) {
-    return new Response('Missing or invalid query param: week (YYYY-MM-DD)', {
-      status: 400,
-    });
+  if (!month) {
+    return new Response('Missing required query param: month', { status: 400 });
+  }
+  if (!Number.isInteger(week) || week < 1) {
+    return new Response('Missing or invalid query param: week', { status: 400 });
   }
 
-  const monday = mondayOf(week);
-  const weekLabel = formatWeekRange(monday);
-  const models = await loadWeekPdfModels(classId, monday);
+  const models = await loadWeekPdfModels({ subjectCode, years, month, week });
 
+  // Reuse the board's date resolution: the teaching-week number maps to a real
+  // Monday via `term_week`. When that table has no row yet (the current state),
+  // fall back to the curriculum coordinate label so the header is never blank.
+  const coordinateLabel = `${month} · Week ${week}`;
+  let weekLabel = coordinateLabel;
+  if (Number.isInteger(weekNo) && weekNo > 0) {
+    const supabase = await createClient();
+    const { mondayDate } = await resolveTermWeek(supabase, weekNo);
+    weekLabel = mondayDate ? formatWeekRange(mondayDate) : `Week ${weekNo} · ${coordinateLabel}`;
+  }
+
+  const filenameStem = `${subjectCode}-${month}-w${week}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return pdfResponse(
-    createElement(WeekLessonPlansDocument, { models, weekLabel }),
-    `lesson-plans-${classId}-${monday}.pdf`,
+    createElement(WeekLessonPlansDocument, { models, weekLabel, subjectLabel: subjectName }),
+    `lesson-plans-${filenameStem}.pdf`,
   );
 }
