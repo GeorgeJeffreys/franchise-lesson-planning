@@ -22,6 +22,7 @@ import { skillKeyOf } from '@/components/curriculum/skill';
 import type { CurriculumLessonRow } from '@/lib/curriculum/types';
 import type {
   BrowseCoordinate,
+  BrowseMonthNav,
   BrowseRow,
   BrowseSubject,
   CurriculumBrowseData,
@@ -55,6 +56,17 @@ async function coordsForSubjectYear(
     .flatMap(({ month, weeks }) =>
       [...weeks].sort((a, b) => a - b).map((week) => ({ month, week })),
     );
+}
+
+/** Group ordered coordinates into the month picker's (month → weeks) option list. */
+function navFromCoords(coords: BrowseCoordinate[]): BrowseMonthNav[] {
+  const nav: BrowseMonthNav[] = [];
+  for (const c of coords) {
+    const last = nav[nav.length - 1];
+    if (last && last.month === c.month) last.weeks.push(c.week);
+    else nav.push({ month: c.month, weeks: [c.week] });
+  }
+  return nav;
 }
 
 /** First non-empty cleaned value of a column across the week's rows, else null. */
@@ -114,6 +126,7 @@ const EMPTY: CurriculumBrowseData = {
   selected: { subjectCode: '', subjectName: '', year: 0, month: '', week: 0 },
   prev: null,
   next: null,
+  nav: [],
   topicChip: null,
   weekly: { skills: null, knowledge: null },
   monthly: { combined: null, knowledge: null, skills: null },
@@ -211,6 +224,7 @@ export async function getCurriculumBrowseData(input: {
     },
     prev,
     next,
+    nav: navFromCoords(coords),
     topicChip: predominantTheme(weekRows),
     weekly: {
       skills: firstOutcome(weekRows, (r) => r.weekly_skills_lo),

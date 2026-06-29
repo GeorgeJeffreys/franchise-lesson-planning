@@ -23,6 +23,12 @@ export interface BrowseCoordinate {
   week: number;
 }
 
+/** A month with its available week numbers — the month picker's option list. */
+export interface BrowseMonthNav {
+  month: string;
+  weeks: number[];
+}
+
 /** The four macro linguistic skills, plus a neutral fallback for anything else. */
 export type SkillKey = 'reading' | 'writing' | 'listening' | 'speaking' | 'other';
 
@@ -82,6 +88,9 @@ export interface CurriculumBrowseData {
   /** Adjacent coordinates within the subject+year (null at the ends). */
   prev: BrowseCoordinate | null;
   next: BrowseCoordinate | null;
+  /** All (month → weeks) coordinates for the selection, in scheme-of-work order —
+   *  the month picker + week selector's option lists. */
+  nav: BrowseMonthNav[];
   /** Predominant theme for the week (the header topic chip). Null when none. */
   topicChip: string | null;
   weekly: WeeklyOutcome;

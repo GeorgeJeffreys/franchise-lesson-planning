@@ -12,8 +12,9 @@
       "title": "No curriculum synced yet",
       "body": "{hasSubject, select, yes {<s>{subject}</s> has} other {This subject has}} no curriculum lessons synced for the years you teach. Once a coordinator syncs the curriculum, your board will fill in."
     },
-    "people": {
-      "everyone": "Everyone"
+    "yearFilter": {
+      "label": "Year group",
+      "allYears": "All years"
     },
     "weekNav": {
       "previousWeek": "Previous week",

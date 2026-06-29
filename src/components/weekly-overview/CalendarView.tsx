@@ -320,7 +320,14 @@ function DayColumn({
   const label = colDate
     ? t('column.periodWithDate', {
         n: period,
-        date: formatDate(colDate, locale, { weekday: 'short', month: 'short', day: 'numeric' }),
+        // No year in the column header — `year: undefined` overrides formatDate's
+        // default so it reads "Mon, Dec 15" rather than "Mon, Dec 15, 2025".
+        date: formatDate(colDate, locale, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: undefined,
+        }),
       })
     : t('column.period', { n: period });
 

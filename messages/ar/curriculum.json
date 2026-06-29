@@ -6,6 +6,8 @@
     "yearLabel": "السنة",
     "year": "السنة {n}",
     "weekWithMonth": "الأسبوع {n} · <m>{month}</m>",
+    "week": "الأسبوع {n}",
+    "monthLabel": "الشهر",
     "prevWeek": "الأسبوع السابق",
     "nextWeek": "الأسبوع التالي",
     "monthlyOutcome": "الناتج الشهري · {month}",

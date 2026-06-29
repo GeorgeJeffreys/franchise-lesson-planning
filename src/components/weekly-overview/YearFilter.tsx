@@ -1,28 +1,32 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
-import type { PlanOwner } from '@/types/weekly-overview';
+import { formatNumber } from '@/lib/format';
 
-/** Sentinel value for the unfiltered (default) state. */
-export const EVERYONE = 'everyone';
+/** Sentinel value for the unfiltered (all year groups) default. */
+export const ALL_YEARS = 'all';
 
 /**
- * The "Everyone" people dropdown — filters the week's plans by owner (created_by).
- * Lists every owner who has a plan in the loaded week, plus the default
- * "Everyone". A pure view filter over already-loaded data (no re-fetch).
+ * The board's year-group dropdown — narrows the board to a single taught year, or
+ * "All years" (the default). Replaces the old people/owner filter. A pure view
+ * filter over already-loaded data (no re-fetch); the option list is the years the
+ * teacher actually teaches this week.
  */
-export function PeopleFilter({
-  owners,
+export function YearFilter({
+  years,
   value,
   onChange,
 }: {
-  owners: PlanOwner[];
-  value: string;
-  onChange: (value: string) => void;
+  /** The taught year groups (0–6), ascending — the dropdown's options. */
+  years: number[];
+  /** Current selection: `ALL_YEARS` or a year number. */
+  value: number | typeof ALL_YEARS;
+  onChange: (value: number | typeof ALL_YEARS) => void;
 }) {
   const t = useTranslations('board');
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,19 +39,20 @@ export function PeopleFilter({
     return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  const everyone = t('people.everyone');
-  const label = value === EVERYONE ? everyone : owners.find((o) => o.id === value)?.name ?? everyone;
+  const allYears = t('yearFilter.allYears');
+  const label = value === ALL_YEARS ? allYears : t('card.year', { n: formatNumber(value, locale) });
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-label={t('yearFilter.label')}
         className="inline-flex items-center gap-[7px] rounded-[9px] border border-border-strong bg-surface px-[12px] py-[8px] text-[12.5px] font-semibold text-neutral-900 transition-colors hover:bg-surface-subtle"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8A8178" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="9" cy="8" r="3" />
-          <path d="M3 19a6 6 0 0 1 12 0M16 7a3 3 0 0 1 0 6M21 19a6 6 0 0 0-4-5.6" />
+          <rect x="3" y="4" width="18" height="5" rx="1.5" />
+          <rect x="3" y="13" width="18" height="5" rx="1.5" />
         </svg>
         {label}
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -55,22 +60,22 @@ export function PeopleFilter({
         </svg>
       </button>
       {open ? (
-        <div className="absolute start-0 z-30 mt-[4px] max-h-[260px] min-w-[180px] overflow-y-auto rounded-[10px] border border-border bg-surface py-[4px] shadow-card">
+        <div className="absolute start-0 z-30 mt-[4px] max-h-[260px] min-w-[160px] overflow-y-auto rounded-[10px] border border-border bg-surface py-[4px] shadow-card">
           <Option
-            label={everyone}
-            active={value === EVERYONE}
+            label={allYears}
+            active={value === ALL_YEARS}
             onClick={() => {
-              onChange(EVERYONE);
+              onChange(ALL_YEARS);
               setOpen(false);
             }}
           />
-          {owners.map((o) => (
+          {years.map((y) => (
             <Option
-              key={o.id}
-              label={o.name}
-              active={value === o.id}
+              key={y}
+              label={t('card.year', { n: formatNumber(y, locale) })}
+              active={value === y}
               onClick={() => {
-                onChange(o.id);
+                onChange(y);
                 setOpen(false);
               }}
             />

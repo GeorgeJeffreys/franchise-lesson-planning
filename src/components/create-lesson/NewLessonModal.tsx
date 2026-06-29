@@ -455,7 +455,7 @@ function LessonStep({
   cells: PickerCell[];
   loading: boolean;
   selectedLessonKey: string | null;
-  onSelect: (lessonKey: string) => void;
+  onSelect: (lessonKey: string | null) => void;
 }) {
   const t = useTranslations('board');
   const locale = useLocale();
@@ -562,7 +562,10 @@ function LessonStep({
                 key={cell.lessonKey}
                 cell={cell}
                 selected={cell.lessonKey === selectedLessonKey}
-                onSelect={() => onSelect(cell.lessonKey)}
+                // Clicking the selected card again toggles it back off (deselect).
+                onSelect={() =>
+                  onSelect(cell.lessonKey === selectedLessonKey ? null : cell.lessonKey)
+                }
               />
             ))}
           </div>
@@ -587,8 +590,12 @@ function PeriodCard({
   return (
     <div
       className={cn(
-        'flex h-[210px] min-w-[168px] flex-1 flex-col rounded-[14px] border p-[16px] transition-colors',
-        selected ? 'border-[1.5px] border-teal bg-teal-tint' : 'border-given-border bg-given',
+        'flex flex-1 flex-col rounded-[14px] border p-[16px] transition-all',
+        // The selected card grows a little wider and un-clamps its LO so the full
+        // outcome is readable; unselected cards stay a fixed height with a 4-line clamp.
+        selected
+          ? 'min-w-[260px] border-[1.5px] border-teal bg-teal-tint'
+          : 'h-[210px] min-w-[168px] border-given-border bg-given',
       )}
     >
       <div
@@ -599,12 +606,15 @@ function PeriodCard({
       >
         {t('modal.periodCard.period', { n: formatNumber(cell.period, locale) })}
       </div>
-      {/* Clamp the Daily LO to keep every card the same height; the full text
-          stays available on hover via the native title tooltip. */}
+      {/* Unselected cards clamp the Daily LO to a fixed 4 lines (full text on hover
+          via the native title tooltip); the selected card un-clamps to show it all. */}
       <p
         dir="auto"
         title={cell.dailyOutcome || undefined}
-        className="mt-[10px] line-clamp-4 text-[14px] font-normal leading-[1.4] text-ink"
+        className={cn(
+          'mt-[10px] text-[14px] font-normal leading-[1.4] text-ink',
+          selected ? '' : 'line-clamp-4',
+        )}
       >
         {cell.dailyOutcome || t('modal.periodCard.untitled')}
       </p>

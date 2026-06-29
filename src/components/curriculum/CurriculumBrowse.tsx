@@ -34,7 +34,10 @@ export function CurriculumBrowse({ data }: { data: CurriculumBrowseData }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[18px] border border-border bg-surface shadow-card">
+    // No `overflow-hidden` here: an overflow-clipping ancestor would trap the
+    // IN-FOCUS panel's `position: sticky` inside this card. The rounded corners are
+    // still respected by the bordered header / inner table, which clip their own.
+    <div className="rounded-[18px] border border-border bg-surface shadow-card">
       <Header data={data} />
       <div className="border-t border-border p-[22px]">
         <OutcomePanels data={data} />
@@ -66,6 +69,12 @@ function Header({ data }: { data: CurriculumBrowseData }) {
   const coordHref = (c: BrowseCoordinate) =>
     `/curriculum?subject=${encodeURIComponent(subjectCode)}&year=${year}&month=${encodeURIComponent(c.month)}&week=${c.week}`;
 
+  // Picking a month jumps to its first available week (the scheme-of-work order).
+  const onMonth = (m: string) => {
+    const firstWeek = data.nav.find((n) => n.month === m)?.weeks[0] ?? week;
+    router.push(coordHref({ month: m, week: firstWeek }));
+  };
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-[14px] px-[22px] py-[15px]">
       <div className="flex flex-wrap items-center gap-[12px]">
@@ -84,16 +93,20 @@ function Header({ data }: { data: CurriculumBrowseData }) {
             label: t('year', { n: formatNumber(y, locale) }),
           }))}
         />
+        {/* Month picker + week selector — mirrors the new-lesson modal's
+            "January ▾" + "‹ Week N ›" pattern, both driving ?month=&week=. */}
+        {data.nav.length > 0 ? (
+          <Selector
+            ariaLabel={t('monthLabel')}
+            value={month}
+            onChange={onMonth}
+            options={data.nav.map((n) => ({ value: n.month, label: n.month }))}
+          />
+        ) : null}
         <div className="flex items-center gap-[6px]">
           <NavArrow href={data.prev ? coordHref(data.prev) : null} label={t('prevWeek')} dir="left" />
-          <span className="min-w-[160px] text-center text-[15px] font-semibold tracking-[-0.01em]">
-            {month
-              ? t.rich('weekWithMonth', {
-                  n: formatNumber(week, locale),
-                  month,
-                  m: (chunks) => <span className="font-normal text-neutral-600">{chunks}</span>,
-                })
-              : '—'}
+          <span className="min-w-[88px] text-center text-[15px] font-semibold tracking-[-0.01em]">
+            {month ? t('week', { n: formatNumber(week, locale) }) : '—'}
           </span>
           <NavArrow href={data.next ? coordHref(data.next) : null} label={t('nextWeek')} dir="right" />
         </div>
@@ -245,6 +258,25 @@ function stripBullet(line: string): string {
   return line.replace(/^\.\s*/, '').trim();
 }
 
+/**
+ * Split a daily Learning Outcome into its individual LOs. The source marks each LO
+ * with a line-leading ". " bullet (cleanLO strips only the first), so distinct LOs
+ * are delimited by a newline that introduces a fresh ". "-led outcome. We split on
+ * exactly that, leaving any non-bulleted continuation (e.g. an attached "Time
+ * Distribution" note) joined to its LO.
+ *
+ * NB: a ";" is NOT a separator here — in the source it only ever appears mid-clause
+ * (e.g. "Write a letter; explaining, apologising…"), so splitting on it would tear
+ * a single outcome apart. A single segment renders as plain text (no orphan bullet).
+ */
+function splitDailyLOs(text: string): string[] {
+  if (!text) return [];
+  return text
+    .split(/\n(?=\s*\.\s)/)
+    .map((s) => stripBullet(s.trim()))
+    .filter(Boolean);
+}
+
 /** Split a section body into individual LOs — one per non-empty line. */
 function splitSectionLOs(body: string): string[] {
   return body
@@ -388,6 +420,28 @@ function OutcomeValue({ value, className }: { value: string | null; className?: 
   );
 }
 
+/**
+ * Render a daily Learning Outcome, splitting a multi-LO day into one bullet per LO.
+ * A single LO renders as plain inline text (no orphan bullet). Text size/weight is
+ * inherited from the parent cell so this works in both the table and the focus card.
+ */
+function DailyOutcome({ text }: { text: string }) {
+  const los = splitDailyLOs(text);
+  if (los.length <= 1) {
+    return <span dir="auto">{los[0] ?? text}</span>;
+  }
+  return (
+    <ul className="space-y-[5px]">
+      {los.map((lo, i) => (
+        <li key={i} dir="auto" className="flex gap-[8px]">
+          <span aria-hidden className="mt-[8px] size-[4px] shrink-0 rounded-full bg-[#a6794f]" />
+          <span>{lo}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ── Week grid: table + focus card ───────────────────────────────────────────────
 
 function WeekGrid({ data }: { data: CurriculumBrowseData }) {
@@ -454,12 +508,13 @@ function WeekTable({
         <thead>
           <tr className="bg-surface-cream">
             {/* LEARNING OUTCOME holds the long, most-read text — let it take all the
-                remaining width; the other columns are squeezed to fixed widths. */}
-            <Th className="w-[76px]">{t('table.day')}</Th>
+                remaining width; the other columns are squeezed to tight fixed widths
+                so the LO column is clearly the widest. */}
+            <Th className="w-[56px]">{t('table.day')}</Th>
             <Th className="w-auto">{t('table.learningOutcome')}</Th>
-            <Th className="w-[88px]">{t('table.skill')}</Th>
-            <Th className="w-[132px]">{t('table.topic')}</Th>
-            <Th className="w-[140px]">{t('table.resources')}</Th>
+            <Th className="w-[76px]">{t('table.skill')}</Th>
+            <Th className="w-[96px]">{t('table.topic')}</Th>
+            <Th className="w-[104px]">{t('table.resources')}</Th>
           </tr>
         </thead>
         <tbody>
@@ -491,7 +546,11 @@ function WeekTable({
                   {t(`daysShort.${row.weekday}`)}
                 </td>
                 <td className={cn('px-[16px] py-[14px] align-top text-[13.5px] leading-[1.45] text-ink', tint)}>
-                  <span dir="auto">{row.dailyOutcome || t('empty')}</span>
+                  {row.dailyOutcome ? (
+                    <DailyOutcome text={row.dailyOutcome} />
+                  ) : (
+                    <span>{t('empty')}</span>
+                  )}
                 </td>
                 <td className={cn('px-[16px] py-[14px] align-top text-[13px] font-medium', tint)}>
                   {row.linguisticSkill ? (
@@ -505,10 +564,13 @@ function WeekTable({
                 {topic ? (
                   <td
                     rowSpan={topic.rowSpan}
-                    className="border-s border-border bg-surface-subtle px-[16px] py-[14px] align-top"
+                    className="px-[16px] py-[14px] align-top"
                   >
                     {topic.theme ? (
-                      <span dir="auto" className="text-[13px] font-semibold text-teal-deep">
+                      // Topic is curriculum content, not a tool/action — render it at
+                      // the same weight/colour as the other content cells (no teal,
+                      // no highlighted column background).
+                      <span dir="auto" className="text-[13px] text-neutral-700">
                         {topic.theme}
                       </span>
                     ) : null}
@@ -601,9 +663,9 @@ function FocusCard({ row }: { row: BrowseRow }) {
         <p className="mt-[14px] text-[10.5px] font-semibold uppercase tracking-[0.06em] text-neutral-500">
           {t('focus.dailyOutcome')}
         </p>
-        <p dir="auto" className="mt-[6px] text-[16px] font-semibold leading-[1.35] text-ink">
-          {row.dailyOutcome || t('empty')}
-        </p>
+        <div className="mt-[6px] text-[16px] font-semibold leading-[1.35] text-ink">
+          {row.dailyOutcome ? <DailyOutcome text={row.dailyOutcome} /> : t('empty')}
+        </div>
 
         {row.resources.length > 0 ? (
           <>

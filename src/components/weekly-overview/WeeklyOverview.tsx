@@ -6,7 +6,7 @@ import { CalendarView } from '@/components/weekly-overview/CalendarView';
 import { StatusView } from '@/components/weekly-overview/StatusView';
 import { WeekNav } from '@/components/weekly-overview/WeekNav';
 import { ViewToggle } from '@/components/weekly-overview/ViewToggle';
-import { PeopleFilter, EVERYONE } from '@/components/weekly-overview/PeopleFilter';
+import { YearFilter, ALL_YEARS } from '@/components/weekly-overview/YearFilter';
 import { ScopeChooserProvider } from '@/components/weekly-overview/ScopeChooser';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { BoardData } from '@/types/weekly-overview';
@@ -28,7 +28,9 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
   const t = useTranslations('board');
   const locale = useLocale();
   const [view, setView] = useState<View>(initialView);
-  const [owner, setOwner] = useState<string>(EVERYONE);
+  // Year-group filter: ALL_YEARS (default) or a single taught year. A pure view
+  // filter over the loaded year bands — no re-fetch.
+  const [yearGroup, setYearGroup] = useState<number | typeof ALL_YEARS>(ALL_YEARS);
 
   const changeView = useCallback(
     (next: View) => {
@@ -44,7 +46,13 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
     [data.coordinate],
   );
 
-  const ownerId = owner === EVERYONE ? null : owner;
+  // The year bands actually shown, after the year-group filter. The whole-week PDF
+  // export still targets every band (it mirrors the curriculum week, not the view).
+  const visibleYears = useMemo(
+    () => (yearGroup === ALL_YEARS ? data.years : data.years.filter((b) => b.year === yearGroup)),
+    [data.years, yearGroup],
+  );
+  const yearOptions = useMemo(() => data.years.map((b) => b.year), [data.years]);
 
   // "Download week" target: the board's currently-viewed coordinate, passed to the
   // /api/pdf/week route exactly as state the board already holds (subject space,
@@ -67,15 +75,13 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
   const canDownloadWeek =
     data.hasClasses && data.coordinate.month !== '' && data.years.length > 0;
 
-  // Plans shown after the owner filter (Not started cards are unaffected).
+  // Plans shown after the year-group filter (Not started cards are unaffected).
   const planCount = useMemo(() => {
-    if (ownerId === null) return data.planCount;
+    if (yearGroup === ALL_YEARS) return data.planCount;
     let n = 0;
-    for (const band of data.years) {
-      for (const p of band.plans) if (p.owner?.id === ownerId) n++;
-    }
+    for (const band of visibleYears) n += band.plans.length;
     return n;
-  }, [data.years, data.planCount, ownerId]);
+  }, [visibleYears, data.planCount, yearGroup]);
 
   return (
     <ScopeChooserProvider
@@ -104,7 +110,7 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-[14px]">
-            <PeopleFilter owners={data.owners} value={owner} onChange={setOwner} />
+            <YearFilter years={yearOptions} value={yearGroup} onChange={setYearGroup} />
             <WeekNav
               weekNo={data.weekNo}
               isCurrent={data.isCurrent}
@@ -166,15 +172,15 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
           <EmptyCurriculum subjectName={data.subjectName} />
         ) : view === 'status' ? (
           <StatusView
-            years={data.years}
-            ownerId={ownerId}
+            years={visibleYears}
+            ownerId={null}
             subjectName={data.subjectName}
             readOnly={data.boardReadOnly}
           />
         ) : (
           <CalendarView
-            years={data.years}
-            ownerId={ownerId}
+            years={visibleYears}
+            ownerId={null}
             subjectName={data.subjectName}
             mondayDate={data.mondayDate}
             readOnly={data.boardReadOnly}

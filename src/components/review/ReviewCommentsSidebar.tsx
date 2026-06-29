@@ -101,7 +101,7 @@ export function ReviewCommentsSidebar({
   return (
     <section
       aria-label={t('comments.title')}
-      className="flex flex-col overflow-hidden rounded-[16px] border border-border bg-surface lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]"
+      className="flex flex-col overflow-hidden rounded-[16px] border border-border bg-surface lg:sticky lg:top-[80px] lg:max-h-[calc(100vh-96px)]"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-border px-[18px] py-[14px]">

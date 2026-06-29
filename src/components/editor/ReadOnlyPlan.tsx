@@ -99,40 +99,46 @@ export function ReadOnlyPlan({
 
   return (
     <div className="mx-auto -my-8 max-w-[1340px]">
-      {/* Content column + reserved right rail. On large screens the content sits in
-          a width-capped left column so a ~360px comments rail (a later slice) can
-          slot beside it via `rightRail` without reflowing the plan body. */}
-      <div className="lg:flex lg:items-start lg:gap-6">
-        <div className="min-w-0 lg:flex-1 lg:max-w-[940px]">
-          {decisionBar}
-          <div className="border-b border-[#EFE8DD] px-[22px] py-4 lg:px-[30px]">
-        <Link
-          href="/"
-          className="mb-2.5 inline-flex items-center gap-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:text-ink"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          This week
-        </Link>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-[10px]">
-            <span className="text-[19px] font-semibold">
-              Year {classContext.year}
-              {groupSuffix ? ` · ${groupSuffix}` : ''}
-            </span>
-            {context ? <span className="text-[13px] text-neutral-600">{context}</span> : null}
-            <span className="rounded-badge bg-[#F3ECE2] px-[9px] py-[3px] text-[11px] font-bold uppercase tracking-[0.04em] text-neutral-600">
-              Read only · {SCOPE_LABEL[classContext.scope]}
+      {/* The decision bar + plan header sit ABOVE the content/rail split, width-capped
+          to the content column. That way the comments rail (right, below) top-aligns
+          with the lesson content block (DAILY OUTCOME / GRAMMAR & VOCAB / THEME row)
+          rather than with the back-link header. */}
+      <div className="lg:max-w-[940px]">
+        {decisionBar}
+        <div className="border-b border-[#EFE8DD] px-[22px] py-4 lg:px-[30px]">
+          <Link
+            href="/"
+            className="mb-2.5 inline-flex items-center gap-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:text-ink"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            This week
+          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-[10px]">
+              <span className="text-[19px] font-semibold">
+                Year {classContext.year}
+                {groupSuffix ? ` · ${groupSuffix}` : ''}
+              </span>
+              {context ? <span className="text-[13px] text-neutral-600">{context}</span> : null}
+              <span className="rounded-badge bg-[#F3ECE2] px-[9px] py-[3px] text-[11px] font-bold uppercase tracking-[0.04em] text-neutral-600">
+                Read only · {SCOPE_LABEL[classContext.scope]}
+              </span>
+            </div>
+            <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
+              {total} / {IN_SESSION_TARGET_MINUTES} min
             </span>
           </div>
-          <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
-            {total} / {IN_SESSION_TARGET_MINUTES} min
-          </span>
         </div>
       </div>
 
-      <div className="px-[22px] pb-10 pt-[22px] lg:px-[30px]">
+      {/* Content column + reserved right rail. On large screens the content sits in a
+          width-capped left column so the ~360px comments rail slots beside it via
+          `rightRail` without reflowing the plan body. */}
+      <div className="lg:flex lg:items-start lg:gap-6">
+        <div className="min-w-0 lg:flex-1 lg:max-w-[940px]">
+          <div className="px-[22px] pb-10 pt-[22px] lg:px-[30px]">
         <CurriculumBand curriculum={curriculum} />
 
         <section className="mt-[24px]">
@@ -186,7 +192,9 @@ export function ReadOnlyPlan({
         </div>
 
         {rightRail ? (
-          <aside className="mt-6 lg:mt-0 lg:w-[360px] lg:flex-shrink-0">{rightRail}</aside>
+          // `lg:mt-[22px]` matches the content block's top padding so the rail's top
+          // lines up with the DAILY OUTCOME / GRAMMAR & VOCAB / THEME row.
+          <aside className="mt-6 lg:mt-[22px] lg:w-[360px] lg:flex-shrink-0">{rightRail}</aside>
         ) : null}
       </div>
     </div>

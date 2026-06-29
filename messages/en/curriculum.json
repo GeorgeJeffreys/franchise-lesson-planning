@@ -6,6 +6,8 @@
     "yearLabel": "Year",
     "year": "Year {n}",
     "weekWithMonth": "Week {n} · <m>{month}</m>",
+    "week": "Week {n}",
+    "monthLabel": "Month",
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
     "monthlyOutcome": "Monthly outcome · {month}",
