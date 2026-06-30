@@ -12,6 +12,8 @@
       "alignCentre": "محاذاة للوسط",
       "bulletList": "قائمة نقطية",
       "numberedList": "قائمة رقمية",
+      "undo": "تراجع (Ctrl Z)",
+      "redo": "إعادة (Ctrl Shift Z)",
       "insertImage": "إدراج صورة في هذا التمرين",
       "insertImageDisabled": "اختر تمريناً أولاً",
       "insertTextBox": "إدراج مربع نص في هذا التمرين",
@@ -43,6 +45,7 @@
     },
     "addExercise": {
       "button": "إضافة تمرين",
+      "addBlock": "إضافة كتلة",
       "chooseBank": "اختيار من بنك الموارد",
       "chooseBankHint": "ابحث في البنك المشترك حسب الوسم",
       "createNew": "إنشاء جديد",

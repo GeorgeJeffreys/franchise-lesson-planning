@@ -12,6 +12,8 @@
       "alignCentre": "Align centre",
       "bulletList": "Bullet list",
       "numberedList": "Numbered list",
+      "undo": "Undo (Ctrl Z)",
+      "redo": "Redo (Ctrl Shift Z)",
       "insertImage": "Insert image into this exercise",
       "insertImageDisabled": "Select an exercise first",
       "insertTextBox": "Insert text box into this exercise",
@@ -43,6 +45,7 @@
     },
     "addExercise": {
       "button": "Add exercise",
+      "addBlock": "Add block",
       "chooseBank": "Choose from resource bank",
       "chooseBankHint": "Search the shared bank by tag",
       "createNew": "Create new",

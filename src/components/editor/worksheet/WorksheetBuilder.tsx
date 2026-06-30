@@ -18,6 +18,7 @@
 // faceted modal) and "Create new" (inserts a Free block).
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -38,9 +39,9 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { FloatingElement, Worksheet, WorksheetDoc } from '@/types/lesson';
 import type { ResourceWithTags, TagsByDimension } from '@/types/resource';
 import {
-  appendBlock,
   clampGeom,
   duplicateBlock,
+  insertBlocksAt,
   isWorksheetEmpty,
   moveBlock,
   newFreeBlock,
@@ -88,9 +89,15 @@ export function WorksheetBuilder({
 }) {
   const t = useTranslations('worksheet');
   const [ws, setWs] = useState<Worksheet>(() => parseWorksheet(value));
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Which add-block menu is open, keyed by insertion index: a divider before
+  // block `i` uses `i`; the bottom "add another" / empty button uses
+  // `ws.blocks.length`. `null` = closed. Only one is ever open.
+  const [menuAt, setMenuAt] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  // Where a bank resource will land once the modal resolves (set when its menu
+  // item is clicked); null falls back to appending at the end.
+  const pendingInsertIndex = useRef<number | null>(null);
 
   // ── Zoom (actual CSS scale; default = fit-to-width) ───────────────────────
   const [zoom, setZoom] = useState(0.72);
@@ -135,13 +142,71 @@ export function WorksheetBuilder({
     wsRef.current = ws;
   }, [ws]);
 
+  // ── Combined undo/redo history ────────────────────────────────────────────
+  // One stack of whole-worksheet snapshots covers EVERYTHING: tiptap text edits
+  // (each block/text-box doc lives in the worksheet) AND block ops (add, remove,
+  // reorder, insert-between). So a single Cmd/Ctrl+Z reverses the last action
+  // whatever its type — tiptap's own per-editor history is disabled (see
+  // editorExtensions). Consecutive edits to the SAME surface within a short window
+  // coalesce into one step via `coalesceKey`, so undo doesn't crawl char-by-char;
+  // structural ops pass no key and are always discrete.
+  const HISTORY_LIMIT = 100;
+  const COALESCE_MS = 500;
+  const historyRef = useRef<{
+    past: Worksheet[];
+    future: Worksheet[];
+    lastKey: string | null;
+    lastTime: number;
+  }>({ past: [], future: [], lastKey: null, lastTime: 0 });
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const syncHistoryFlags = useCallback(() => {
+    const h = historyRef.current;
+    setCanUndo(h.past.length > 0);
+    setCanRedo(h.future.length > 0);
+  }, []);
+
   const commit = useCallback(
-    (next: Worksheet) => {
+    (next: Worksheet, coalesceKey?: string) => {
+      const h = historyRef.current;
+      const now = Date.now();
+      const coalesce =
+        !!coalesceKey && coalesceKey === h.lastKey && now - h.lastTime < COALESCE_MS;
+      if (!coalesce) {
+        h.past.push(wsRef.current);
+        if (h.past.length > HISTORY_LIMIT) h.past.shift();
+      }
+      h.future = [];
+      h.lastKey = coalesceKey ?? null;
+      h.lastTime = now;
       setWs(next);
       onChange(next);
+      syncHistoryFlags();
     },
-    [onChange],
+    [onChange, syncHistoryFlags],
   );
+
+  const undo = useCallback(() => {
+    const h = historyRef.current;
+    if (h.past.length === 0) return;
+    const prev = h.past.pop() as Worksheet;
+    h.future.push(wsRef.current);
+    h.lastKey = null; // an undo always starts a fresh coalescing run
+    setWs(prev);
+    onChange(prev);
+    syncHistoryFlags();
+  }, [onChange, syncHistoryFlags]);
+
+  const redo = useCallback(() => {
+    const h = historyRef.current;
+    if (h.future.length === 0) return;
+    const next = h.future.pop() as Worksheet;
+    h.past.push(wsRef.current);
+    h.lastKey = null;
+    setWs(next);
+    onChange(next);
+    syncHistoryFlags();
+  }, [onChange, syncHistoryFlags]);
 
   // Resolve any From-bank resource ids we don't have yet.
   const resourceIds = useMemo(
@@ -227,6 +292,25 @@ export function WorksheetBuilder({
     return () => window.removeEventListener('keydown', onKey);
   }, [computeFit, maximised]);
 
+  // ── Keyboard undo/redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, Ctrl+Y) ─────────────
+  // Handled at the worksheet level for both text and block ops. Plain <input>/
+  // <textarea> fields (the AI prompt, the adjust box) keep their NATIVE undo;
+  // contenteditable (tiptap) surfaces route here, since their own history is off.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'z' && key !== 'y') return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      if (key === 'y' || (key === 'z' && e.shiftKey)) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+
   // ── Pinch-to-zoom on the canvas (non-passive wheel + Safari gestures) ──────
   useEffect(() => {
     const vp = viewportRef.current;
@@ -264,13 +348,19 @@ export function WorksheetBuilder({
   }, []);
 
   // ── Block actions ─────────────────────────────────────────────────────────
-  const createNew = useCallback(() => {
-    setMenuOpen(false);
-    commit(appendBlock(ws, newFreeBlock()));
-  }, [commit, ws]);
+  // All insert paths are index-aware: a block can be added at any position (a
+  // between-blocks divider) or appended (the bottom button / empty state).
+  const createNewAt = useCallback(
+    (index: number) => {
+      setMenuAt(null);
+      commit(insertBlocksAt(wsRef.current, index, [newFreeBlock()]));
+    },
+    [commit],
+  );
 
-  const chooseBank = useCallback(() => {
-    setMenuOpen(false);
+  const chooseBankAt = useCallback((index: number) => {
+    setMenuAt(null);
+    pendingInsertIndex.current = index;
     setModalOpen(true);
   }, []);
 
@@ -283,10 +373,10 @@ export function WorksheetBuilder({
     async (resource: ResourceWithTags) => {
       const built = await buildBlocksFromResource(resource);
       if (built.length > 0) {
-        let next = wsRef.current;
-        for (const block of built) next = appendBlock(next, block);
-        commit(next);
+        const index = pendingInsertIndex.current ?? wsRef.current.blocks.length;
+        commit(insertBlocksAt(wsRef.current, index, built));
       }
+      pendingInsertIndex.current = null;
       void recordUsageAction(resource.id, context.lessonPlanId);
       setModalOpen(false);
     },
@@ -297,7 +387,11 @@ export function WorksheetBuilder({
   // read the latest worksheet via wsRef rather than a captured snapshot.
   const changeFree = useCallback(
     (id: string, doc: WorksheetDoc, fromAI: boolean) => {
-      commit(updateBlock(wsRef.current, id, (b) => (b.kind === 'free' ? { ...b, doc, fromAI } : b)));
+      // Coalesce a run of keystrokes in the same block into one undo step.
+      commit(
+        updateBlock(wsRef.current, id, (b) => (b.kind === 'free' ? { ...b, doc, fromAI } : b)),
+        `doc:${id}`,
+      );
     },
     [commit],
   );
@@ -305,10 +399,15 @@ export function WorksheetBuilder({
   const deleteBlock = useCallback((id: string) => commit(removeBlock(wsRef.current, id)), [commit]);
   const duplicateFree = useCallback((id: string) => commit(duplicateBlock(wsRef.current, id)), [commit]);
 
-  // Lift a Free block's contained floating elements (text boxes / images).
+  // Lift a Free block's contained floating elements (text boxes / images). A
+  // coalesceKey is passed only for text-box typing (so it folds into one undo
+  // step); add/remove/move/style changes pass none and stay discrete.
   const onElementsChange = useCallback(
-    (blockId: string, elements: FloatingElement[]) => {
-      commit(updateBlock(wsRef.current, blockId, (b) => (b.kind === 'free' ? { ...b, elements } : b)));
+    (blockId: string, elements: FloatingElement[], coalesceKey?: string) => {
+      commit(
+        updateBlock(wsRef.current, blockId, (b) => (b.kind === 'free' ? { ...b, elements } : b)),
+        coalesceKey,
+      );
     },
     [commit],
   );
@@ -489,6 +588,10 @@ export function WorksheetBuilder({
           canInsert={!!active}
           onInsertImage={insertFloatingImage}
           onInsertTextBox={insertTextBox}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
       </div>
 
@@ -497,7 +600,7 @@ export function WorksheetBuilder({
         ref={viewportRef}
         className="ws-canvas ws-no-print"
         onClick={() => {
-          if (menuOpen) setMenuOpen(false);
+          if (menuAt !== null) setMenuAt(null);
           // Click-off deselects and commits the active box; it never creates one.
           setSelectedEl(null);
           setActive(null);
@@ -527,46 +630,58 @@ export function WorksheetBuilder({
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#5C544E' }}>{t('empty')}</div>
                     <AddExerciseMenu
                       variant="empty"
-                      open={menuOpen}
-                      onToggle={() => setMenuOpen((o) => !o)}
-                      onChooseBank={chooseBank}
-                      onCreateNew={createNew}
+                      open={menuAt === 0}
+                      onToggle={() => setMenuAt((cur) => (cur === 0 ? null : 0))}
+                      onChooseBank={() => chooseBankAt(0)}
+                      onCreateNew={() => createNewAt(0)}
                     />
                   </div>
                 ) : (
                   <>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                       <SortableContext items={ws.blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
                           {ws.blocks.map((block, i) => (
-                            <SortableBlock
-                              key={block.id}
-                              block={block}
-                              index={i}
-                              ctx={context}
-                              resource={block.kind === 'resource' ? resolved[block.resourceId] ?? null : null}
-                              resourceLoading={block.kind === 'resource' && !attempted.has(block.resourceId)}
-                              onChangeFree={changeFree}
-                              onElementsChange={onElementsChange}
-                              onDelete={deleteBlock}
-                              onDuplicateFree={duplicateFree}
-                              onActivate={onActivate}
-                              onDeactivate={onDeactivate}
-                              selectedElementId={selectedEl}
-                              onSelectElement={setSelectedEl}
-                              onElementDrop={onElementDrop}
-                              registerBox={registerBox}
-                            />
+                            <Fragment key={block.id}>
+                              {/* Insert-between affordance: a hover teal divider that
+                                  inserts a block at index `i` (any position). */}
+                              <AddExerciseMenu
+                                variant="divider"
+                                open={menuAt === i}
+                                onToggle={() => setMenuAt((cur) => (cur === i ? null : i))}
+                                onChooseBank={() => chooseBankAt(i)}
+                                onCreateNew={() => createNewAt(i)}
+                              />
+                              <SortableBlock
+                                block={block}
+                                index={i}
+                                ctx={context}
+                                resource={block.kind === 'resource' ? resolved[block.resourceId] ?? null : null}
+                                resourceLoading={block.kind === 'resource' && !attempted.has(block.resourceId)}
+                                onChangeFree={changeFree}
+                                onElementsChange={onElementsChange}
+                                onDelete={deleteBlock}
+                                onDuplicateFree={duplicateFree}
+                                onActivate={onActivate}
+                                onDeactivate={onDeactivate}
+                                selectedElementId={selectedEl}
+                                onSelectElement={setSelectedEl}
+                                onElementDrop={onElementDrop}
+                                registerBox={registerBox}
+                              />
+                            </Fragment>
                           ))}
                         </div>
                       </SortableContext>
                     </DndContext>
                     <AddExerciseMenu
                       variant="another"
-                      open={menuOpen}
-                      onToggle={() => setMenuOpen((o) => !o)}
-                      onChooseBank={chooseBank}
-                      onCreateNew={createNew}
+                      open={menuAt === ws.blocks.length}
+                      onToggle={() =>
+                        setMenuAt((cur) => (cur === ws.blocks.length ? null : ws.blocks.length))
+                      }
+                      onChooseBank={() => chooseBankAt(ws.blocks.length)}
+                      onCreateNew={() => createNewAt(ws.blocks.length)}
                     />
                   </>
                 )}

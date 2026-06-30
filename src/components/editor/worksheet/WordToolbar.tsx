@@ -263,6 +263,10 @@ export function WordToolbar({
   canInsert,
   onInsertImage,
   onInsertTextBox,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: {
   /** The active block's editor, or null when no block is focused. */
   editor: Editor | null;
@@ -272,6 +276,11 @@ export function WordToolbar({
   onInsertImage: () => void;
   /** Insert a floating text box into the active block. */
   onInsertTextBox: () => void;
+  /** Worksheet-level undo / redo (covers text edits AND block ops). */
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }) {
   const t = useTranslations('worksheet');
   useEditorTick(editor);
@@ -294,6 +303,21 @@ export function WordToolbar({
         borderBottom: '1px solid #EFE8DD',
       }}
     >
+      {/* Undo / redo — worksheet-level, so they work even when no block is
+          focused (e.g. to reverse an add/remove/reorder). */}
+      <IconButton title={t('toolbar.undo')} inert={!canUndo} onClick={onUndo}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-1" />
+        </svg>
+      </IconButton>
+      <IconButton title={t('toolbar.redo')} inert={!canRedo} onClick={onRedo}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 14l5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h1" />
+        </svg>
+      </IconButton>
+
+      <Divider />
+
       <HeadingDropdown editor={editor} />
       <FontSizeDropdown editor={editor} />
 

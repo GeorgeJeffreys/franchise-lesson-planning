@@ -20,7 +20,12 @@ export interface WorksheetEditorOptions {
 /** Build the extension list (a fresh array per editor instance). */
 export function worksheetEditorExtensions(opts: WorksheetEditorOptions = {}): AnyExtension[] {
   return [
-    StarterKit,
+    // History is disabled at the editor level: undo/redo is owned by the
+    // worksheet builder's combined history stack so a single Cmd/Ctrl+Z reverses
+    // the last action — a text edit OR a block op (add/remove/reorder/insert) —
+    // whatever its type, in true order. A per-editor history would fight that
+    // stack (double-undo) and could never see structural changes.
+    StarterKit.configure({ history: false }),
     Underline,
     TextStyle,
     Color,

@@ -36,7 +36,7 @@ export function SortableBlock({
   resource: ResourceWithTags | null;
   resourceLoading?: boolean;
   onChangeFree: (id: string, doc: WorksheetDoc, fromAI: boolean) => void;
-  onElementsChange: (blockId: string, elements: FloatingElement[]) => void;
+  onElementsChange: (blockId: string, elements: FloatingElement[], coalesceKey?: string) => void;
   onDelete: (id: string) => void;
   onDuplicateFree: (id: string) => void;
   onActivate: (api: ActiveBlock) => void;

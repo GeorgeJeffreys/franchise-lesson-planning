@@ -39,12 +39,52 @@ function isTiptapDoc(value: unknown): value is WorksheetDoc {
   );
 }
 
+type DocNode = { type?: string; attrs?: unknown; content?: unknown[] };
+
+/**
+ * Merge adjacent same-type list nodes (`orderedList` / `bulletList`) into one.
+ *
+ * The AI generator emits "simple markdown" where numbered items are often
+ * separated by blank lines; each gap closes the list, so a run of items becomes
+ * one single-item `<ol>` per item and every item renders as "1." Coalescing the
+ * contiguous run back into a single list node makes the numbering increment.
+ * Applied once at the JSON boundary (`parseWorksheet`) so the editor, the print
+ * view and the read-only preview all render the healed doc, and existing saved
+ * worksheets self-heal on load. Top-level lists only — the subset we emit.
+ */
+function coalesceDocLists(doc: WorksheetDoc): WorksheetDoc {
+  const content = doc.content;
+  if (!Array.isArray(content) || content.length === 0) return doc;
+  const merged: DocNode[] = [];
+  let changed = false;
+  for (const raw of content) {
+    const node = raw as DocNode;
+    const isList = node?.type === 'orderedList' || node?.type === 'bulletList';
+    const prev = merged[merged.length - 1];
+    if (
+      isList &&
+      prev &&
+      prev.type === node.type &&
+      JSON.stringify(prev.attrs ?? null) === JSON.stringify(node.attrs ?? null)
+    ) {
+      prev.content = [...(prev.content ?? []), ...(node.content ?? [])];
+      changed = true;
+    } else if (isList) {
+      // Shallow-clone list nodes so a later merge never mutates the source doc.
+      merged.push({ ...node, content: [...(node.content ?? [])] });
+    } else {
+      merged.push(node);
+    }
+  }
+  return changed ? { ...doc, content: merged } : doc;
+}
+
 /** Narrow an unknown array element to a valid WorksheetBlock, or null. */
 function asBlock(value: unknown): WorksheetBlock | null {
   if (typeof value !== 'object' || value === null) return null;
   const v = value as Record<string, unknown>;
   if (v.kind === 'free') {
-    const doc = isTiptapDoc(v.doc) ? v.doc : null;
+    const doc = isTiptapDoc(v.doc) ? coalesceDocLists(v.doc) : null;
     return {
       id: typeof v.id === 'string' ? v.id : newBlockId(),
       kind: 'free',
@@ -126,7 +166,7 @@ export function parseWorksheet(raw: unknown): Worksheet {
       const block: WorksheetFreeBlock = {
         id: newBlockId(),
         kind: 'free',
-        doc: obj,
+        doc: coalesceDocLists(obj),
         fromAI: false,
         elements: [],
       };
@@ -144,6 +184,19 @@ export function isWorksheetEmpty(ws: Worksheet): boolean {
 /** Append a block, returning a new worksheet. */
 export function appendBlock(ws: Worksheet, block: WorksheetBlock): Worksheet {
   return { ...ws, blocks: [...ws.blocks, block] };
+}
+
+/** Insert one or more blocks at `index` (clamped to [0, length]), returning a
+ *  new worksheet. Index === length appends. Drives "insert between blocks". */
+export function insertBlocksAt(
+  ws: Worksheet,
+  index: number,
+  newBlocks: WorksheetBlock[],
+): Worksheet {
+  const blocks = [...ws.blocks];
+  const i = Math.max(0, Math.min(index, blocks.length));
+  blocks.splice(i, 0, ...newBlocks);
+  return { ...ws, blocks };
 }
 
 /** Replace the block with `id` via an updater, returning a new worksheet. */

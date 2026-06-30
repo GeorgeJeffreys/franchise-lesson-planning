@@ -1,13 +1,22 @@
 'use client';
 
+import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-// The "+ Add exercise" affordance and its dropdown. Two visual variants share
-// the same menu: `empty` is the large teal button shown when the worksheet has
-// no exercises; `another` is the smaller dashed "add another" button shown below
-// the last block. The menu's two items — Choose from resource bank / Create new —
-// match the mockup copy exactly. Open state is owned by the parent so only one
-// menu is open at a time and an outside click can close it.
+// The "+ Add exercise" affordance and its dropdown. Three visual variants share
+// the same menu:
+//   • `empty`   — the large teal button shown when the worksheet has no exercises;
+//   • `another` — the smaller dashed "add another" button below the last block;
+//   • `divider` — a thin teal line + "+ Add block" pill revealed on hover BETWEEN
+//                 two blocks, so a block can be inserted at any index, not only
+//                 appended.
+// The menu's two items — Choose from resource bank / Create new — match the
+// mockup copy exactly. Open state is owned by the parent (keyed by insertion
+// index) so only one menu is open at a time and an outside click can close it.
+//
+// The dropdown is collision-aware: it opens downward by default but flips upward
+// when it would clip past the bottom of the scrollable worksheet canvas, so it is
+// always fully visible even when added near the bottom of the page.
 
 function BankIcon() {
   return (
@@ -28,19 +37,20 @@ function PenIcon() {
   );
 }
 
-function Menu({
-  onChooseBank,
-  onCreateNew,
-}: {
-  onChooseBank: () => void;
-  onCreateNew: () => void;
-}) {
+const Menu = forwardRef<
+  HTMLDivElement,
+  { onChooseBank: () => void; onCreateNew: () => void; placement: 'down' | 'up' }
+>(function Menu({ onChooseBank, onCreateNew, placement }, ref) {
   const t = useTranslations('worksheet');
   return (
     <div
+      ref={ref}
       style={{
         position: 'absolute',
-        top: 'calc(100% + 8px)',
+        // Collision-aware: open up or down so the menu is never clipped.
+        ...(placement === 'up'
+          ? { bottom: 'calc(100% + 8px)' }
+          : { top: 'calc(100% + 8px)' }),
         left: '50%',
         transform: 'translateX(-50%)',
         width: 260,
@@ -106,6 +116,43 @@ function Menu({
       </button>
     </div>
   );
+});
+
+/**
+ * Decide whether the open dropdown should hang below the trigger or flip above
+ * it. Measured against the scrollable worksheet canvas (the element that would
+ * actually clip it); falls back to the window. Runs in a layout effect so the
+ * flip is applied before paint — no downward flash.
+ */
+function useMenuPlacement(
+  open: boolean,
+  triggerRef: React.RefObject<HTMLElement | null>,
+  menuRef: React.RefObject<HTMLElement | null>,
+): 'down' | 'up' {
+  // Default to 'down'; a stale value while the menu is CLOSED is invisible, and on
+  // the next open the layout effect re-measures before paint (no flash).
+  const [placement, setPlacement] = useState<'down' | 'up'>('down');
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      const tRect = trigger.getBoundingClientRect();
+      const mRect = menu.getBoundingClientRect(); // on-screen (zoom-scaled) height
+      const scroller = trigger.closest('.ws-canvas') as HTMLElement | null;
+      const top = scroller ? scroller.getBoundingClientRect().top : 0;
+      const bottom = scroller ? scroller.getBoundingClientRect().bottom : window.innerHeight;
+      const spaceBelow = bottom - tRect.bottom;
+      const spaceAbove = tRect.top - top;
+      const needed = mRect.height + 16; // menu height + the 8px gap + a little slack
+      setPlacement(needed <= spaceBelow || spaceAbove <= spaceBelow ? 'down' : 'up');
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open, triggerRef, menuRef]);
+  return placement;
 }
 
 export function AddExerciseMenu({
@@ -115,13 +162,79 @@ export function AddExerciseMenu({
   onChooseBank,
   onCreateNew,
 }: {
-  variant: 'empty' | 'another';
+  variant: 'empty' | 'another' | 'divider';
   open: boolean;
   onToggle: () => void;
   onChooseBank: () => void;
   onCreateNew: () => void;
 }) {
   const t = useTranslations('worksheet');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const placement = useMenuPlacement(open, triggerRef, menuRef);
+  const [hover, setHover] = useState(false);
+
+  // ── Between-blocks divider ───────────────────────────────────────────────
+  if (variant === 'divider') {
+    const show = hover || open;
+    return (
+      <div
+        // Stop the canvas-level "close menu" / deselect handler from firing.
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{ position: 'relative', height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            insetInline: 0,
+            height: 2,
+            borderRadius: 2,
+            background: show ? '#1F7A6C' : 'transparent',
+            transition: 'background 120ms',
+          }}
+        />
+        {show ? (
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={onToggle}
+            title={t('addExercise.addBlock')}
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              fontFamily: 'inherit',
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: '#fff',
+              background: '#1F7A6C',
+              border: 'none',
+              padding: '4px 11px',
+              borderRadius: 999,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              boxShadow: '0 4px 10px -4px rgba(31,122,108,0.6)',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {t('addExercise.addBlock')}
+          </button>
+        ) : null}
+        {open ? (
+          <Menu ref={menuRef} onChooseBank={onChooseBank} onCreateNew={onCreateNew} placement={placement} />
+        ) : null}
+      </div>
+    );
+  }
+
+  // ── Empty-state / append-at-end button ───────────────────────────────────
   const empty = variant === 'empty';
   return (
     <div
@@ -130,6 +243,7 @@ export function AddExerciseMenu({
       onClick={(e) => e.stopPropagation()}
     >
       <button
+        ref={triggerRef}
         type="button"
         onClick={onToggle}
         style={
@@ -170,7 +284,9 @@ export function AddExerciseMenu({
         </svg>
         {t('addExercise.button')}
       </button>
-      {open ? <Menu onChooseBank={onChooseBank} onCreateNew={onCreateNew} /> : null}
+      {open ? (
+        <Menu ref={menuRef} onChooseBank={onChooseBank} onCreateNew={onCreateNew} placement={placement} />
+      ) : null}
     </div>
   );
 }

@@ -117,8 +117,9 @@ export function FreeBlock({
   index: number;
   ctx: WorksheetContext;
   onChange: (doc: WorksheetDoc, fromAI: boolean) => void;
-  /** Lift this block's floating elements for autosave. */
-  onElementsChange: (blockId: string, elements: FloatingElement[]) => void;
+  /** Lift this block's floating elements for autosave. `coalesceKey` folds a run
+   *  of related changes (e.g. text-box typing) into a single undo step. */
+  onElementsChange: (blockId: string, elements: FloatingElement[], coalesceKey?: string) => void;
   onDelete: () => void;
   onDuplicate: () => void;
   /** Register this block (or one of its text boxes) as the toolbar's target. */
@@ -175,7 +176,7 @@ export function FreeBlock({
   }, [block.elements]);
 
   const commitElements = useCallback(
-    (next: FloatingElement[]) => onElementsChange(block.id, next),
+    (next: FloatingElement[], coalesceKey?: string) => onElementsChange(block.id, next, coalesceKey),
     [block.id, onElementsChange],
   );
 
@@ -251,6 +252,13 @@ export function FreeBlock({
     [boxSize, cascadeGeom, commitElements, onSelectElement],
   );
 
+  // The last doc this editor itself emitted. With tiptap's own history disabled
+  // (undo/redo is owned by the builder), the editor is otherwise uncontrolled
+  // after mount — this ref lets the sync effect below tell apart "our own edit"
+  // (block.doc === what we emitted) from an EXTERNAL change (undo/redo restored a
+  // previous doc), and only push the latter back into tiptap.
+  const emittedDocRef = useRef<WorksheetDoc | null>(block.doc);
+
   const editor = useEditor({
     // handleFloatInline only runs from a NodeView button (an event), never during
     // render, and is stable — reading the latest elements via a ref inside it is safe.
@@ -259,8 +267,21 @@ export function FreeBlock({
     content: (block.doc as JSONContent | null) ?? '',
     immediatelyRender: false,
     editorProps: { attributes: { class: 'worksheet-doc' } },
-    onUpdate: ({ editor }) => onChange(editor.getJSON() as WorksheetDoc, fromAIRef.current),
+    onUpdate: ({ editor }) => {
+      const json = editor.getJSON() as WorksheetDoc;
+      emittedDocRef.current = json;
+      onChange(json, fromAIRef.current);
+    },
   });
+
+  // Re-sync the editor when block.doc changes from OUTSIDE this editor (undo/redo).
+  // setContent with emitUpdate=false avoids looping back through onUpdate.
+  useEffect(() => {
+    if (!editor) return;
+    if (block.doc === emittedDocRef.current) return;
+    emittedDocRef.current = block.doc;
+    editor.commands.setContent((block.doc as JSONContent | null) ?? '', false);
+  }, [block.doc, editor]);
 
   const setFrom = useCallback((value: boolean) => {
     fromAIRef.current = value;
@@ -310,7 +331,9 @@ export function FreeBlock({
       setNotesDismissed(false);
       setPreAdjust(null); // fresh generate clears any earlier undo snapshot
       setView('doc');
-      onChange(editor.getJSON() as WorksheetDoc, true);
+      const json = editor.getJSON() as WorksheetDoc;
+      emittedDocRef.current = json;
+      onChange(json, true);
     } catch (err) {
       setGenError(
         err instanceof GenerateResourceRequestError ? err.message : t('free.generateError'),
@@ -341,7 +364,9 @@ export function FreeBlock({
         setTeacherNotes(result.teacher_notes);
         setNotesDismissed(false);
         setAdjustText('');
-        onChange(editor.getJSON() as WorksheetDoc, true);
+        const json = editor.getJSON() as WorksheetDoc;
+        emittedDocRef.current = json;
+        onChange(json, true);
       } catch (err) {
         setAdjustError(
           err instanceof GenerateResourceRequestError ? err.message : t('free.adjustError'),
@@ -359,7 +384,9 @@ export function FreeBlock({
     setTeacherNotes(preAdjust.notes);
     setNotesDismissed(false);
     setPreAdjust(null);
-    onChange(editor.getJSON() as WorksheetDoc, true);
+    const json = editor.getJSON() as WorksheetDoc;
+    emittedDocRef.current = json;
+    onChange(json, true);
   }, [editor, preAdjust, onChange]);
 
   const toCompose = useCallback(() => {
@@ -415,6 +442,7 @@ export function FreeBlock({
       onDocChange: (id: string, doc: WorksheetDoc) =>
         commitElements(
           elementsRef.current.map((e) => (e.id === id && e.kind === 'textbox' ? { ...e, doc } : e)),
+          `eldoc:${id}`,
         ),
       onStyleChange: (id: string, patch: { border?: boolean; fill?: 'transparent' | 'white' }) =>
         commitElements(

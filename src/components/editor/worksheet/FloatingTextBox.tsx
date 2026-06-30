@@ -5,7 +5,7 @@
 // block on focus, so Paragraph / B / I / U / colour / align / lists all apply
 // inside it. Minimal style: a border on/off toggle and a transparent/white fill.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { generateHTML, type JSONContent } from '@tiptap/core';
@@ -58,13 +58,30 @@ export function FloatingTextBox({
   onDeactivate: (id: string) => void;
 }) {
   const t = useTranslations('worksheet');
+  // Tracks the last doc this editor emitted, so the sync effect below can tell a
+  // self-edit from an EXTERNAL change (undo/redo restored a previous doc) and push
+  // only the latter back into tiptap — its own history is disabled, the builder
+  // owns undo/redo.
+  const emittedDocRef = useRef<WorksheetDoc | null>(el.doc);
   const editor = useEditor({
     extensions: worksheetEditorExtensions(),
     content: (el.doc as JSONContent | null) ?? '',
     immediatelyRender: false,
     editorProps: { attributes: { class: 'worksheet-doc' } },
-    onUpdate: ({ editor }) => onDocChange(editor.getJSON() as WorksheetDoc),
+    onUpdate: ({ editor }) => {
+      const json = editor.getJSON() as WorksheetDoc;
+      emittedDocRef.current = json;
+      onDocChange(json);
+    },
   });
+
+  // Re-sync when el.doc changes from outside this editor (undo/redo).
+  useEffect(() => {
+    if (!editor) return;
+    if (el.doc === emittedDocRef.current) return;
+    emittedDocRef.current = el.doc;
+    editor.commands.setContent((el.doc as JSONContent | null) ?? '', false);
+  }, [el.doc, editor]);
 
   // Register as the toolbar's active context when focused: formatting targets this
   // box's editor, while inserts target the parent block.

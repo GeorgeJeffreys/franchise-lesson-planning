@@ -73,8 +73,12 @@ export function markdownToHtml(markdown: string): string {
     const line = rawLine.replace(/\s+$/, '');
 
     if (line.trim() === '') {
+      // A blank line ends a paragraph but NOT a list: AI markdown routinely puts
+      // blank lines between numbered items, and flushing here would emit one
+      // single-item <ol> per item (every item rendering as "1."). The list is
+      // instead closed when a non-list line (heading / bullet of the other kind /
+      // plain text) appears, or at end of input.
       flushPara();
-      flushList();
       continue;
     }
 
