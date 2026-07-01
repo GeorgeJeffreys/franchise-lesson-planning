@@ -85,14 +85,19 @@ export function ObjectiveStep({
   const editableRef = useRef<HTMLSpanElement>(null);
   const [focused, setFocused] = useState(false);
 
-  // The check feedback is collapsed behind a "+ FEEDBACK" disclosure: it appears
-  // only once a check has returned a result, and stays closed until opened.
+  // The check feedback is a "+ FEEDBACK" disclosure. It defaults closed (before any
+  // check has run), then auto-expands whenever a check returns results so the
+  // teacher sees the outcome without an extra click.
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     const el = editableRef.current;
     if (el && el.textContent !== remainder) el.textContent = remainder;
   }, [remainder]);
+
+  useEffect(() => {
+    if (checkResult) setFeedbackOpen(true);
+  }, [checkResult]);
 
   // Focus the editable region and drop the caret at the END of any existing text.
   // Used when the teacher clicks the fixed stem or the padding around the field —
@@ -189,11 +194,11 @@ export function ObjectiveStep({
         </div>
 
         {/* Feedback lives INSIDE the pink (teacher-editable) box, beneath "Check
-            my objective": a "+ Feedback" disclosure that surfaces only once a check
-            has returned a result, closed by default. Each bullet opens with the
+            my objective": a "+ Feedback" disclosure that surfaces once a check has
+            returned a result and auto-expands to show it. Each bullet opens with the
             SMARTT dimension it addresses in bold. */}
         {checkResult ? (
-          <div className="mt-[14px] border-t border-mine-field pt-[14px]">
+          <div className="mt-[14px]">
             <button
               type="button"
               onClick={() => setFeedbackOpen((open) => !open)}
