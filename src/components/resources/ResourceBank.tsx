@@ -475,6 +475,7 @@ export function ResourceBank({
       {uploadOpen ? (
         <UploadModal
           mode="create"
+          currentUserId={currentUserId}
           subjects={subjects}
           defaultSubjectId={defaultSubjectId}
           vocabulary={vocabulary}
@@ -487,6 +488,7 @@ export function ResourceBank({
       {editing ? (
         <UploadModal
           mode="edit"
+          currentUserId={currentUserId}
           subjects={subjects}
           defaultSubjectId={defaultSubjectId}
           vocabulary={vocabulary}

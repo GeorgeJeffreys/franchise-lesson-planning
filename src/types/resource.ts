@@ -88,15 +88,19 @@ export interface ResourceFilters {
   offset?: number;
 }
 
-/** Input for creating a resource. Provide exactly one of file or externalUrl. */
+/** Input for creating a resource. Provide exactly one of filePath or externalUrl. */
 export interface CreateResourceInput {
   title: string;
   description?: string | null;
   subjectId?: string | null;
   year?: number | null;
-  /** A file to upload to the 'resources' bucket. Mutually exclusive with externalUrl. */
-  file?: File;
-  /** An external link. Mutually exclusive with file. */
+  /**
+   * The object path of a file ALREADY uploaded to the 'resources' bucket (the
+   * browser uploads directly to Storage and passes the path). Mutually exclusive
+   * with externalUrl.
+   */
+  filePath?: string | null;
+  /** An external link. Mutually exclusive with filePath. */
   externalUrl?: string | null;
   /** Tag ids to attach on creation. */
   tagIds?: string[];

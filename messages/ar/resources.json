@@ -116,6 +116,7 @@
       "newBadge": "شارة جديد",
       "saveChangesError": "تعذّر حفظ التغييرات.",
       "uploadError": "تعذّر رفع المورد.",
+      "tooLarge": "هذا الملف كبير جدًا — الحد الأقصى {max} ميغابايت. اختر ملفًا أصغر.",
       "readyToSave": "جاهز للحفظ",
       "setMoreToSave": "{remaining, plural, zero {اضبط {remainingText} عنصراً إضافياً للحفظ} one {اضبط عنصراً واحداً إضافياً للحفظ} two {اضبط عنصرين إضافيين للحفظ} few {اضبط {remainingText} عناصر إضافية للحفظ} many {اضبط {remainingText} عنصراً إضافياً للحفظ} other {اضبط {remainingText} عنصر إضافي للحفظ}}",
       "addTitleToSave": "أضف عنواناً للحفظ",

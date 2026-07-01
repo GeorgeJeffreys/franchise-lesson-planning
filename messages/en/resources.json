@@ -116,6 +116,7 @@
       "newBadge": "New badge",
       "saveChangesError": "Could not save changes.",
       "uploadError": "Could not upload the resource.",
+      "tooLarge": "That file is too large — the maximum is {max} MB. Choose a smaller file.",
       "readyToSave": "Ready to save",
       "setMoreToSave": "{remaining, plural, one {Set {remainingText} more thing to save} other {Set {remainingText} more things to save}}",
       "addTitleToSave": "Add a title to save",

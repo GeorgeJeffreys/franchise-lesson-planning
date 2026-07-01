@@ -15,6 +15,13 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { formatNumber } from '@/lib/format';
+import { createClient } from '@/lib/supabase/client';
+import {
+  MAX_RESOURCE_BYTES,
+  MAX_RESOURCE_MB,
+  RESOURCE_BUCKET,
+  buildResourceStoragePath,
+} from '@/lib/resources/storage';
 import type { ResourceWithTags, TagDimension, TagsByDimension } from '@/types/resource';
 import {
   SUBJECT_SPECIFIC_DIMENSIONS,
@@ -25,6 +32,8 @@ import { CheckIcon, LinkIcon, LockIcon, SparkleIcon, XIcon } from '@/components/
 
 interface UploadModalProps {
   mode: 'create' | 'edit';
+  /** The signed-in user's id — keys the direct-upload object path. */
+  currentUserId: string;
   subjects: { id: string; name: string }[];
   defaultSubjectId: string | null;
   vocabulary: TagsByDimension;
@@ -84,6 +93,7 @@ function TagSelect({
 
 export function UploadModal({
   mode,
+  currentUserId,
   subjects,
   defaultSubjectId,
   vocabulary,
@@ -172,16 +182,41 @@ export function UploadModal({
       return;
     }
 
-    const fd = new FormData();
-    fd.set('title', title.trim());
-    if (description.trim()) fd.set('description', description.trim());
-    if (subjectId) fd.set('subjectId', subjectId);
-    if (year) fd.set('year', year);
-    if (sourceMode === 'file' && file) fd.set('file', file);
-    if (sourceMode === 'link' && link.trim()) fd.set('externalUrl', link.trim());
-    for (const id of chosenTagIds()) fd.append('tagIds', id);
+    // Graceful pre-flight guard: reject an oversized file inline BEFORE any
+    // upload, so a too-large file surfaces a message instead of failing the
+    // upload round-trip or collapsing the page.
+    if (sourceMode === 'file' && file && file.size > MAX_RESOURCE_BYTES) {
+      setError(t('upload.tooLarge', { max: formatNumber(MAX_RESOURCE_MB, locale) }));
+      return;
+    }
 
     startTransition(async () => {
+      const fd = new FormData();
+      fd.set('title', title.trim());
+      if (description.trim()) fd.set('description', description.trim());
+      if (subjectId) fd.set('subjectId', subjectId);
+      if (year) fd.set('year', year);
+      for (const id of chosenTagIds()) fd.append('tagIds', id);
+
+      if (sourceMode === 'file' && file) {
+        // Upload the bytes DIRECTLY to Storage (the browser talks to Supabase,
+        // not the Next server) and send only the resulting object path to the
+        // create action — so the upload isn't bounded by the Server Action body
+        // limit, and a storage failure is caught and shown inline.
+        const supabase = createClient();
+        const path = buildResourceStoragePath(currentUserId, file.name);
+        const { error: uploadError } = await supabase.storage
+          .from(RESOURCE_BUCKET)
+          .upload(path, file, { upsert: false, contentType: file.type || undefined });
+        if (uploadError) {
+          setError(uploadError.message || t('upload.uploadError'));
+          return;
+        }
+        fd.set('filePath', path);
+      } else if (sourceMode === 'link' && link.trim()) {
+        fd.set('externalUrl', link.trim());
+      }
+
       const res = await onSubmitCreate(fd);
       if (res.ok) onClose();
       else setError(res.error ?? t('upload.uploadError'));

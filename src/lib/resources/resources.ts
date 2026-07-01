@@ -5,6 +5,7 @@
 // is backed by EXACTLY ONE of an uploaded file or an external URL.
 
 import { createClient } from '@/lib/supabase/server';
+import { RESOURCE_BUCKET } from '@/lib/resources/storage';
 import type {
   CreateResourceInput,
   Resource,
@@ -15,7 +16,7 @@ import type {
   UpdateResourceInput,
 } from '@/types/resource';
 
-const STORAGE_BUCKET = 'resources';
+const STORAGE_BUCKET = RESOURCE_BUCKET;
 
 const RESOURCE_COLUMNS =
   'id, title, description, subject_id, year, file_path, external_url, uploaded_by, usage_count, created_at';
@@ -168,22 +169,30 @@ export async function getResource(id: string): Promise<ResourceWithTags | null> 
   return withTags ?? null;
 }
 
-/** Build a unique-ish object path for an upload, keyed by the current user. */
-function buildStoragePath(userId: string, fileName: string): string {
-  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  return `${userId}/${crypto.randomUUID()}-${safe}`;
+/**
+ * Remove an object from the 'resources' bucket. Used to roll back an orphaned
+ * upload when the browser uploaded a file but the metadata row never landed.
+ * Best-effort and idempotent (removing a missing object is a no-op).
+ */
+export async function removeUploadedResourceFile(filePath: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
 }
 
 /**
- * Create a resource. Provide EXACTLY ONE of `file` (uploaded to the 'resources'
- * bucket) or `externalUrl`. Any `tagIds` are linked after the row is created.
- * If a file upload succeeds but the row insert fails, the orphaned object is
- * cleaned up.
+ * Create a resource from metadata. Provide EXACTLY ONE of `filePath` (the object
+ * path of a file the browser already uploaded to the 'resources' bucket) or
+ * `externalUrl`. Any `tagIds` are linked after the row is created. If the row
+ * insert fails, the orphaned storage object is cleaned up.
+ *
+ * The file bytes no longer pass through this server code — the browser uploads
+ * them directly to Storage — so uploads aren't bounded by the Server Action body
+ * limit. This function only writes metadata.
  */
 export async function createResource(
   input: CreateResourceInput
 ): Promise<ResourceResult<Resource>> {
-  const hasFile = !!input.file;
+  const hasFile = !!input.filePath;
   const hasUrl = !!input.externalUrl;
   if (hasFile === hasUrl) {
     return {
@@ -198,20 +207,7 @@ export async function createResource(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not authenticated.' };
 
-  let filePath: string | null = null;
-  if (input.file) {
-    filePath = buildStoragePath(user.id, input.file.name);
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      // Set contentType from the file's MIME type so the object isn't stored as a
-      // generic binary blob — without it previews (PDFs, images) won't render
-      // inline when opened. Fall back to storage-js inference when unknown.
-      .upload(filePath, input.file, {
-        upsert: false,
-        contentType: input.file.type || undefined,
-      });
-    if (uploadError) return { ok: false, error: uploadError.message };
-  }
+  const filePath = input.filePath ?? null;
 
   const { data, error } = await supabase
     .from('resources')

@@ -22,6 +22,7 @@ import {
   listResources,
   moveResourceBetweenFolders,
   removeResourceFromFolder,
+  removeUploadedResourceFile,
   renameFolder,
   setResourceTags,
   updateResource,
@@ -149,23 +150,34 @@ export async function recordUsageAction(
 // ── create / edit / delete ─────────────────────────────────────────────────────
 
 /**
- * Create a resource from the upload modal's FormData. Exactly one of an uploaded
- * file or an external URL is provided; all chosen tag ids ride along and are
- * linked on creation. `uploaded_by`, `usage_count` and `created_at` are set
- * server-side by the DB, never the client.
+ * Create a resource from the upload modal's FormData. The browser uploads the
+ * file's bytes DIRECTLY to the 'resources' Storage bucket and passes us only its
+ * object path (`filePath`) — or, for a link resource, an `externalUrl`. Exactly
+ * one is provided; all chosen tag ids ride along and are linked on creation.
+ * `uploaded_by`, `usage_count` and `created_at` are set server-side by the DB,
+ * never the client.
+ *
+ * If we bail out with a file already uploaded (a validation failure that the
+ * modal normally prevents), the orphaned object is removed so nothing leaks.
  */
 export async function createResourceAction(
   formData: FormData
 ): Promise<ResourceResult<{ id: string }>> {
+  const filePath = String(formData.get('filePath') ?? '').trim() || null;
+  const externalUrl = String(formData.get('externalUrl') ?? '').trim() || null;
+
+  const bail = async (error: string): Promise<ResourceResult<{ id: string }>> => {
+    if (filePath) await removeUploadedResourceFile(filePath);
+    return { ok: false, error };
+  };
+
   const title = String(formData.get('title') ?? '').trim();
-  if (!title) return { ok: false, error: 'Give the resource a title.' };
+  if (!title) return bail('Give the resource a title.');
 
   const description = String(formData.get('description') ?? '').trim() || null;
   const subjectId = (formData.get('subjectId') as string) || null;
   const yearRaw = formData.get('year');
   const year = yearRaw ? Number(yearRaw) : null;
-  const externalUrl = String(formData.get('externalUrl') ?? '').trim() || null;
-  const file = formData.get('file');
   const tagIds = formData.getAll('tagIds').map(String).filter(Boolean);
 
   const input: CreateResourceInput = {
@@ -176,8 +188,8 @@ export async function createResourceAction(
     tagIds,
   };
 
-  if (file instanceof File && file.size > 0) {
-    input.file = file;
+  if (filePath) {
+    input.filePath = filePath;
   } else if (externalUrl) {
     input.externalUrl = externalUrl;
   } else {
