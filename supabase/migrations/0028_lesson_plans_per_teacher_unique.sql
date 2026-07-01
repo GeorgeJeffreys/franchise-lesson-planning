@@ -51,4 +51,3 @@ create unique index if not exists lesson_plans_owner_centre_slot_key
 create unique index if not exists lesson_plans_owner_org_slot_key
   on public.lesson_plans (created_by, curriculum_lesson_id)
   where scope = 'org';
-</content>
