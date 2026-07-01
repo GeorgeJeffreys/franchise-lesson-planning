@@ -29,6 +29,7 @@
     },
     "objective": {
       "heading": "اكتب هدف SMARTT",
+      "stem": "ستتمكّن آية من",
       "fieldAria": "هدف SMARTT",
       "placeholder": "قراءة خمس جمل قصيرة عن عائلة وتحديد كلمات العائلة.",
       "check": "تحقّق من هدفي",
@@ -42,6 +43,7 @@
     },
     "banner": {
       "label": "هدف SMARTT",
+      "stem": "ستتمكّن آية من",
       "notWritten": "لم يُكتب بعد"
     },
     "curriculum": {

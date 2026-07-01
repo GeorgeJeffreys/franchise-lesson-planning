@@ -3,8 +3,13 @@
 // and only lets the teacher edit the remainder. These helpers keep the stored
 // string and the editable remainder in sync.
 
-/** The enforced opening of every SMARTT objective. */
-export const OBJECTIVE_STEM = 'By the end of this session, students will be able to';
+/**
+ * The enforced opening of every SMARTT objective. This is the canonical, English,
+ * locale-invariant value that {@link composeObjective} bakes into the stored
+ * string (and {@link stripStem} peels back off). The editor's *displayed* prefix
+ * is localised via the `stem` i18n message, whose English value mirrors this.
+ */
+export const OBJECTIVE_STEM = 'Aya will be able to';
 
 /** The six SMARTT criteria, shown as guidance in the pink box. */
 export const SMARTT_CRITERIA: { label: string; description: string }[] = [

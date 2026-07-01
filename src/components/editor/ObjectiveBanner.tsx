@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { OBJECTIVE_STEM } from '@/lib/editor/objective';
 
 /**
  * The compact pink objective banner shown on every step past Step 1: the fixed
@@ -16,7 +15,7 @@ export function ObjectiveBanner({ remainder }: { remainder: string }) {
         {t('label')}
       </span>
       <span dir="auto" className="text-[13.5px] leading-[1.45] text-neutral-900">
-        <span className="text-[#A88792]">{OBJECTIVE_STEM}</span>{' '}
+        <span className="text-[#A88792]">{t('stem')}</span>{' '}
         {remainder.trim() || <span className="italic text-[#B89AA4]">{t('notWritten')}</span>}
       </span>
     </div>

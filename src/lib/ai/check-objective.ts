@@ -31,7 +31,7 @@ const MODEL = 'claude-sonnet-4-6';
  * The fixed opening every Alsama objective must keep. The suggested rewrite is
  * required to begin with this exact stem.
  */
-export const OBJECTIVE_STEM = 'By the end of this session, students will be able to…';
+export const OBJECTIVE_STEM = 'Aya will be able to…';
 
 /** Optional surrounding lesson context the teacher can supply to sharpen feedback. */
 export interface ObjectiveCheckContext {

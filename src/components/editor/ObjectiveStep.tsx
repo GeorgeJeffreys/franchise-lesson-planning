@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { OBJECTIVE_STEM } from '@/lib/editor/objective';
 import {
   SMARTT_LETTERS,
   smarttDimensionLabel,
@@ -158,7 +157,7 @@ export function ObjectiveStep({
               stays muted (text-stem) so it reads as a fixed label; the teacher's
               text renders in body ink (text-ink), clearly distinct from the stem. */}
           <p className="text-[16px] leading-[1.55]">
-            <span className="text-stem">{OBJECTIVE_STEM} </span>
+            <span className="text-stem">{t('stem')} </span>
             <span
               ref={editableRef}
               role="textbox"
