@@ -30,6 +30,17 @@ import type {
   CurriculumBrowseData,
 } from '@/types/curriculum-browse';
 
+/**
+ * A resource label that carries no real resource. The source bakes several
+ * "empty" spellings into the label column — null/blank, an em-dash placeholder,
+ * or the literal string "n/a" (any case). Scrub them here so no consumer (the
+ * weekly table or the detail rail) ever renders a phantom resource line.
+ */
+function isNoResource(label: string): boolean {
+  const s = label.trim().toLowerCase();
+  return s === '' || s === '—' || s === 'n/a';
+}
+
 /** Map a raw curriculum row to the `BrowseRow` view-model (table row / grid cell). */
 function toBrowseRow(r: CurriculumLessonRow): BrowseRow {
   return {
@@ -40,7 +51,7 @@ function toBrowseRow(r: CurriculumLessonRow): BrowseRow {
     skillKey: skillKeyOf(r.linguistic_skill ?? ''),
     theme: (r.theme ?? '').trim(),
     resources: (r.resources ?? [])
-      .filter((res) => res.label && res.label.trim())
+      .filter((res) => res.label && !isNoResource(res.label))
       .map((res) => ({ label: res.label.trim(), url: res.url })),
     lessonKey: r.lesson_key,
   };

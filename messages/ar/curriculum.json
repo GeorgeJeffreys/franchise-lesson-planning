@@ -1,7 +1,6 @@
 {
   "curriculum": {
     "title": "المنهج",
-    "readOnly": "مرجع للقراءة فقط",
     "subjectLabel": "المادة",
     "yearLabel": "السنة",
     "year": "السنة {n}",
@@ -20,7 +19,6 @@
       "monthly": "شهري"
     },
     "monthGrid": {
-      "inFocus": "قيد التركيز",
       "noLessons": "لا توجد دروس لهذا الشهر."
     },
     "monthlyOutcome": "الناتج الشهري · {month}",
