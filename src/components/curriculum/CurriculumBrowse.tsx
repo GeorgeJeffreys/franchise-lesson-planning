@@ -78,7 +78,7 @@ export function CurriculumBrowse({
   );
 }
 
-// ── Header: selectors + week/month nav + view toggle + read-only badge ───────────
+// ── Header: selectors + week/month nav + view toggle ─────────────────────────────
 
 function Header({ data, view }: { data: CurriculumBrowseData; view: CurriculumView }) {
   const t = useTranslations('curriculum');
@@ -180,7 +180,6 @@ function Header({ data, view }: { data: CurriculumBrowseData; view: CurriculumVi
       </div>
       <div className="flex items-center gap-[14px]">
         <ViewToggle weeklyHref={buildHref({ view: 'weekly' })} monthlyHref={buildHref({ view: 'monthly' })} view={view} />
-        <span className="text-[13px] text-text-faint">{t('readOnly')}</span>
       </div>
     </div>
   );
@@ -393,7 +392,6 @@ function MonthlyBody({ data }: { data: CurriculumBrowseData }) {
         <div className="mt-[20px] grid items-start gap-[18px] lg:grid-cols-[minmax(0,1fr)_320px]">
           <MonthCalendar
             grid={grid}
-            selectedWeek={data.selected.week}
             selected={sel}
             onSelect={(weekIdx, periodIdx) => setSel({ weekIdx, periodIdx })}
           />
@@ -412,12 +410,10 @@ const GRID_COLS = 'grid grid-cols-[84px_repeat(5,minmax(0,1fr))] gap-[10px]';
 
 function MonthCalendar({
   grid,
-  selectedWeek,
   selected,
   onSelect,
 }: {
   grid: BrowseMonthWeek[];
-  selectedWeek: number;
   selected: { weekIdx: number; periodIdx: number } | null;
   onSelect: (weekIdx: number, periodIdx: number) => void;
 }) {
@@ -439,57 +435,30 @@ function MonthCalendar({
         ))}
       </div>
 
-      {grid.map((weekRow, weekIdx) => {
-        const isFocusWeek = weekRow.week === selectedWeek;
-        const cells = weekRow.cells.map((cell, periodIdx) => (
-          <GridCell
-            key={periodIdx}
-            cell={cell}
-            selected={selected?.weekIdx === weekIdx && selected?.periodIdx === periodIdx}
-            onSelect={() => onSelect(weekIdx, periodIdx)}
-          />
-        ));
-
-        if (isFocusWeek) {
-          // The in-focus week lifts into a teal-bordered box with a header line.
-          return (
-            <div
-              key={weekRow.week}
-              className="rounded-[13px] border border-teal-tint-border bg-surface-subtle p-[11px]"
-            >
-              <div className="mb-[8px] flex flex-wrap items-center gap-[10px] px-[2px]">
-                <span dir="auto" className="text-[13px] font-bold text-teal-deep">
-                  {t('week', { n: formatNumber(weekRow.week, locale) })}
-                  {weekRow.themeLabel ? ` · ${weekRow.themeLabel}` : ''}
-                </span>
-                <span className="rounded-[6px] border border-teal-tint-border bg-surface px-[8px] py-[2px] text-[11px] text-neutral-600">
-                  {t('monthGrid.inFocus')}
-                </span>
-              </div>
-              <div className={cn(GRID_COLS, 'items-stretch')}>
-                <div />
-                {cells}
-              </div>
-            </div>
-          );
-        }
-
-        return (
-          <div key={weekRow.week} className={cn(GRID_COLS, 'items-stretch')}>
-            <div className="flex flex-col justify-center">
-              <span className="text-[13px] font-semibold text-ink">
-                {t('week', { n: formatNumber(weekRow.week, locale) })}
+      {/* Every week renders as a plain row — no highlighted "in focus" week. The only
+          teal accent is the selected cell (GridCell), which drives the detail rail. */}
+      {grid.map((weekRow, weekIdx) => (
+        <div key={weekRow.week} className={cn(GRID_COLS, 'items-stretch')}>
+          <div className="flex flex-col justify-center">
+            <span className="text-[13px] font-semibold text-ink">
+              {t('week', { n: formatNumber(weekRow.week, locale) })}
+            </span>
+            {weekRow.themeLabel ? (
+              <span dir="auto" className="text-[11px] text-text-faint">
+                {weekRow.themeLabel}
               </span>
-              {weekRow.themeLabel ? (
-                <span dir="auto" className="text-[11px] text-text-faint">
-                  {weekRow.themeLabel}
-                </span>
-              ) : null}
-            </div>
-            {cells}
+            ) : null}
           </div>
-        );
-      })}
+          {weekRow.cells.map((cell, periodIdx) => (
+            <GridCell
+              key={periodIdx}
+              cell={cell}
+              selected={selected?.weekIdx === weekIdx && selected?.periodIdx === periodIdx}
+              onSelect={() => onSelect(weekIdx, periodIdx)}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
