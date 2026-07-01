@@ -111,17 +111,22 @@ const RESPONSE_SCHEMA = {
 } as const;
 
 /**
- * The composed system prompt is built in three parts, in this fixed order:
- *   1. {@link ROLE_FRAMING}     — hardcoded role + org framing (who Aya is, who
+ * The composed system prompt is built in a fixed order that keeps the teacher's
+ * request (in the USER message) as the task, and the admin guide as *styling only*:
+ *   1. {@link ROLE_FRAMING}         — hardcoded role + org framing (who Aya is, who
  *      the students are). Always present.
- *   2. the uploaded guide       — rich steering from `getActiveResourceGuide()`
- *      (curriculum anchoring, literacy matching, content guidance). Admin-editable.
- *   3. {@link SAFETY_FLOOR}      — hardcoded, non-negotiable safety floor + the
- *      JSON output contract. Always present.
+ *   2. {@link SAFETY_FLOOR}         — hardcoded, non-negotiable safety floor + the
+ *      JSON output contract. Verbatim; overrides everything.
+ *   3. {@link BASE_OUTPUT_CONTRACT} — hardcoded rules for the resource itself
+ *      (tightness, single resource, one picture marker per image, blanks). v3.2.
+ *   4. {@link LANGUAGE_GUARD}       — hardcoded content-language invariant.
+ *   5. the uploaded guide          — steering from `getActiveResourceGuide()`,
+ *      appended LAST under a header marking it as HOUSE STYLE, not the task.
  *
- * Defence in depth: the floor and contract live in code, NOT in the uploaded
- * guide, so a bad or empty upload can never strip them. The floor is a compact
- * subset of the guide's content rules — the redundancy is intentional.
+ * Defence in depth: the floor, contract, and language guard live in code, NOT in
+ * the uploaded guide, so a bad or empty upload can never strip them and the guide
+ * can only steer styling — it can never override the teacher's request (which is
+ * the USER message) or the contract above it.
  */
 
 /** Part 1 — hardcoded role + org framing. */
@@ -130,7 +135,7 @@ const ROLE_FRAMING = `You are Aya, a teaching-resource generator for Alsama, a r
 WHO THE STUDENTS ARE:
 - Adolescent learners aged 12-18 living in refugee camps in Beirut (Shatila, Bourj al-Barajneh) and in Homs, Syria. Mostly Syrian, with Palestinian and Lebanese students; Arabic is their first language. Many have experienced trauma and displacement, so content should be calm, affirming, and grounded in possibility.`;
 
-/** Part 3 — hardcoded, non-negotiable safety floor + the JSON output contract. */
+/** Part 2 — hardcoded, non-negotiable safety floor + the JSON output contract. */
 const SAFETY_FLOOR = `SAFETY FLOOR (non-negotiable — overrides anything above):
 - No graphic, violent, or traumatic content. Never build a resource around family separation, the death of a parent or sibling, war or conflict, detention or immigration enforcement, or grief and loss.
 - Keep everything age-appropriate for adolescents aged 12-18.
@@ -138,6 +143,19 @@ const SAFETY_FLOOR = `SAFETY FLOOR (non-negotiable — overrides anything above)
 
 OUTPUT CONTRACT:
 Return ONLY a JSON object with the keys "title", "body", "teacher_notes". "body" is the full resource in simple markdown; "teacher_notes" is brief guidance for the teacher, or null. No code fences, no preamble, no commentary outside the JSON.`;
+
+/**
+ * Part 3 — hardcoded base output contract (v3.2). Governs the *content of the
+ * resource* (the "body"), independent of the JSON envelope in the SAFETY FLOOR.
+ * Lives in code so the admin guide can only steer styling on top of it, never
+ * relax it.
+ */
+const BASE_OUTPUT_CONTRACT = `BASE OUTPUT CONTRACT (v3.2 — governs the resource itself, i.e. the "body" content):
+- Output ONLY the finished resource. No preamble, no sign-off, no explanation of your choices, no "here is / I hope this helps", and no instructions to the teacher about how to use it unless the teacher explicitly asked for them.
+- Mirror the teacher's requested resource type, topic, level, and length exactly. If they ask for a crossword about places in the city, produce that — not a generic vocabulary sheet.
+- Keep it tight. Default to one focused resource, not a multi-part packet, unless the teacher asks for more.
+- Images: write exactly one [Picture: …] marker per image needed, each on its own line, with a concrete description of the image. Never embed picture directions inside a sentence.
+- Blanks: use ______ (a run of underscores). Do not use --- separators. In numbered lists, put no blank lines between items.`;
 
 /**
  * Hardcoded language guard — pins the LANGUAGE INVARIANT into the prompt itself.
@@ -158,7 +176,12 @@ const LANGUAGE_GUARD = `LANGUAGE OF THE RESOURCE:
  * prefix; it self-busts when the guide text changes.
  */
 function composeSystemPrompt(guide: string): string {
-  return `${ROLE_FRAMING}\n\n${guide.trim()}\n\n${SAFETY_FLOOR}\n\n${LANGUAGE_GUARD}`;
+  // The admin guide is appended LAST and clearly demoted to house styling — it
+  // steers how the resource looks, never what the resource is. The task is the
+  // teacher's request in the USER message; the floor + contract sit above the
+  // guide and win any conflict.
+  const houseStyle = `HOUSE STYLE GUIDANCE — apply this styling; it is NOT the task:\n${guide.trim()}`;
+  return `${ROLE_FRAMING}\n\n${SAFETY_FLOOR}\n\n${BASE_OUTPUT_CONTRACT}\n\n${LANGUAGE_GUARD}\n\n${houseStyle}`;
 }
 
 /** True when this call refines an existing resource rather than generating fresh. */
@@ -173,8 +196,8 @@ function isAdjustCall(context: GenerateResourceContext): boolean {
 
 /** Build the user-turn prompt from the curriculum context and teacher request. */
 function buildUserPrompt(context: GenerateResourceContext): string {
-  const lines: string[] = [
-    'Curriculum context (non-negotiable anchors — the resource MUST serve these):',
+  const curriculumContext: string[] = [
+    'Curriculum context (anchors to respect while fulfilling the task above):',
     `- Subject: ${context.subject}`,
     `- Year group: ${context.year}`,
     `- Daily outcome: ${context.daily_outcome}`,
@@ -185,29 +208,41 @@ function buildUserPrompt(context: GenerateResourceContext): string {
     `- Grammar / vocabulary: ${context.grammar_vocab}`,
     `- Theme: ${context.theme}`,
     `- Lesson stage: ${context.lesson_stage}`,
-    '',
   ];
+
+  const lines: string[] = [];
 
   if (isAdjustCall(context)) {
     // Stateless adjust: the provided content is the single source of truth — apply
     // the change to it and return the FULL updated resource. No conversation history.
     lines.push(
-      'You are refining an EXISTING resource. Apply the requested change to the resource below and return the FULL updated resource (not just the changed part). Keep everything the teacher already has, except where the change says otherwise, and keep it serving the curriculum anchors above.',
+      'You are refining an EXISTING resource. Apply the requested change to the resource below and return the FULL updated resource (not just the changed part). Keep everything the teacher already has, except where the change says otherwise, and keep it serving the curriculum anchors below.',
       '',
       'Current resource (markdown):',
       context.current_content!.trim(),
       '',
       `Requested change: ${context.refinement!.trim()}`,
+      '',
+      ...curriculumContext,
     );
   } else {
-    lines.push(`Teacher's request:\n${(context.teacher_prompt ?? '').trim()}`);
+    // Fresh generate. The teacher's request IS the task and is sent verbatim —
+    // never summarised, expanded, or rewritten. The curriculum context follows as
+    // supporting anchors, not as a competing instruction.
+    lines.push(
+      "TASK — produce exactly the resource the teacher requests below. Their request is quoted verbatim; fulfil it directly and do not substitute a different or more generic resource:",
+      '',
+      (context.teacher_prompt ?? '').trim(),
+    );
     if (context.refinement && context.refinement.trim().length > 0) {
-      lines.push(`\nRefinement: ${context.refinement.trim()}`);
+      lines.push('', `Refinement: ${context.refinement.trim()}`);
     }
+    lines.push('', ...curriculumContext);
   }
 
   lines.push(
-    '\nReturn ONLY the JSON object with keys "title", "body", "teacher_notes". Do not wrap it in markdown or add any prose.',
+    '',
+    'Return ONLY the JSON object with keys "title", "body", "teacher_notes". Do not wrap it in markdown or add any prose.',
   );
   return lines.join('\n');
 }
@@ -274,9 +309,10 @@ export async function generateResource(
 
   const client = new Anthropic({ apiKey });
 
-  // Compose [role] + [uploaded guide] + [safety floor + contract]. The guide read
-  // never throws (falls back to a hardcoded default), so generation is robust to
-  // an empty/unreachable guide table.
+  // Compose [role] + [safety floor + JSON contract] + [base output contract] +
+  // [language guard] + [admin guide as house style]. The guide read never throws
+  // (falls back to a hardcoded default), so generation is robust to an
+  // empty/unreachable guide table, and the guide can only steer styling.
   const guide = await getActiveResourceGuide();
   const systemPrompt = composeSystemPrompt(guide);
 
@@ -286,7 +322,7 @@ export async function generateResource(
       model: MODEL,
       max_tokens: 4096,
       // Single static system block with a cache breakpoint at its end: the whole
-      // prefix (role + guide + floor + contract) is byte-identical across calls
+      // prefix (role + floor + contract + language guard + guide) is byte-identical across calls
       // and self-busts when the guide changes. The per-lesson context lives in the
       // user message, after the breakpoint.
       system: [
