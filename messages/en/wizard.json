@@ -29,7 +29,7 @@
     },
     "objective": {
       "heading": "Write the SMARTT objective",
-      "stem": "Aya will be able to",
+      "stem": "By the end of this session, Aya will be able to",
       "fieldAria": "SMARTT objective",
       "placeholder": "read five short sentences about a family and identify the family words.",
       "check": "Check my objective",
@@ -43,7 +43,7 @@
     },
     "banner": {
       "label": "SMARTT objective",
-      "stem": "Aya will be able to",
+      "stem": "By the end of this session, Aya will be able to",
       "notWritten": "not written yet"
     },
     "curriculum": {
