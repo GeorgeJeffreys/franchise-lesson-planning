@@ -115,6 +115,8 @@
       "submitting": "Submitting…",
       "unlock": "Unlock for editing",
       "unlocking": "Unlocking…",
+      "recall": "Recall to edit",
+      "recalling": "Recalling…",
       "needObjective": "Add a SMARTT objective first"
     },
     "lockedBanner": {

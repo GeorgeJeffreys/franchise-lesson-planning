@@ -263,5 +263,36 @@ in-repo — §1).
 - The live `lesson_plans` schema differs from the in-repo migrations (scope columns
   + any unique indexes applied by hand — §1). **Verify the live schema before
   applying 0028.**
+
+---
+
+## Phase 1 — fix applied (per-teacher ownership)
+
+Follow-up to the read-only audit above; implemented in the same effort as the
+audit's recommendations.
+
+- **Create path (BUG A):** already resolved — `createScopedPlan` dedup + race
+  lookups are scoped `.eq('created_by', user.id)` (`create-lesson.ts:133,173`), so
+  each teacher opens/creates their OWN row and empty slots never resolve to a
+  colleague's plan.
+- **Migration `0028`:** now drops the production whole-centre constraint
+  `uq_plan_centre` (the constraint named in the production error), as both a table
+  constraint and a bare index (`if exists`, so the non-matching form is a no-op),
+  alongside the dead `class_id_lesson_date_key`. Per-teacher, per-scope, per-slot
+  uniqueness (partial indexes keyed on `created_by`) replaces it. **Authored only —
+  applied by hand in the Supabase SQL editor after confirming the live schema.**
+- **Editability (BUG B):** the author's own plan is never routed to the read-only
+  `/view` surface (`page.tsx:40` redirects only non-author coordinators; the board
+  links an author's card to the editor via `canEdit`). The wizard stays read-only
+  while `submitted`/`approved`; the author can **recall** either state back to
+  `in_progress` — `unsubmitLessonPlan` now covers `approved` (clearing
+  `submitted_at` + `reviewed_at`), and `SubmitControl` renders a "Recall to edit"
+  control on an approved plan (deliberate change from "only a coordinator moves it
+  off approved"). The `enforce_approval_role` trigger only gates moves INTO
+  `approved`/`needs_review`, so the author's move to `in_progress` is permitted.
+- **Impersonation identity:** confirmed the ownership check uses the EFFECTIVE
+  identity. `/api/test-impersonate` performs a real `signInWithPassword` (§4), so
+  `getUser()` / `auth.uid()` return the impersonated uid — `created_by === user.id`
+  and RLS compare the impersonated teacher, not the real admin.
 </content>
 </invoke>

@@ -253,10 +253,11 @@ export function LessonPlanEditor({
     }
   }
 
-  // Recall a submitted plan back to `in_progress`, unlocking the whole wizard. The
-  // teacher always lands in `in_progress` (never the prior `needs_review`): the
-  // persisted comments carry the "changes requested" context, so the status need
-  // not. Only reachable from `submitted` — an `approved` plan shows no unlock.
+  // Recall a submitted OR approved plan back to `in_progress`, unlocking the whole
+  // wizard. The author always lands in `in_progress` (never the prior
+  // `needs_review`): the persisted comments carry the "changes requested" context,
+  // so the status need not. Reachable from both locked states — the author may now
+  // reopen their own approved plan (SubmitControl renders a recall control there).
   async function handleUnlock() {
     setUnlocking(true);
     setSubmitError(null);

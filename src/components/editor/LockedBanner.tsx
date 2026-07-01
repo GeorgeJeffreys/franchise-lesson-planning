@@ -6,9 +6,9 @@ import type { PlanStatus } from '@/types/lesson';
 /**
  * A light "view only" banner shown above the four content steps while the plan is
  * locked (`submitted` / `approved`). It tells the teacher why editing is disabled
- * and routes them to the Review step, where the Submit/Unlock control is the one
- * way to toggle the lock. For an `approved` plan there is no teacher unlock, so the
- * link is omitted and the copy reflects the approved state.
+ * and routes them to the Review step, where the Submit/Recall control is the one
+ * way to toggle the lock. The author can now recall an `approved` plan too, so the
+ * link is shown in both locked states; only the title copy reflects the status.
  */
 export function LockedBanner({
   status,
@@ -29,15 +29,13 @@ export function LockedBanner({
         </svg>
         <span className="font-semibold">{approved ? t('approvedTitle') : t('title')}</span>
       </div>
-      {approved ? null : (
-        <button
-          type="button"
-          onClick={onGoToReview}
-          className="text-[13px] font-semibold text-teal underline-offset-2 hover:underline"
-        >
-          {t('link')}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onGoToReview}
+        className="text-[13px] font-semibold text-teal underline-offset-2 hover:underline"
+      >
+        {t('link')}
+      </button>
     </div>
   );
 }

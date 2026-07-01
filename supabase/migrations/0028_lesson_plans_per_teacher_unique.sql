@@ -20,14 +20,28 @@
 -- PRE-FLIGHT (the live schema is NOT fully represented in-repo — see audit §1):
 --   * Confirm columns `scope`, `school_id`, `subject_id` exist on lesson_plans
 --     (added by hand in the Supabase SQL editor, like 0018/0019).
---   * Enumerate existing unique indexes on lesson_plans and drop any hand-applied
---     coordinate index that EXCLUDES created_by (add explicit `drop index if
---     exists <name>;` lines below once their real names are known) — otherwise it
---     will keep colliding two teachers' plans for the same slot.
+--   * The hand-applied whole-centre coordinate index is `uq_plan_centre` (seen in
+--     production as the violated constraint). It EXCLUDES created_by, so it forces
+--     one plan per centre coordinate across all teachers and must be dropped —
+--     step 0 below handles it as both a constraint and a bare index (its exact
+--     kind was applied by hand and isn't in-repo; `if exists` makes both no-ops
+--     when absent). If enumerating the live DB reveals further coordinate indexes
+--     that exclude created_by, add matching `drop` lines beside it.
 --
 -- Idempotent: safe to re-run. Partial unique indexes (one per scope) key every
 -- scope on created_by; NULLs in class_id/school_id for the non-matching scopes are
 -- excluded by the WHERE clause, so there is no NULL-distinctness footgun.
+
+-- 0. Drop the hand-applied whole-centre uniqueness. `uq_plan_centre` keys the
+--    centre coordinate WITHOUT created_by, so it permits only one plan per centre
+--    slot for the whole staff — the source of the production
+--    `duplicate key value violates unique constraint "uq_plan_centre"` on an empty
+--    slot. It is superseded by the per-teacher centre index in step 2. It may have
+--    been applied as a table constraint or as a bare unique index; drop both forms
+--    (each `if exists`, so the non-matching form is a no-op).
+alter table public.lesson_plans
+  drop constraint if exists uq_plan_centre;
+drop index if exists public.uq_plan_centre;
 
 -- 1. Drop the now-dead coordinate constraint from 0003. Centre/org plans are
 --    created with class_id = null AND lesson_date = null, so (class_id, lesson_date)

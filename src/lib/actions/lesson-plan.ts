@@ -267,17 +267,24 @@ export async function decidePlan(planId: string, decision: PlanDecision): Promis
 }
 
 /**
- * Revert a submitted plan back to `in_progress` so the teacher can keep editing,
- * clearing `submitted_at`. Touches only the workflow columns; RLS still scopes
- * the write to a plan the teacher owns or is assigned to. (An approved plan is
- * not reverted from the editor — the control is display-only in that state.)
+ * Recall a submitted OR approved plan back to `in_progress` so the OWNING teacher
+ * can keep editing, clearing both `submitted_at` and `reviewed_at` for a clean
+ * draft (mirrors the coordinator `reopen` reset in `decidePlan`). A lesson plan is
+ * a per-teacher artefact, so its author may reopen it in either locked state —
+ * deliberately extended to `approved` (teachers can now unlock their own approved
+ * plans, unlike the old "only a coordinator moves it off approved" rule).
+ *
+ * Authorisation rides on RLS + the `enforce_approval_role` trigger. The trigger
+ * only role-gates moves INTO `approved` / `needs_review`; a move to `in_progress`
+ * is unrestricted, so the author's own recall is permitted for both statuses (RLS
+ * still scopes the write to a plan they created).
  */
 export async function unsubmitLessonPlan(input: { id: string }): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('lesson_plans')
-    .update({ status: 'in_progress', submitted_at: null })
+    .update({ status: 'in_progress', submitted_at: null, reviewed_at: null })
     .eq('id', input.id)
     .select('updated_at')
     .maybeSingle();

@@ -115,6 +115,8 @@
       "submitting": "جارٍ الإرسال…",
       "unlock": "فتح للتعديل",
       "unlocking": "جارٍ الفتح…",
+      "recall": "استرجاع للتعديل",
+      "recalling": "جارٍ الاسترجاع…",
       "needObjective": "أضف هدف SMARTT أولاً"
     },
     "lockedBanner": {
