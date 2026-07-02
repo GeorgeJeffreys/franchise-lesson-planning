@@ -192,13 +192,19 @@ export function SettingsForm(props: SettingsFormProps) {
   function onSave() {
     setError(null);
     setToast(null);
+    // Send the FULL ticked set (declarative reconcile via set_my_classes), but
+    // only when the class selection actually changed — a name/space-only save
+    // leaves class assignments untouched.
+    const classesDirty = addClassIds.size > 0 || removeClassIds.size > 0;
+    const classIds = classesDirty
+      ? classGroups.flatMap((g) => g.list).filter((c) => isClassTicked(c.id)).map((c) => c.id)
+      : undefined;
     startTransition(async () => {
       const res = await saveSettings({
         fullName: name.trim() !== props.fullName.trim() ? name.trim() : undefined,
         addSpaces,
         removeSpaceIds: [...removeSpaceIds],
-        addClassIds: [...addClassIds],
-        removeClassIds: [...removeClassIds],
+        classIds,
       });
       if (!res.ok) {
         setError(res.error ?? 'Could not save your changes.');
@@ -362,39 +368,33 @@ export function SettingsForm(props: SettingsFormProps) {
             No classes in your subject spaces yet.
           </div>
         ) : (
-          <div className="flex flex-col gap-[14px]">
-            {classGroups.map(({ year, list }) => (
-              <div key={year}>
-                <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.05em] text-text-faint">
-                  Year {year}
-                </div>
-                {list.map((c) => {
-                  const ticked = isClassTicked(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={ticked}
-                      onClick={() => toggleClass(c.id)}
-                      className="flex w-full items-center gap-[11px] py-1 text-left"
-                    >
-                      {ticked ? (
-                        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-teal">
-                          <CheckIcon size={11} />
-                        </span>
-                      ) : (
-                        <span className="size-5 shrink-0 rounded-[6px] border-[1.5px] border-[#D8CFC2] bg-surface" />
-                      )}
-                      <span className="flex-1 text-[13.5px] font-semibold">
-                        Year {c.year}
-                      </span>
-                      <SubjectChip>{c.subjectName ?? '—'}</SubjectChip>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+          // One row per class (one class per year per space), sorted by year.
+          // The checkbox label already carries the year, so no separate year
+          // header — that would just repeat the label.
+          <div className="flex flex-col gap-[2px]">
+            {classGroups.flatMap(({ list }) => list).map((c) => {
+              const ticked = isClassTicked(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={ticked}
+                  onClick={() => toggleClass(c.id)}
+                  className="flex w-full items-center gap-[11px] py-[6px] text-left"
+                >
+                  {ticked ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-[6px] bg-teal">
+                      <CheckIcon size={11} />
+                    </span>
+                  ) : (
+                    <span className="size-5 shrink-0 rounded-[6px] border-[1.5px] border-[#D8CFC2] bg-surface" />
+                  )}
+                  <span className="flex-1 text-[13.5px] font-semibold">Year {c.year}</span>
+                  <SubjectChip>{c.subjectName ?? '—'}</SubjectChip>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
