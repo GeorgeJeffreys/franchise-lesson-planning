@@ -102,7 +102,20 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     // If the membership read fails for any reason, don't trap the user behind the
     // gate — let the request through and let the page handle it.
     if (error) return supabaseResponse;
-    const hasSpace = (count ?? 0) > 0;
+    let hasSpace = (count ?? 0) > 0;
+
+    // Admins are org-wide and hold no subject_membership by design, so the
+    // membership count alone would misroute them into the (teacher) onboarding
+    // flow — the exact failure hit when stepping into the admin test persona,
+    // which has no membership. Treat an admin as gate-satisfied: they route into
+    // the app and, like any onboarded user, get bounced off /onboarding back to
+    // the home grid below. `is_admin()` is a definer RPC keyed on auth.uid();
+    // checked ONLY when there's no space, so the common has-space path adds no
+    // round-trip. Fail-open: an errored/absent result leaves hasSpace unchanged.
+    if (!hasSpace) {
+      const { data: isAdmin } = await supabase.rpc('is_admin');
+      if (isAdmin === true) hasSpace = true;
+    }
 
     if (!hasSpace && !onOnboarding) {
       const redirectUrl = request.nextUrl.clone();
