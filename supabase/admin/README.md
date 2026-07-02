@@ -61,3 +61,23 @@ psql "$DATABASE_URL" -v teacher_email="'teacher@example.org'" \
 By uid, or in the Supabase SQL editor, follow the same email/uid resolver
 instructions documented at the top of the file. To re-seed from scratch, delete
 the teacher's plans for the week first, then re-run.
+
+## `report_seed_references.sql` → `purge_seed_centres.sql`
+
+A two-step, **read-then-delete** cleanup for the four SEED centres left in prod by
+`seed_centres_classes.sql` — `Shatila 1`, `Shatila 2`, `Bourj 1`, `Bourj 2` — which
+now clutter the centres list beside the two REAL centres (`Shatila Centre`
+`42c11721-…`, `Bourj al-Barajneh Centre` `c87896b6-…`). Both resolve the seed
+centres by **name** and ABORT if any resolved id equals a real centre id.
+
+1. **`report_seed_references.sql`** — read-only. Prints, per seed centre, how many
+   `class_teachers`, `lesson_plans` (by class and by centre), `subject_membership`,
+   and `profiles.school_id` rows reference it. **Run this first** and confirm every
+   count is seed-only before deleting.
+2. **`purge_seed_centres.sql`** — ⚠️ destructive hard delete in ONE transaction,
+   bottom-up (`lesson_plans` → `class_teachers` → `subject_membership` → null
+   `profiles.school_id` → `classes` → `schools`). `plan_comments`/`plan_events`
+   cascade from `lesson_plans` automatically. Any unexpected FK rolls the whole
+   thing back — nothing partial.
+
+Run both in the Supabase SQL editor (service-role). Never from a user request.
