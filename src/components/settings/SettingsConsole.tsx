@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import type {
   AdminMembersData,
+  AdminUser,
   CentreRow,
   ConsoleAccess,
   ConsoleClassesData,
@@ -24,6 +25,7 @@ import { AdminMembersTab, CoordinatorMembersTab } from './console/MembersTab';
 import { CurriculumTab } from './console/CurriculumTab';
 import { AiGuideTab } from './console/AiGuideTab';
 import { SmarttGuideTab } from './console/SmarttGuideTab';
+import { UsersTab } from './console/UsersTab';
 import { LanguageSetting } from './LanguageSetting';
 
 export interface SettingsConsoleProps {
@@ -39,6 +41,8 @@ export interface SettingsConsoleProps {
   resourceGuide?: ResourceGuideVersion | null;
   smarttGuide?: SmarttGuideVersion | null;
   terms?: TermRow[];
+  /** `null` = load failed (error state); `undefined` = not loaded (non-admin). */
+  users?: AdminUser[] | null;
 }
 
 export function SettingsConsole(props: SettingsConsoleProps) {
@@ -108,6 +112,12 @@ export function SettingsConsole(props: SettingsConsoleProps) {
         ) : null}
         {tab === 'smartt_guide' && access.isAdmin ? (
           <SmarttGuideTab active={props.smarttGuide ?? null} />
+        ) : null}
+        {tab === 'users' && access.isAdmin ? (
+          <UsersTab
+            users={props.users ?? null}
+            currentUserId={access.profileId}
+          />
         ) : null}
       </div>
     </div>

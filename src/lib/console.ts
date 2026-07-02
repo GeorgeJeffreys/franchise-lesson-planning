@@ -28,7 +28,8 @@ export type ConsoleTab =
   | 'members'
   | 'curriculum'
   | 'ai_guide'
-  | 'smartt_guide';
+  | 'smartt_guide'
+  | 'users';
 
 export interface CoordinatorSpace {
   schoolId: string;
@@ -51,7 +52,7 @@ export interface ConsoleAccess {
 /**
  * Resolve which console tabs the signed-in user gets and where they land.
  * Admin → Centres · Subjects · Classes · Members · Curriculum · AI resource guide
- * · SMARTT objective guide (+ Profile first).
+ * · SMARTT objective guide · Users (+ Profile first).
  * Coordinator (non-admin, ≥1 coordinator membership) → Members · Curriculum.
  * Everyone has Profile. Teacher → Profile only.
  */
@@ -72,7 +73,7 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
   const tabs: ConsoleTab[] = ['profile'];
   let defaultTab: ConsoleTab = 'profile';
   if (isAdmin) {
-    tabs.push('centres', 'subjects', 'classes', 'calendar', 'members', 'curriculum', 'ai_guide', 'smartt_guide');
+    tabs.push('centres', 'subjects', 'classes', 'calendar', 'members', 'curriculum', 'ai_guide', 'smartt_guide', 'users');
     defaultTab = 'centres';
   } else if (isCoordinator) {
     tabs.push('members', 'curriculum');
@@ -357,6 +358,64 @@ export async function getAdminMembers(): Promise<AdminMembersData> {
     centres: (schools ?? []) as Array<{ id: string; name: string }>,
     subjects: (subjects ?? []) as Array<{ id: string; name: string }>,
   };
+}
+
+// ── Users (admin-only, org-wide) ──────────────────────────────────────────────
+// The global user-administration list backing the Users tab. Distinct from the
+// per-space Members tab above: it surfaces EVERY user (email included, via the
+// definer RPC) plus their admin/deactivation flags. Email lives in auth.users, so
+// this can only come from the `list_users_admin()` SECURITY DEFINER function,
+// which hard-gates on is_admin(). Filtering/search happen client-side in the tab.
+
+/** One subject space a user belongs to, for the Users-tab chips. */
+export interface UserSpace {
+  subject: string | null;
+  role: MembershipRole;
+  centre: string | null;
+}
+
+export interface AdminUser {
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  isAdmin: boolean;
+  isDeactivated: boolean;
+  spaces: UserSpace[];
+}
+
+/**
+ * Every user in the org, for the admin Users tab. Throws only for a hard failure;
+ * the RPC itself raises for non-admins (the tab is admin-gated, so that is a
+ * belt-and-braces). Returns rows already normalised to camelCase.
+ */
+export async function getUsersAdmin(): Promise<AdminUser[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('list_users_admin');
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as unknown as Array<{
+    user_id: string;
+    full_name: string | null;
+    email: string | null;
+    is_admin: boolean;
+    is_deactivated: boolean;
+    spaces:
+      | Array<{ subject: string | null; role: MembershipRole; centre: string | null }>
+      | null;
+  }>;
+
+  return rows.map((r) => ({
+    userId: r.user_id,
+    fullName: r.full_name,
+    email: r.email,
+    isAdmin: r.is_admin,
+    isDeactivated: r.is_deactivated,
+    spaces: (r.spaces ?? []).map((s) => ({
+      subject: s.subject,
+      role: s.role,
+      centre: s.centre,
+    })),
+  }));
 }
 
 // ── Members & roles (coordinator) ──────────────────────────────────────────────

@@ -16,7 +16,8 @@
       "members": "Members & roles",
       "curriculum": "Curriculum",
       "ai_guide": "AI resource guide",
-      "smartt_guide": "SMARTT objective guide"
+      "smartt_guide": "SMARTT objective guide",
+      "users": "Users"
     },
     "language": {
       "label": "Language"
@@ -156,6 +157,69 @@
         "saved": "Saved just now",
         "uploaded": "Uploaded {ago}",
         "none": "No guide yet"
+      }
+    },
+    "users": {
+      "title": "Users",
+      "searchPlaceholder": "Search name or email…",
+      "filter": {
+        "access": {
+          "label": "Access",
+          "all": "All",
+          "admin": "Admin",
+          "nonAdmin": "Non-admin"
+        },
+        "status": {
+          "label": "Status",
+          "active": "Active",
+          "deactivated": "Deactivated",
+          "all": "All"
+        }
+      },
+      "col": {
+        "person": "Person",
+        "access": "Access",
+        "spaces": "Subject spaces",
+        "status": "Status"
+      },
+      "you": "YOU",
+      "adminBadge": "Admin",
+      "orgWide": "Org-wide access",
+      "space": "{subject} · {role}",
+      "retainedSuffix": " (retained)",
+      "status": {
+        "active": "Active",
+        "deactivated": "Deactivated"
+      },
+      "action": {
+        "makeAdmin": "Make admin",
+        "removeAdmin": "Remove admin",
+        "deactivate": "Deactivate",
+        "reactivate": "Reactivate"
+      },
+      "lastAdminTooltip": "This is the last active admin. Promote another admin before removing or deactivating this one.",
+      "empty": {
+        "title": "No users match “{query}”",
+        "body": "Try a different search or clear the filters.",
+        "clear": "Clear filters"
+      },
+      "error": {
+        "title": "Couldn't load users",
+        "body": "Something went wrong reaching the server. Your changes are safe.",
+        "retry": "Try again"
+      },
+      "promoteDialog": {
+        "title": "Make {name} an admin?",
+        "body": "Admins can manage every centre, subject, class, and user across the whole organisation — including promoting or deactivating other admins.",
+        "currently": "Currently: {detail}",
+        "noSpaces": "No subject spaces",
+        "confirm": "Make admin"
+      },
+      "deactivateDialog": {
+        "title": "Deactivate {name}?",
+        "warning": "{name} loses access immediately and is signed out on every device.",
+        "body": "This is reversible. Reactivating restores their access and all subject spaces exactly as they are now — nothing is deleted.",
+        "confirm": "Deactivate"
       }
     },
     "aiGuide": {

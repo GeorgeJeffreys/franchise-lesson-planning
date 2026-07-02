@@ -61,6 +61,16 @@
   --color-border: #e7decf;
   --color-border-strong: #ddd4c8;
 
+  /* ── Destructive / danger (RESERVED) ───────────────────────────────────────
+   * The semantic palette (cream / pink / teal) carries NO destructive meaning,
+   * so destructive intent gets one reserved brick-red. Used ONLY for destructive
+   * text-actions (Remove admin / Deactivate) in the Users list and for the solid
+   * confirm button + faint tint panel inside the Deactivate dialog. Never chrome,
+   * never touching the cream/pink/teal roles. Granting admin stays teal. */
+  --color-danger: #b23a2e;
+  --color-danger-bg: #fbece8; /* faint tint panel / icon chip */
+  --color-danger-border: #f2d6ce;
+
   /* ── Status palette (Weekly Overview) — fg / bg / border per state ──────── */
   --color-status-approved: #2e7d5b;
   --color-status-approved-bg: #e2f0e8;

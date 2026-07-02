@@ -17,7 +17,9 @@ import {
   getCurriculumStatus,
   getSubjects,
   getTerms,
+  getUsersAdmin,
   type AdminMembersData,
+  type AdminUser,
   type CentreRow,
   type ConsoleClassesData,
   type CoordSpaceMembers,
@@ -79,9 +81,12 @@ export default async function SettingsPage() {
   let resourceGuide: ResourceGuideVersion | null | undefined;
   let smarttGuide: SmarttGuideVersion | null | undefined;
   let terms: TermRow[] | undefined;
+  // `null` distinguishes a load failure (renders the tab's error state) from
+  // "not loaded because not admin" (`undefined`).
+  let users: AdminUser[] | null | undefined;
 
   if (access.isAdmin) {
-    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide, terms] =
+    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide, terms, users] =
       await Promise.all([
         getCentres(),
         getSubjects(),
@@ -91,6 +96,7 @@ export default async function SettingsPage() {
         getActiveResourceGuideVersion(),
         getActiveSmarttGuideVersion(),
         getTerms(),
+        getUsersAdmin().catch(() => null),
       ]);
   } else if (access.isCoordinator) {
     const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
@@ -125,6 +131,7 @@ export default async function SettingsPage() {
           resourceGuide={resourceGuide}
           smarttGuide={smarttGuide}
           terms={terms}
+          users={users}
         />
       </div>
     </AppShell>

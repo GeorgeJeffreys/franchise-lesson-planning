@@ -2,8 +2,12 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 
-/** Path prefixes reachable without authentication (the public auth surface). */
-const PUBLIC_PREFIXES = ['/login', '/auth'];
+/** Path prefixes reachable without authentication (the public auth surface).
+ * `/access-removed` is the front-door block for a deactivated user: it must be
+ * reachable while still holding a (soon-to-be-revoked) session AND after the
+ * self-sign-out completes, and it must be exempt from the deactivation redirect
+ * itself, so it lives on the public surface. */
+const PUBLIC_PREFIXES = ['/login', '/auth', '/access-removed'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some(
@@ -61,6 +65,24 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // Deactivation front-door block: a deactivated user is bounced to
+  // /access-removed (which shows the "access removed" state and signs them out)
+  // before anything else — ahead of the onboarding gate, since a deactivated
+  // user's memberships are hidden by the helper predicate and would otherwise
+  // misroute them to /onboarding. Only page navigations are checked (see
+  // shouldEvaluateGate). `is_deactivated()` is a definer RPC keyed on auth.uid().
+  // Fail-open: if the check errors we let the request through (the DB helpers +
+  // self-provision guard still deny any real access), never trapping the user.
+  if (user && shouldEvaluateGate(request) && !isPublicPath(request.nextUrl.pathname)) {
+    const { data: deactivated } = await supabase.rpc('is_deactivated');
+    if (deactivated === true) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/access-removed';
+      redirectUrl.search = '';
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   // Onboarding gate: an authenticated user with no subject_membership rows is

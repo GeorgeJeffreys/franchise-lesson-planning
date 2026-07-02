@@ -2,5 +2,10 @@
   "common": {
     "appName": "Alsama Lesson Planner",
     "loading": "Loading"
+  },
+  "accessRemoved": {
+    "title": "Your access has been removed",
+    "body": "An administrator has deactivated your account. You've been signed out on every device. Nothing has been deleted — if this is a mistake, ask an administrator to reactivate you.",
+    "backToSignIn": "Back to sign in"
   }
 }
