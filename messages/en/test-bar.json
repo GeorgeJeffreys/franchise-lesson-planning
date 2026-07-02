@@ -1,0 +1,16 @@
+{
+  "testBar": {
+    "testMode": "Test mode",
+    "viewingAs": "Viewing as:",
+    "yourAccount": "your account",
+    "switchPersona": "Switch persona",
+    "searchPlaceholder": "Search personas…",
+    "noPersonas": "No personas available",
+    "returnToAccount": "Return to my account",
+    "switchFailed": "Switch failed",
+    "noCentre": "No centre",
+    "roleTeacher": "Teacher",
+    "roleCoordinator": "Coordinator",
+    "roleAdmin": "Admin"
+  }
+}

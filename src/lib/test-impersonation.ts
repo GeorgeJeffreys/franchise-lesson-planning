@@ -8,37 +8,31 @@ import {
   isChunkLike,
   stringToBase64URL,
 } from '@supabase/ssr';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { isTestRole, type TestRole } from '@/lib/test-roles';
+import { getSupabaseEnv } from '@/lib/supabase/env';
+import { isTestRole, type Persona } from '@/lib/test-roles';
 
-export { TEST_ROLES, isTestRole, type TestRole } from '@/lib/test-roles';
+export { isTestRole, type Persona, type TestRole } from '@/lib/test-roles';
 
 /**
- * Dev/preview-only test-user impersonation — gates, the role→credentials map, and
- * the server-side "should the bar render?" check. Shared by the impersonate route
- * (`src/app/api/test-impersonate/route.ts`) and the authed shell.
+ * Dev/preview-only test-user impersonation — the eligibility gates, the persona
+ * enumeration, and the server-side "should the bar render?" check. Shared by the
+ * impersonate route (`src/app/api/test-impersonate/route.ts`) and the authed shell.
  *
- * This is SECURITY-SENSITIVE: passing the gates lets a real admin sign in as one
- * of three pre-configured test users so they can see each role's true, RLS-scoped
- * UX. The session is a genuine, Supabase-issued one (the route logs in with the
- * test user's email+password); we never self-sign a token. Every gate below must
- * hold; none is optional.
+ * This is SECURITY-SENSITIVE: passing the gates lets an eligible tester step into
+ * a dedicated per-tester persona so they can see that teacher's true, RLS-scoped
+ * UX under the per-teacher plan-ownership model. The session is a genuine,
+ * Supabase-issued one (the route signs in as the persona with its email + the
+ * shared, server-only TEST_PERSONA_PASSWORD); we never self-sign a token.
  *
  * `server-only` guarantees this module can never be bundled for the browser, so
- * the env that maps roles to real credentials never leaks. No NEXT_PUBLIC_* here.
+ * the shared persona password and persona emails never leak. No NEXT_PUBLIC_* here.
  */
 
-/** httpOnly cookie holding the real admin's stashed session (for "Return"). */
+/** httpOnly cookie holding the real caller's stashed session (for "Return"). */
 export const STASH_COOKIE = 'test-impersonation-stash';
-
-/**
- * httpOnly cookie recording which role is currently being viewed. With genuine
- * sign-in there is no self-minted token to read a role off of, so the route
- * records it here on each switch and clears it on "Return"; the shell reads it to
- * label the bar.
- */
-export const IMPERSONATION_ROLE_COOKIE = 'test-impersonation-role';
 
 /**
  * Shape stashed in {@link STASH_COOKIE}: the real user's id + their ENTIRE
@@ -114,13 +108,6 @@ export function clearAuthCookies(cookieStore: CookieStore): void {
   }
 }
 
-/** Map each role key to the env vars holding its sign-in credentials. */
-const ROLE_CREDENTIALS_ENV: Record<TestRole, { email: string; password: string }> = {
-  teacher: { email: 'TEST_USER_TEACHER_EMAIL', password: 'TEST_USER_TEACHER_PASSWORD' },
-  coordinator: { email: 'TEST_USER_COORDINATOR_EMAIL', password: 'TEST_USER_COORDINATOR_PASSWORD' },
-  admin: { email: 'TEST_USER_ADMIN_EMAIL', password: 'TEST_USER_ADMIN_PASSWORD' },
-};
-
 /**
  * The master switch. The bar renders and the route acts ONLY when the explicit
  * `ENABLE_TEST_IMPERSONATION` flag is set. Absence of the flag is off.
@@ -144,7 +131,13 @@ export function impersonationEnabled(): boolean {
   return true;
 }
 
-/** Real-admin allowlist from `TEST_IMPERSONATION_ALLOWED_UIDS` (comma-separated). */
+/**
+ * Env-allowlist eligibility fallback from `TEST_IMPERSONATION_ALLOWED_UIDS`
+ * (comma-separated). Retained so the current allowlisted account's access to the
+ * bar is unbroken even before anyone is flagged `can_impersonate`. Dynamic
+ * eligibility (the `can_impersonate` flag / real-admin status) is layered on top
+ * in {@link isEligibleCaller}.
+ */
 export function getAllowedUids(): string[] {
   return (process.env.TEST_IMPERSONATION_ALLOWED_UIDS ?? '')
     .split(',')
@@ -153,20 +146,91 @@ export function getAllowedUids(): string[] {
 }
 
 /**
- * Resolve a role's sign-in credentials from server-only env. Returns the
- * credentials, or the NAME of the first missing/empty var (never a value) so the
- * caller can report `stage:'config'` without leaking a secret.
+ * The shared, server-only password every seeded persona signs in with. Returns
+ * `null` (never a value) when unset/empty so the caller can report
+ * `stage:'config'` without leaking anything. No NEXT_PUBLIC_*: server-only.
  */
-export function roleToCredentials(
-  role: TestRole,
-): { ok: true; email: string; password: string } | { ok: false; missingVar: string } {
-  const vars = ROLE_CREDENTIALS_ENV[role];
-  const email = process.env[vars.email]?.trim();
-  if (!email) return { ok: false, missingVar: vars.email };
-  // Do NOT trim the password — a credential is taken verbatim.
-  const password = process.env[vars.password];
-  if (!password) return { ok: false, missingVar: vars.password };
-  return { ok: true, email, password };
+export function getPersonaPassword(): string | null {
+  // Do NOT trim — a credential is taken verbatim.
+  const pw = process.env.TEST_PERSONA_PASSWORD;
+  return pw ? pw : null;
+}
+
+/** Server-only enumeration shape: {@link Persona} plus the sign-in email. */
+interface PersonaWithEmail extends Persona {
+  email: string;
+}
+
+/** Strip the server-only email before a persona is handed to the client. */
+function sanitizePersona({ id, name, role, centre }: PersonaWithEmail): Persona {
+  return { id, name, role, centre };
+}
+
+/**
+ * A Supabase client authenticated as the given (real caller's) session, WITHOUT
+ * touching cookies or refreshing tokens. Used to enumerate/validate personas as
+ * the real caller even while the live cookie session is the impersonated persona
+ * — the definer RPC (`list_impersonation_personas`) then scopes to the real
+ * caller's eligibility and admin status. If the access token has since expired
+ * the RPC simply fails and the list comes back empty (Return still works).
+ */
+export function createSessionClient(session: Session): SupabaseClient {
+  const { url, anonKey } = getSupabaseEnv();
+  return createSupabaseClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${session.access_token}` } },
+  });
+}
+
+/** Raw row shape returned by the `list_impersonation_personas` RPC. */
+interface RawPersonaRow {
+  persona_id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+  centre_name: string | null;
+}
+
+/**
+ * Enumerate the caller-scoped personas via the security-definer RPC. The RPC
+ * gates on real-admin OR `can_impersonate` and applies the anti-escalation scope
+ * (non-admins see teacher personas only), so the returned list is already safe to
+ * act on. Returns `[]` on any error (ineligible caller, expired stash token, RPC
+ * missing) — the picker then shows its empty state rather than surfacing a 500.
+ */
+export async function listImpersonationPersonas(
+  client: SupabaseClient,
+): Promise<PersonaWithEmail[]> {
+  const { data, error } = await client.rpc('list_impersonation_personas');
+  if (error || !data) return [];
+  return (data as RawPersonaRow[])
+    .filter((r) => typeof r.email === 'string' && r.email.length > 0)
+    .map((r) => ({
+      id: r.persona_id,
+      name: r.full_name?.trim() || (r.email as string),
+      role: isTestRole(r.role) ? r.role : 'teacher',
+      centre: r.centre_name ?? null,
+      email: r.email as string,
+    }));
+}
+
+/**
+ * Whether `uid` may USE the bar (step into a persona). Dynamic eligibility =
+ * `profiles.can_impersonate` OR real-admin (`profiles.role = 'admin'`), with the
+ * `TEST_IMPERSONATION_ALLOWED_UIDS` env allowlist kept as a fallback. Reads only
+ * the caller's OWN profile row (allowed by `profiles_select_own` RLS), so `client`
+ * must be authenticated as `uid`. It is deliberately NOT gated on coordinator role
+ * and never promotes anyone.
+ */
+export async function isEligibleCaller(client: SupabaseClient, uid: string): Promise<boolean> {
+  if (getAllowedUids().includes(uid)) return true;
+  const { data } = await client
+    .from('profiles')
+    .select('role, can_impersonate')
+    .eq('id', uid)
+    .maybeSingle();
+  const row = data as { role: string | null; can_impersonate: boolean | null } | null;
+  return !!row && (row.can_impersonate === true || row.role === 'admin');
 }
 
 /** Cookie options for the stash — server-set, httpOnly, never readable by JS. */
@@ -231,25 +295,32 @@ export interface ImpersonationState {
   active: boolean;
   /** Whether a real session is currently stashed (i.e. we are viewing-as). */
   impersonating: boolean;
-  /** The role currently being viewed, when impersonating. */
-  currentRole: TestRole | null;
+  /** The persona currently being viewed, when impersonating. */
+  currentPersona: Persona | null;
+  /** The caller-scoped personas the picker may offer (client-safe, no emails). */
+  personas: Persona[];
 }
 
 const INACTIVE: ImpersonationState = {
   active: false,
   impersonating: false,
-  currentRole: null,
+  currentPersona: null,
+  personas: [],
 };
 
 /**
- * Server-side decision for the authed shell: should the test bar render, and if
- * so, whose role is being viewed? The real-admin identity — not the current
- * session — decides this, so the bar stays visible THROUGHOUT impersonation
- * (otherwise the only in-app way back disappears):
- *   - if a valid stash from an allowlisted admin exists, we are impersonating and
- *     the bar renders regardless of the (test-user) session's state;
- *   - otherwise the bar renders only when the current session IS an allowlisted
- *     admin (so they can start impersonating).
+ * Server-side decision for the authed shell: should the test bar render, whose
+ * persona is being viewed, and which personas may be picked?
+ *
+ *   - Impersonating: a VALID STASH is itself proof the session began from an
+ *     eligible caller (the route only ever writes it after the eligibility gate),
+ *     so the bar renders regardless of the now-impersonated session's state — the
+ *     only in-app way back must never disappear. Personas are enumerated AS THE
+ *     REAL caller (via the stashed session), so the picker stays populated and
+ *     correctly scoped; the current persona is that list entry matching the live
+ *     session's uid.
+ *   - Not impersonating: the bar renders only for an eligible real caller
+ *     (`can_impersonate` OR admin OR the env allowlist), who may then start.
  */
 export async function getImpersonationState(): Promise<ImpersonationState> {
   if (!impersonationEnabled()) return INACTIVE;
@@ -257,22 +328,29 @@ export async function getImpersonationState(): Promise<ImpersonationState> {
   const cookieStore = await cookies();
   const stash = await readStash(cookieStore);
 
-  // Impersonating: authorize from the stashed real admin, not the cookie user.
-  if (stash && getAllowedUids().includes(stash.uid)) {
-    const roleValue = cookieStore.get(IMPERSONATION_ROLE_COOKIE)?.value;
-    return {
-      active: true,
-      impersonating: true,
-      currentRole: isTestRole(roleValue) ? roleValue : null,
-    };
+  if (stash) {
+    // Enumerate as the real caller, not the impersonated session.
+    const privileged = createSessionClient(stash.session);
+    const withEmail = await listImpersonationPersonas(privileged);
+    const personas = withEmail.map(sanitizePersona);
+
+    // The current persona is the live (impersonated) session's user.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const current = user ? personas.find((p) => p.id === user.id) ?? null : null;
+
+    return { active: true, impersonating: true, currentPersona: current, personas };
   }
 
-  // Not impersonating: the bar shows only for an allowlisted real admin session.
+  // Not impersonating: the bar shows only for an eligible real caller.
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || !getAllowedUids().includes(user.id)) return INACTIVE;
+  if (!user || !(await isEligibleCaller(supabase, user.id))) return INACTIVE;
 
-  return { active: true, impersonating: false, currentRole: null };
+  const personas = (await listImpersonationPersonas(supabase)).map(sanitizePersona);
+  return { active: true, impersonating: false, currentPersona: null, personas };
 }

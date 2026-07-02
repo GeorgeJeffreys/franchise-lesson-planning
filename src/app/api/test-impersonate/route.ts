@@ -4,41 +4,44 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import {
-  IMPERSONATION_ROLE_COOKIE,
   clearAuthCookies,
   clearStash,
-  getAllowedUids,
+  createSessionClient,
+  getPersonaPassword,
   impersonationEnabled,
+  isEligibleCaller,
   isStashedSessionResumable,
-  isTestRole,
+  listImpersonationPersonas,
   readStash,
-  roleToCredentials,
-  stashCookieOptions,
   writeSessionToAuthCookies,
   writeStash,
 } from '@/lib/test-impersonation';
 
 /**
- * Dev/preview-only impersonation endpoint. POST a `{ role }` to view-as one of
- * the three pre-configured test users, or `{ action: 'return' }` to restore your
- * own account. SECURITY-SENSITIVE: it establishes real Supabase sessions, so
- * every gate in `impersonationEnabled()` + the admin allowlist must hold or it
- * refuses.
+ * Dev/preview-only impersonation endpoint. POST a `{ personaId }` to step into a
+ * dedicated per-tester persona, or `{ action: 'return' }` to restore your own
+ * account. SECURITY-SENSITIVE: it establishes real Supabase sessions, so the
+ * master switch (`impersonationEnabled()`) and the caller-eligibility gate must
+ * hold or it refuses.
  *
- * The client only ever sends a role KEY; the server maps it to that role's
- * credentials from server-only env. An arbitrary user id or credential from the
- * client is never honoured. The test passwords are server-only and never leave
- * the server (not in any response, log line, or client bundle).
+ * The client only ever sends a persona UID. The server NEVER trusts it blindly:
+ * it re-enumerates the caller-scoped personas through the security-definer RPC
+ * (`list_impersonation_personas`, which returns only `is_test_persona` rows and
+ * hides admin personas from non-admins) and requires the requested id to be in
+ * that list. The persona's email and the shared password stay server-only and
+ * never leave the server (not in any response, log line, or client bundle).
  *
  * Session mechanism (matches this repo's @supabase/ssr cookie setup):
- *   - switch: sign in as the test user with `signInWithPassword({email, password})`
+ *   - switch: sign in as the persona with `signInWithPassword({email, password})`
+ *     — email from the RPC, password from the server-only TEST_PERSONA_PASSWORD —
  *     on the cookie-bound anon client. Supabase issues a genuine, correctly-signed
  *     session and the client writes its auth cookies; RLS then resolves to that
- *     user. We do NOT self-sign a token (the project signs with ECC/ES256, which
- *     we cannot reproduce — self-signed HS256 tokens are rejected as `bad_jwt`).
+ *     persona (so plans it creates/edits are owned by the persona, not the caller).
+ *     We do NOT self-sign a token, and we do NOT mint sessions via the admin API.
  *   - return: the real session's tokens are stashed (httpOnly) before the first
- *     swap and restored with `setSession`, then the stash is cleared. The real
- *     session's tokens are genuine, so restoration works.
+ *     swap and restored by writing the auth cookies directly, then the stash is
+ *     cleared. A valid stash is itself proof the session began from an eligible
+ *     caller, so Return is authorized by the stash alone.
  *
  * Failures return `{ ok: false, stage, message }` with an appropriate status so
  * the bar can show exactly which step failed and why. `message` is a short,
@@ -50,9 +53,9 @@ import {
 /** The step that failed, surfaced to the caller and the logs. */
 type Stage =
   | 'gate' // disabled / wrong env / not allowed in prod
-  | 'auth' // no current session / caller not in allowlist / sign-in failed
+  | 'auth' // no current session / caller not eligible / sign-in failed
   | 'config' // a required env var is missing or empty
-  | 'resolve_user' // invalid or missing role
+  | 'resolve_user' // invalid persona id / not permitted
   | 'restore'; // restoring the stashed real session failed
 
 /**
@@ -104,22 +107,21 @@ export async function POST(request: NextRequest) {
     const stash = await readStash(cookieStore);
 
     const body = (await request.json().catch(() => null)) as
-      | { role?: unknown; action?: unknown }
+      | { personaId?: unknown; action?: unknown }
       | null;
 
     // ── Return to my account ────────────────────────────────────────────────
-    // Authorized from the STASH alone, never the current session: while
-    // impersonating, the cookie user is the test user (not on the allowlist). The
-    // stash is only ever written after an allowlisted admin passed the gate on
-    // switch, so a valid stash from an allowlisted admin IS proof this session
-    // began as that admin — that is what authorizes the return.
+    // Authorized by the STASH alone, never the current session: while
+    // impersonating the cookie user is the persona, not the caller. The stash is
+    // only ever written after the eligibility gate passed on the first switch, so
+    // a VALID STASH is itself proof this session began from an eligible caller —
+    // that is what authorizes the return. Re-checking eligibility here would
+    // strand a tester whose eligibility comes from `can_impersonate` rather than
+    // the env allowlist, so we deliberately do not.
     if (body?.action === 'return') {
       stage = 'restore';
       if (!stash) {
         return NextResponse.json({ ok: true, impersonating: false });
-      }
-      if (!getAllowedUids().includes(stash.uid)) {
-        return fail('auth', 'caller is not on the impersonation allowlist', 404);
       }
 
       // If the stashed real session is still good, resume it by writing the auth
@@ -129,7 +131,6 @@ export async function POST(request: NextRequest) {
       if (isStashedSessionResumable(stash.session)) {
         writeSessionToAuthCookies(cookieStore, stash.session);
         clearStash(cookieStore);
-        cookieStore.delete(IMPERSONATION_ROLE_COOKIE);
         return NextResponse.json({ ok: true, impersonating: false });
       }
 
@@ -138,11 +139,10 @@ export async function POST(request: NextRequest) {
       // normal Entra login — a clean fallback, not an error.
       clearAuthCookies(cookieStore);
       clearStash(cookieStore);
-      cookieStore.delete(IMPERSONATION_ROLE_COOKIE);
       return NextResponse.json({ ok: true, impersonating: false, redirectTo: '/login' });
     }
 
-    // ── Switch into a role: requires the current REAL admin session ──────────
+    // ── Switch into a persona ─────────────────────────────────────────────────
     stage = 'auth';
     const supabase = await createClient();
     const {
@@ -151,29 +151,42 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return fail('auth', 'no current session', 401);
     }
-    // The real admin is the stashed identity when already impersonating, else the
-    // current session.
+    // The real caller is the stashed identity when already impersonating, else the
+    // current session. Enumerate/validate personas AS THE REAL CALLER: while
+    // impersonating the live session is the persona, so use a client bound to the
+    // stashed session; otherwise the current cookie session already is the caller.
     const realUid = stash?.uid ?? user.id;
-    if (!getAllowedUids().includes(realUid)) {
-      return fail('auth', 'caller is not on the impersonation allowlist', 404);
+    const privileged = stash ? createSessionClient(stash.session) : supabase;
+
+    // Eligibility: can_impersonate OR real admin OR env-allowlist fallback.
+    if (!(await isEligibleCaller(privileged, realUid))) {
+      return fail('auth', 'caller is not eligible to impersonate', 404);
     }
 
-    // ── Switch role: validate the requested role ─────────────────────────────
+    // ── Resolve the requested persona (never trust the client's id) ───────────
+    // The target must be present in the server-computed, caller-scoped list (the
+    // RPC returns only is_test_persona rows and hides admin personas from
+    // non-admins), so a guessed or out-of-scope id is rejected here.
     stage = 'resolve_user';
-    if (!isTestRole(body?.role)) {
-      return fail('resolve_user', 'invalid or missing role', 400);
+    const personaId = typeof body?.personaId === 'string' ? body.personaId : null;
+    if (!personaId) {
+      return fail('resolve_user', 'missing persona id', 400);
     }
-    const role = body.role;
+    const personas = await listImpersonationPersonas(privileged);
+    const target = personas.find((p) => p.id === personaId);
+    if (!target) {
+      return fail('resolve_user', 'persona not found or not permitted', 404);
+    }
 
-    // ── Config: resolve this role's credentials (names only, never values) ────
+    // ── Config: the shared persona password (server-only, never a value) ──────
     stage = 'config';
-    const creds = roleToCredentials(role);
-    if (!creds.ok) {
-      return fail('config', `${creds.missingVar} is not set`, 500);
+    const password = getPersonaPassword();
+    if (!password) {
+      return fail('config', 'TEST_PERSONA_PASSWORD is not set', 500);
     }
 
     // Stash the real session ONCE, before the first swap, so subsequent switches
-    // (teacher → coordinator → …) don't overwrite it and "Return" still works.
+    // (persona → persona → …) don't overwrite it and "Return" still works.
     if (!stash) {
       stage = 'auth';
       const {
@@ -187,36 +200,32 @@ export async function POST(request: NextRequest) {
       writeStash(cookieStore, { uid: user.id, session });
     }
 
-    // ── Establish the impersonated session by signing in as the test user ─────
-    // The cookie-bound anon client logs in with the test user's email+password;
-    // Supabase issues a genuine, correctly-signed session and writes its auth
-    // cookies, so RLS resolves to that user on subsequent requests. No token is
-    // self-signed and no password is ever returned or logged.
+    // ── Establish the impersonated session by signing in as the persona ───────
+    // The cookie-bound anon client logs in with the persona's email + the shared
+    // server-only password; Supabase issues a genuine, correctly-signed session
+    // and writes its auth cookies, so RLS resolves to the persona on subsequent
+    // requests. No token is self-signed and no password is ever returned or logged.
     stage = 'auth';
-    // Diagnostic (secret-free): the resolved email + whether the anon client's
-    // envs are present. A missing URL/key here is the likeliest cause of an
-    // empty/opaque sign-in error (the request never reaches GoTrue).
+    // Diagnostic (secret-free): whether the anon client's envs are present. A
+    // missing URL/key here is the likeliest cause of an empty/opaque sign-in error
+    // (the request never reaches GoTrue). The persona email/password are omitted.
     console.error(
       '[test-impersonate] sign-in attempt',
       JSON.stringify({
-        role,
-        email: creds.email,
+        personaId: target.id,
         hasAnonUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()),
         hasAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()),
       }),
     );
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: creds.email,
-      password: creds.password,
+      email: target.email,
+      password,
     });
     if (signInError) {
-      return fail('auth', reason(signInError, 'failed to sign in as the test user'), 401);
+      return fail('auth', reason(signInError, 'failed to sign in as the persona'), 401);
     }
 
-    // Record which role is now being viewed so the shell can label the bar.
-    cookieStore.set(IMPERSONATION_ROLE_COOKIE, role, stashCookieOptions());
-
-    return NextResponse.json({ ok: true, impersonating: true, role });
+    return NextResponse.json({ ok: true, impersonating: true, personaId: target.id });
   } catch (err) {
     // Unexpected throw — tag it with the step in flight; message is secret-free.
     return fail(stage, reason(err, 'unexpected error'), 500);

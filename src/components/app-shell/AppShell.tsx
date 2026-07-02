@@ -57,7 +57,8 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
       {impersonation.active ? (
         <TestUserBar
           impersonating={impersonation.impersonating}
-          currentRole={impersonation.currentRole}
+          currentPersona={impersonation.currentPersona}
+          personas={impersonation.personas}
         />
       ) : null}
 
