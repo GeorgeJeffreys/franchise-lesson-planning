@@ -208,9 +208,24 @@ export async function POST(request: NextRequest) {
       if (!session) {
         return fail('auth', 'no active session to stash', 401);
       }
+      // Capture the REAL caller's display name now, while the live session is
+      // still theirs (auth.uid() is the real caller): after the swap the session
+      // is the persona and this profile row may not be readable. This is the only
+      // moment we can read it with no definer RPC and no cross-identity read. The
+      // real user's own name reaching their own browser is expected and fine; it
+      // is never a persona identity. Fall back to the auth email if there is no
+      // profile row / full_name.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      const realDisplayName =
+        (profile as { full_name: string | null } | null)?.full_name ?? user.email ?? undefined;
       // Stash the WHOLE session (incl. expiry + user), CHUNKED, so Return can
-      // resume it by writing cookies directly, with no refresh-token replay.
-      writeStash(cookieStore, { uid: user.id, session });
+      // resume it by writing cookies directly, with no refresh-token replay. The
+      // real caller's display name rides along so the bar can anchor real identity.
+      writeStash(cookieStore, { uid: user.id, session, realDisplayName });
     }
 
     // ── Establish the impersonated session by signing in as the persona ───────

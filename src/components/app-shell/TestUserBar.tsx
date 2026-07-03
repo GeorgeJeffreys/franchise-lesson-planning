@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import type { ToggleRole } from '@/lib/test-roles';
+import { useImpersonationActions } from '@/components/app-shell/useImpersonationActions';
 
 type TestUserBarProps = {
   /** Whether a real session is stashed (we are currently viewing-as). */
@@ -13,6 +12,8 @@ type TestUserBarProps = {
   availableRoles: ToggleRole[];
   /** The toggle role currently being viewed, when impersonating. */
   currentRole?: ToggleRole;
+  /** The REAL caller's display name, shown while impersonating to anchor identity. */
+  realDisplayName?: string;
 };
 
 /**
@@ -34,67 +35,26 @@ type TestUserBarProps = {
  * Pink is reserved for editable content zones and is deliberately NOT used here to
  * signify the teacher role.
  */
-export function TestUserBar({ impersonating, availableRoles, currentRole }: TestUserBarProps) {
-  const router = useRouter();
+export function TestUserBar({
+  impersonating,
+  availableRoles,
+  currentRole,
+  realDisplayName,
+}: TestUserBarProps) {
   const t = useTranslations('testBar');
-  const [isPending, startTransition] = useTransition();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The banner's role switches and its Return button share the account menu's
+  // single implementation, so "Return to my account" is never forked.
+  const { post, returnToAccount, busy, error } = useImpersonationActions();
 
   const roleLabels: Record<ToggleRole, string> = {
     teacher: t('roleTeacher'),
     coordinator: t('roleCoordinator'),
   };
 
-  async function post(payload: Record<string, unknown>) {
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await fetch('/api/test-impersonate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        // The route returns { ok:false, stage, message } with a secret-free
-        // reason; surface it so failures are diagnosable. Fall back if absent.
-        let detail = t('switchFailed');
-        try {
-          const data = (await res.json()) as { stage?: unknown; message?: unknown };
-          if (typeof data?.stage === 'string' && typeof data?.message === 'string') {
-            detail = `${data.stage}: ${data.message}`;
-          }
-        } catch {
-          // Non-JSON body; keep the generic message.
-        }
-        setError(detail);
-        setBusy(false);
-        return;
-      }
-      // A clean fallback (e.g. the real session expired while impersonating) asks
-      // us to send the user to normal login rather than surfacing an error.
-      let redirectTo: string | null = null;
-      try {
-        const data = (await res.json()) as { redirectTo?: unknown };
-        if (typeof data?.redirectTo === 'string') redirectTo = data.redirectTo;
-      } catch {
-        // No / non-JSON body — just refresh in place.
-      }
-      // Cookies are now swapped; refresh so server components re-read the session
-      // and RLS-scoped data re-loads as the new user (or go to login on fallback).
-      startTransition(() => {
-        if (redirectTo) router.push(redirectTo);
-        else router.refresh();
-        setBusy(false);
-      });
-    } catch {
-      setError(t('switchFailed'));
-      setBusy(false);
-    }
-  }
-
-  const disabled = isPending || busy;
-  const viewing = impersonating && currentRole ? roleLabels[currentRole] : t('yourAccount');
+  const disabled = busy;
+  // The real caller's own name (never a persona's). A final neutral generic
+  // guards the rare case where the stash carried neither a name nor an email.
+  const realName = realDisplayName ?? t('yourAccount');
   const isToggle = availableRoles.length > 1;
 
   return (
@@ -105,10 +65,27 @@ export function TestUserBar({ impersonating, availableRoles, currentRole }: Test
       </span>
 
       <span className="text-neutral-700">
-        {t('viewingAs')}{' '}
-        <span className="font-semibold text-ink" dir="auto">
-          {viewing}
-        </span>
+        {impersonating && currentRole ? (
+          // Lead with the REAL identity so the persona reads as a costume, not a
+          // replacement. The role is the persona being viewed (currentRole); the
+          // name is the real caller's own name.
+          t.rich('youViewingAs', {
+            name: realName,
+            role: roleLabels[currentRole],
+            b: (chunks) => (
+              <span className="font-semibold text-ink" dir="auto">
+                {chunks}
+              </span>
+            ),
+          })
+        ) : (
+          <>
+            {t('viewingAs')}{' '}
+            <span className="font-semibold text-ink" dir="auto">
+              {t('yourAccount')}
+            </span>
+          </>
+        )}
       </span>
 
       <div className="ml-auto flex items-center gap-2">
@@ -170,7 +147,7 @@ export function TestUserBar({ impersonating, availableRoles, currentRole }: Test
           <button
             type="button"
             disabled={disabled}
-            onClick={() => post({ action: 'return' })}
+            onClick={() => returnToAccount()}
             className={cn(
               'ml-1.5 rounded-sm border border-border-strong bg-surface px-[10px] py-[4px] font-semibold text-neutral-800 transition-colors',
               'hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40 focus-visible:ring-offset-1',

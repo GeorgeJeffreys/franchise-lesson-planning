@@ -44,6 +44,14 @@ export const STASH_COOKIE = 'test-impersonation-stash';
 export interface ImpersonationStash {
   uid: string;
   session: Session;
+  /**
+   * The real caller's display name (`profiles.full_name`, falling back to the
+   * auth email), captured before the first swap so the bar can anchor the real
+   * identity while impersonating. This is the REAL user's own name — never a
+   * persona's — so surfacing it to their own browser is expected. Optional: it
+   * is absent from stashes written before this field existed.
+   */
+  realDisplayName?: string;
 }
 
 /** next/headers cookie store (writable inside Route Handlers). */
@@ -271,7 +279,9 @@ export async function readStash(cookieStore: CookieStore): Promise<Impersonation
       typeof session.access_token === 'string' &&
       typeof session.refresh_token === 'string'
     ) {
-      return { uid: parsed.uid, session };
+      const realDisplayName =
+        typeof parsed.realDisplayName === 'string' ? parsed.realDisplayName : undefined;
+      return { uid: parsed.uid, session, realDisplayName };
     }
     return null;
   } catch {
@@ -295,6 +305,12 @@ export interface ImpersonationState {
   availableRoles: ToggleRole[];
   /** The toggle role currently being viewed, when impersonating (undefined if it degrades). */
   currentRole?: ToggleRole;
+  /**
+   * The REAL caller's display name, surfaced only when impersonating so the bar
+   * can anchor real identity ("You: …"). From the stash's `realDisplayName`,
+   * falling back to the stashed session's user email for in-flight stashes.
+   */
+  realDisplayName?: string;
 }
 
 const INACTIVE: ImpersonationState = {
@@ -335,11 +351,18 @@ export async function getImpersonationState(): Promise<ImpersonationState> {
     } = await supabase.auth.getUser();
     const currentRole = user ? await currentRoleFor(supabase, user.id) : undefined;
 
+    // Anchor the real caller's identity. Prefer the name captured at stash time;
+    // for a stash written before that field existed, fall back to the stashed
+    // session's user email. The bar applies a final neutral generic if both are
+    // absent, so this is never blank and never crashes.
+    const realDisplayName = stash.realDisplayName ?? stash.session.user?.email ?? undefined;
+
     return {
       active: true,
       impersonating: true,
       availableRoles: rolesForCaller(isAdmin),
       currentRole,
+      realDisplayName,
     };
   }
 

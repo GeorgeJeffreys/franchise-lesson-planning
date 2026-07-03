@@ -59,6 +59,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
           impersonating={impersonation.impersonating}
           availableRoles={impersonation.availableRoles}
           currentRole={impersonation.currentRole}
+          realDisplayName={impersonation.realDisplayName}
         />
       ) : null}
 
@@ -92,6 +93,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
             subtitle={subtitle}
             pseudoRtlEnabled={pseudoRtlEnabled}
             pseudoRtlOn={pseudoRtlOn}
+            impersonating={impersonation.impersonating}
           />
         </div>
       </header>
