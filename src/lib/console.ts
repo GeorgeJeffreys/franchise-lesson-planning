@@ -306,28 +306,6 @@ export async function getConsoleClasses(): Promise<ConsoleClassesData> {
   };
 }
 
-// ── Members & roles ───────────────────────────────────────────────────────────
-// The admin Members tab is retired: user access is now managed from the Users-tab
-// "Edit access" modal (role-first). The coordinator-facing Members surface below
-// (getCoordinatorMembers) stays.
-
-/** Resolve a `teacher_id:school_id:subject_id` → "Year N" home-class map
- *  from the `class_teachers` rows the caller can see (RLS: own only, mostly). */
-function buildHomeClassMap(
-  links: Array<{
-    teacher_id: string;
-    classes: { school_id: string; subject_id: string; year: number } | null;
-  }>,
-): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const l of links) {
-    if (!l.classes) continue;
-    const k = `${l.teacher_id}:${l.classes.school_id}:${l.classes.subject_id}`;
-    if (!map.has(k)) map.set(k, `Year ${l.classes.year}`);
-  }
-  return map;
-}
-
 // ── Users (admin-only, org-wide) ──────────────────────────────────────────────
 // The global user-administration list backing the Users tab. Distinct from the
 // per-space Members tab above: it surfaces EVERY user (email included, via the
@@ -482,68 +460,68 @@ export async function getPendingCoordinatorRequests(): Promise<PendingCoordinato
 }
 
 // ── Members & roles (coordinator) ──────────────────────────────────────────────
+// The coordinator-facing roster, re-skinned to match the admin Users tab but scoped
+// to the caller's coordinated subject(s). One row per teacher (the per-school
+// cartesian is collapsed — coordinator authority is school-agnostic). Email lives in
+// auth.users, so this can only come from the `list_subject_members()` SECURITY
+// DEFINER function, which intrinsically scopes to the caller's coordinator_subject
+// rows (a non-coordinator gets nothing) and returns teachers only — never other
+// coordinators or admins. Filtering/search happen client-side in the tab.
 
-export interface CoordSpaceMember {
-  membershipId: string;
-  profileId: string;
-  name: string;
-  role: MembershipRole;
-  homeClass: string | null;
-  isSelf: boolean;
-}
-
-export interface CoordSpaceMembers {
-  schoolId: string;
+/** One coordinated-subject space a teacher belongs to. `membershipIds` are the
+ *  teacher's `subject_membership` rows in that subject (one per school) — what a
+ *  coordinator deletes to remove them from the subject (RLS-gated). */
+export interface SubjectMemberSpace {
   subjectId: string;
-  schoolName: string | null;
   subjectName: string | null;
-  members: CoordSpaceMember[];
+  membershipIds: string[];
 }
 
-export async function getCoordinatorMembers(): Promise<CoordSpaceMembers[]> {
-  const { coordinatorSpaces, profileId } = await getConsoleAccess();
-  if (coordinatorSpaces.length === 0) return [];
+export interface SubjectMember {
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  /** Global role from `profiles` (`user_role`) — distinct from `membership_role`.
+   *  In practice always 'teacher' here (coordinators/admins are excluded), but
+   *  surfaced faithfully from the RPC. */
+  role: MembershipRole | 'admin';
+  isDeactivated: boolean;
+  spaces: SubjectMemberSpace[];
+}
 
+/**
+ * Teachers within the caller's coordinated subject(s), for the coordinator Members
+ * tab. Throws only on a hard failure; the RPC scopes itself to the caller and raises
+ * only for a deactivated caller (belt-and-braces — a deactivated user can't reach
+ * the tab). Rows arrive already normalised to camelCase.
+ */
+export async function getSubjectMembers(): Promise<SubjectMember[]> {
   const supabase = await createClient();
-  const [{ data: memberships }, { data: profiles }, { data: ct }] = await Promise.all([
-    supabase.from('subject_membership').select('id, profile_id, school_id, subject_id, role'),
-    supabase.from('profiles').select('id, full_name'),
-    supabase
-      .from('class_teachers')
-      .select('teacher_id, classes ( school_id, subject_id, year )'),
-  ]);
+  const { data, error } = await supabase.rpc('list_subject_members');
+  if (error) throw new Error(error.message);
 
-  const membershipRows = (memberships ?? []) as Array<{
-    id: string;
-    profile_id: string;
-    school_id: string;
-    subject_id: string;
-    role: MembershipRole;
+  const rows = (data ?? []) as unknown as Array<{
+    user_id: string;
+    full_name: string | null;
+    email: string | null;
+    role: MembershipRole | 'admin';
+    is_deactivated: boolean;
+    spaces:
+      | Array<{ subject_id: string; subject: string | null; membership_ids: string[] | null }>
+      | null;
   }>;
-  const nameById = new Map<string, string>();
-  for (const p of (profiles ?? []) as Array<{ id: string; full_name: string | null }>) {
-    nameById.set(p.id, p.full_name ?? 'Unnamed');
-  }
-  const homeClasses = buildHomeClassMap(
-    (ct ?? []) as unknown as Parameters<typeof buildHomeClassMap>[0],
-  );
 
-  return coordinatorSpaces.map((space) => ({
-    schoolId: space.schoolId,
-    subjectId: space.subjectId,
-    schoolName: space.schoolName,
-    subjectName: space.subjectName,
-    members: membershipRows
-      .filter((m) => m.school_id === space.schoolId && m.subject_id === space.subjectId)
-      .map((m) => ({
-        membershipId: m.id,
-        profileId: m.profile_id,
-        name: nameById.get(m.profile_id) ?? 'Unnamed',
-        role: m.role,
-        homeClass: homeClasses.get(`${m.profile_id}:${m.school_id}:${m.subject_id}`) ?? null,
-        isSelf: m.profile_id === profileId,
-      }))
-      .sort((a, b) => Number(b.isSelf) - Number(a.isSelf) || a.name.localeCompare(b.name)),
+  return rows.map((r) => ({
+    userId: r.user_id,
+    fullName: r.full_name,
+    email: r.email,
+    role: r.role,
+    isDeactivated: r.is_deactivated,
+    spaces: (r.spaces ?? []).map((s) => ({
+      subjectId: s.subject_id,
+      subjectName: s.subject,
+      membershipIds: s.membership_ids ?? [],
+    })),
   }));
 }
 
