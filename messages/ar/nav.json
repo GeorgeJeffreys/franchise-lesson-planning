@@ -10,6 +10,12 @@
     "signOut": "تسجيل الخروج",
     "weeklyOverview": "النظرة الأسبوعية",
     "language": "اللغة",
-    "forceRtlDev": "فرض الاتجاه من اليمين لليسار (تطوير)"
+    "forceRtlDev": "فرض الاتجاه من اليمين لليسار (تطوير)",
+    "switchHint": "تبديل",
+    "yourSpaces": "مساحاتك",
+    "roleTeacher": "معلّم",
+    "roleCoordinator": "منسّق",
+    "updatingSpace": "جارٍ التحديث…",
+    "switchError": "تعذّر تبديل المساحة — حاول مرة أخرى"
   }
 }

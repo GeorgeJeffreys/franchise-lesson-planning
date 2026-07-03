@@ -12,6 +12,7 @@ import 'server-only';
 // every curriculum row, so the two paths return the same content either way.
 
 import { createClient } from '@/lib/supabase/server';
+import { getActiveSpace } from '@/lib/active-space';
 import {
   cleanLO,
   getCurriculumMonthRows,
@@ -187,9 +188,14 @@ export async function getCurriculumBrowseData(input: {
     codes.map((code) => ({ code, name: names.get(code) ?? code })),
   );
 
-  // Resolve subject (snap to first available — English sorts first).
+  // Resolve subject: an explicit `?subject=` wins (browsing another subject); else
+  // default to the user's ACTIVE space so the curriculum content agrees with the
+  // header chip; else fall back to the first synced subject (English sorts first).
+  const active = await getActiveSpace();
   const subject =
-    subjects.find((s) => s.code === input.subject) ?? subjects[0];
+    subjects.find((s) => s.code === input.subject) ??
+    (active ? subjects.find((s) => s.code === active.subjectCode) : undefined) ??
+    subjects[0];
 
   const years = await yearsForSubject(subject.code);
   if (years.length === 0) {

@@ -10,6 +10,12 @@
     "signOut": "Sign out",
     "weeklyOverview": "Weekly Overview",
     "language": "Language",
-    "forceRtlDev": "Force RTL (dev)"
+    "forceRtlDev": "Force RTL (dev)",
+    "switchHint": "Switch",
+    "yourSpaces": "Your spaces",
+    "roleTeacher": "Teacher",
+    "roleCoordinator": "Coordinator",
+    "updatingSpace": "Updating…",
+    "switchError": "Couldn't switch space — try again"
   }
 }
