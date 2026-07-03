@@ -8,6 +8,7 @@ import { signOut } from '@/lib/actions/auth';
 import { setActiveSpace } from '@/lib/actions/active-space';
 import { LocaleSwitcher } from '@/components/app-shell/LocaleSwitcher';
 import { ForceRtlToggle } from '@/components/app-shell/ForceRtlToggle';
+import { useImpersonationActions } from '@/components/app-shell/useImpersonationActions';
 import type { SwitcherSpace } from '@/lib/active-space';
 
 /** Up-to-two-letter initials for the avatar, derived from the display name. */
@@ -22,6 +23,13 @@ function initials(name: string): string {
  * The signed-in user control in the shell: an initials avatar + name chip that
  * opens a small menu (identity, profile link, sign out). Sign out posts to the
  * `signOut` server action, so the session is cleared server-side.
+ *
+ * This chip ALWAYS reflects the current session user — the persona while
+ * impersonating — and its Settings / language / sign-out act on that live
+ * session; it is never relabelled to the real caller. The one exception is the
+ * bottom item: while impersonating, "Sign out" (which would strand the tester on
+ * the persona's logout) is swapped for "Return to my account", wired to the same
+ * shared Return action the TEST MODE banner uses.
  */
 export function UserMenu({
   name,
@@ -29,6 +37,7 @@ export function UserMenu({
   spaces = [],
   pseudoRtlEnabled = false,
   pseudoRtlOn = false,
+  impersonating = false,
 }: {
   name: string;
   subtitle?: string;
@@ -38,8 +47,12 @@ export function UserMenu({
   pseudoRtlEnabled?: boolean;
   /** Current pseudo-RTL state (server-read from the cookie). */
   pseudoRtlOn?: boolean;
+  /** Whether a real session is stashed (viewing-as); swaps Sign out → Return. */
+  impersonating?: boolean;
 }) {
   const t = useTranslations('nav');
+  const tBar = useTranslations('testBar');
+  const { returnToAccount, busy } = useImpersonationActions();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -213,18 +226,40 @@ export function UserMenu({
           <LocaleSwitcher onSelect={() => setOpen(false)} />
           {pseudoRtlEnabled ? <ForceRtlToggle initialOn={pseudoRtlOn} /> : null}
           <div className="my-1 border-t border-neutral-100" />
-          <form action={signOut} role="none">
+          {impersonating ? (
+            // Viewing-as: restore the real account instead of signing the persona
+            // out. Reuses the banner's shared Return action (no forked logic).
+            // This is a safe recovery/navigation action, so it takes the normal
+            // neutral treatment — NOT the destructive Sign-out colour.
             <button
-              type="submit"
+              type="button"
               role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-3 py-[9px] text-start text-[13px] font-semibold text-pink hover:bg-surface-subtle"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                void returnToAccount();
+              }}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-3 py-[9px] text-start text-[13px] font-semibold text-neutral-900 hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-60"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 5 5v6" />
               </svg>
-              {t('signOut')}
+              {tBar('returnToAccount')}
             </button>
-          </form>
+          ) : (
+            <form action={signOut} role="none">
+              <button
+                type="submit"
+                role="menuitem"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-3 py-[9px] text-start text-[13px] font-semibold text-pink hover:bg-surface-subtle"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                {t('signOut')}
+              </button>
+            </form>
+          )}
         </div>
       ) : null}
     </div>
