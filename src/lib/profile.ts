@@ -3,6 +3,7 @@
 // Supabase client, so RLS scopes the read to the user's own profile.
 
 import { createClient } from '@/lib/supabase/server';
+import { getActiveSpace } from '@/lib/active-space';
 
 export interface HeaderProfile {
   /** Display name (full_name, falling back to email, then a friendly default). */
@@ -11,16 +12,16 @@ export interface HeaderProfile {
   subtitle?: string;
 }
 
-interface MembershipRow {
-  schools: { name: string } | null;
-  subjects: { name: string } | null;
+/** Compose the "Centre · Subject" subline, degrading gracefully when one is absent. */
+export function spaceSubtitle(school?: string, subject?: string): string | undefined {
+  return school && subject ? `${school} · ${subject}` : school ?? subject ?? undefined;
 }
 
 /**
  * Load the shell's header identity for the signed-in user. The "Centre · Subject"
- * subline comes from the user's primary `subject_membership` (the earliest by
- * created_at) — the permission model is per-space now, so the subtitle reflects
- * the space they joined first. Omitted when they belong to no space yet.
+ * subline comes from the user's ACTIVE space (`getActiveSpace()`) — the single
+ * canonical resolver every subject-defaulting surface shares, so the chip never
+ * disagrees with the board or curriculum. Omitted when they belong to no space yet.
  */
 export async function getHeaderProfile(): Promise<HeaderProfile> {
   const supabase = await createClient();
@@ -30,26 +31,13 @@ export async function getHeaderProfile(): Promise<HeaderProfile> {
 
   if (!user) return { name: 'there' };
 
-  const [{ data: profile }, { data: membership }] = await Promise.all([
+  const [{ data: profile }, active] = await Promise.all([
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
-    supabase
-      .from('subject_membership')
-      .select('schools ( name ), subjects ( name )')
-      .eq('profile_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    getActiveSpace(),
   ]);
 
-  // The embeds are many-to-one, so each resolves to a single object at runtime;
-  // database.types.ts is still a placeholder, so narrow by hand.
-  const row = membership as unknown as MembershipRow | null;
-
   const name = (profile as { full_name: string | null } | null)?.full_name ?? user.email ?? 'there';
-  const school = row?.schools?.name;
-  const subject = row?.subjects?.name;
-  const subtitle =
-    school && subject ? `${school} · ${subject}` : school ?? subject ?? undefined;
+  const subtitle = active ? spaceSubtitle(active.schoolName, active.subjectName) : undefined;
 
   return { name, subtitle };
 }

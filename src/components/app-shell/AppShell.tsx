@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/app-shell/NotificationBell';
 import { TestUserBar } from '@/components/app-shell/TestUserBar';
 import { getBellNotifications } from '@/lib/notifications';
 import { getImpersonationState } from '@/lib/test-impersonation';
+import { getSpaceSwitcher } from '@/lib/active-space';
 
 type AppShellProps = {
   /** The signed-in user's display name (full_name, falling back to email). */
@@ -28,9 +29,10 @@ type AppShellProps = {
  * unread dot shows only when that list is non-empty.
  */
 export async function AppShell({ name, subtitle, children }: AppShellProps) {
-  const [impersonation, notifications] = await Promise.all([
+  const [impersonation, notifications, spaces] = await Promise.all([
     getImpersonationState(),
     getBellNotifications(),
+    getSpaceSwitcher(),
   ]);
 
   // Dev-only RTL preview toggle, surfaced in the user menu. Gated on an explicit
@@ -91,6 +93,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
           <UserMenu
             name={name}
             subtitle={subtitle}
+            spaces={spaces}
             pseudoRtlEnabled={pseudoRtlEnabled}
             pseudoRtlOn={pseudoRtlOn}
             impersonating={impersonation.impersonating}

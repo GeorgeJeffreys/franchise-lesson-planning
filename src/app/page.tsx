@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AppShell } from '@/components/app-shell/AppShell';
 import { WeeklyOverview } from '@/components/weekly-overview/WeeklyOverview';
 import { getBoardData } from '@/lib/weekly-overview';
+import { getHeaderProfile } from '@/lib/profile';
 
 // Rendered per-request so it reflects the live session and selected coordinate.
 export const dynamic = 'force-dynamic';
@@ -24,13 +25,18 @@ export default async function Home({
   const view = viewParam === 'status' ? 'status' : 'calendar';
   const weekNum = week ? Number(week) : undefined;
 
-  const data = await getBoardData({
-    month: month || undefined,
-    week: Number.isFinite(weekNum) ? weekNum : undefined,
-  });
+  // The chip subtitle comes from the shared header profile (the active space), not
+  // the board's own resolved context, so the chip agrees with every other page.
+  const [data, { name, subtitle }] = await Promise.all([
+    getBoardData({
+      month: month || undefined,
+      week: Number.isFinite(weekNum) ? weekNum : undefined,
+    }),
+    getHeaderProfile(),
+  ]);
 
   return (
-    <AppShell name={data.teacherName} subtitle={data.context ?? undefined}>
+    <AppShell name={name} subtitle={subtitle}>
       <WeeklyOverview data={data} view={view} />
 
       {/* Temporary dev aid: a quiet link to your auth uid, still needed to run
