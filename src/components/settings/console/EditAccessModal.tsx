@@ -1,14 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { AdminUser, SubjectSpaceAxes } from '@/lib/console';
-import type { MembershipRole } from '@/lib/auth';
 import {
-  setUserAdmin,
+  setUserAccess,
   setUserDeactivated,
-  setUserMembership,
+  type AccessRole,
   type UsersActionResult,
 } from '@/lib/actions/users';
 import { setUserImpersonation } from '@/lib/actions/console';
@@ -17,16 +16,31 @@ import { Checkbox } from './ui';
 import { cn } from '@/lib/cn';
 
 // ── icons (inline, matching lucide's paths — no lucide dependency in this app) ──
-function ShieldIcon({ size = 16, className }: { size?: number; className?: string }) {
+// Role-tile glyphs use the exact paths from the design spec.
+function TeacherIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5" />
     </svg>
   );
 }
-function EyeIcon({ size = 16, className }: { size?: number; className?: string }) {
+function CoordinatorIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  );
+}
+function ShieldIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+function EyeIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -39,16 +53,34 @@ function XIcon({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-function LockIcon({ size = 13, className }: { size?: number; className?: string }) {
+function LockIcon({ size = 13 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
+function CheckMark() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
 
-const spaceKey = (schoolId: string, subjectId: string) => `${schoolId}:${subjectId}`;
+const ROLE_ICON: Record<AccessRole, (props: { size?: number }) => ReactElement> = {
+  teacher: TeacherIcon,
+  coordinator: CoordinatorIcon,
+  admin: ShieldIcon,
+};
+
+/** Derive the single access role to show from the user's current data. */
+function deriveRole(user: AdminUser): AccessRole {
+  if (user.isAdmin) return 'admin';
+  if (user.spaces.some((s) => s.role === 'coordinator')) return 'coordinator';
+  return 'teacher';
+}
 
 export function EditAccessModal({
   user,
@@ -68,17 +100,20 @@ export function EditAccessModal({
   const router = useRouter();
 
   // Optimistic local state — the UI never waits on the round-trip; a failed write
-  // reverts the specific field and shows the server's raised message.
-  const [isAdmin, setIsAdmin] = useState(user.isAdmin);
+  // reverts the specific field and shows the server's raised message. The role and
+  // the two chip groups are the desired access; each change reconciles the whole
+  // set via setUserAccess (persist-on-the-spot).
+  const initialRole = useMemo(() => deriveRole(user), [user]);
+  const [role, setRole] = useState<AccessRole>(initialRole);
+  const [schoolIds, setSchoolIds] = useState<Set<string>>(
+    () => new Set(user.spaces.filter((s) => s.role === 'teacher' && s.schoolId).map((s) => s.schoolId!)),
+  );
+  const [subjectIds, setSubjectIds] = useState<Set<string>>(() => {
+    const src: 'teacher' | 'coordinator' = initialRole === 'coordinator' ? 'coordinator' : 'teacher';
+    return new Set(user.spaces.filter((s) => s.role === src && s.subjectId).map((s) => s.subjectId!));
+  });
   const [isDeactivated, setIsDeactivated] = useState(user.isDeactivated);
   const [canImpersonate, setCanImpersonate] = useState(user.canImpersonate);
-  const [spaceRoles, setSpaceRoles] = useState<Map<string, MembershipRole>>(() => {
-    const m = new Map<string, MembershipRole>();
-    for (const s of user.spaces) {
-      if (s.schoolId && s.subjectId) m.set(spaceKey(s.schoolId, s.subjectId), s.role);
-    }
-    return m;
-  });
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,37 +138,52 @@ export function EditAccessModal({
     [router, t],
   );
 
+  const isAdmin = role === 'admin';
+
   // ── lock logic — mirror exactly what the server (0035) refuses ────────────────
   const isLastActiveAdmin = isAdmin && !isDeactivated && otherActiveAdmins === 0;
+  const roleLocked = isLastActiveAdmin; // whole selector locks to Admin
   const deactivateLocked = isLastActiveAdmin || isSelf;
 
-  function toggleAdmin(next: boolean) {
-    // Toggling admin must NOT touch memberships (that is what makes dim-not-clear
-    // correct: the ticks persist so unchecking admin restores them exactly).
+  const commit = useCallback(
+    (nextRole: AccessRole, nextSchools: Set<string>, nextSubjects: Set<string>) =>
+      setUserAccess(user.userId, {
+        role: nextRole,
+        schoolIds: [...nextSchools],
+        subjectIds: [...nextSubjects],
+      }),
+    [user.userId],
+  );
+
+  function selectRole(next: AccessRole) {
+    if (next === role || roleLocked) return;
+    const prev = role;
     persist(
-      () => setIsAdmin(next),
-      () => setIsAdmin(!next),
-      () => setUserAdmin(user.userId, next),
+      () => setRole(next),
+      () => setRole(prev),
+      () => commit(next, schoolIds, subjectIds),
     );
   }
 
-  function toggleRole(schoolId: string, subjectId: string, role: MembershipRole) {
-    const key = spaceKey(schoolId, subjectId);
-    const current = spaceRoles.get(key) ?? null;
-    // Teacher/Coordinator are mutually exclusive per space: clicking the checked
-    // role clears it (→ no membership); clicking the other switches to it.
-    const next: MembershipRole | null = current === role ? null : role;
-    const write = (value: MembershipRole | null) =>
-      setSpaceRoles((prev) => {
-        const m = new Map(prev);
-        if (value) m.set(key, value);
-        else m.delete(key);
-        return m;
-      });
+  function toggleSchool(id: string) {
+    const next = new Set(schoolIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     persist(
-      () => write(next),
-      () => write(current),
-      () => setUserMembership(user.userId, schoolId, subjectId, next),
+      () => setSchoolIds(next),
+      () => setSchoolIds(schoolIds),
+      () => commit(role, next, subjectIds),
+    );
+  }
+
+  function toggleSubject(id: string) {
+    const next = new Set(subjectIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    persist(
+      () => setSubjectIds(next),
+      () => setSubjectIds(subjectIds),
+      () => commit(role, schoolIds, next),
     );
   }
 
@@ -206,6 +256,12 @@ export function EditAccessModal({
     };
   }, []);
 
+  const roleOptions: Array<{ value: AccessRole; label: string }> = [
+    { value: 'teacher', label: t('roles.teacher') },
+    { value: 'coordinator', label: t('roles.coordinator') },
+    { value: 'admin', label: t('users.adminBadge') },
+  ];
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
@@ -258,161 +314,155 @@ export function EditAccessModal({
 
         {/* ── Body (scrolls) ───────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-[22px] py-[20px]">
-          {/* Global access */}
-          <div className="mb-[10px] text-[11px] font-bold uppercase tracking-[0.06em] text-[#B4AA9E]">
-            {t('users.globalAccess')}
+          {/* Role selector */}
+          <div className="mb-[10px] text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#A79E94]">
+            {t('users.role')}
           </div>
           <div
-            className={cn(
-              'flex items-center gap-[12px] rounded-[11px] border px-[14px] py-[12px]',
-              isAdmin ? 'border-[#CFE6E0] bg-[#F7FBFA]' : 'border-[#E7DECF] bg-white',
-            )}
+            role="radiogroup"
+            aria-label={t('users.role')}
+            className={cn('flex flex-col gap-[8px]', roleLocked && 'pointer-events-none opacity-[.55]')}
           >
-            <Checkbox
-              checked={isAdmin}
-              locked={isLastActiveAdmin}
-              onChange={toggleAdmin}
-              aria-label={t('users.adminBadge')}
-            />
-            <span
-              className={cn(
-                'inline-flex size-[34px] shrink-0 items-center justify-center rounded-[9px]',
-                isAdmin ? 'bg-[#E4F0ED] text-[#186155]' : 'bg-[#F3ECE2] text-[#8A8178]',
-              )}
-            >
-              <ShieldIcon />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-ink">{t('users.adminBadge')}</div>
-              <div className={cn('text-[12px]', isAdmin ? 'text-[#186155]' : 'text-[#8A8178]')}>
-                {isAdmin ? t('users.orgWide') : t('users.standardAccess')}
-              </div>
-            </div>
+            {roleOptions.map(({ value, label }) => {
+              const selected = role === value;
+              const Icon = ROLE_ICON[value];
+              const showLock = roleLocked && value === 'admin';
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={roleLocked}
+                  onClick={() => selectRole(value)}
+                  className={cn(
+                    'flex w-full items-center gap-[12px] rounded-[11px] border px-[14px] py-[11px] text-start transition-colors',
+                    selected ? 'border-[#CFE6E0] bg-[#F7FBFA]' : 'border-[#E7DECF] bg-white',
+                    roleLocked ? 'cursor-not-allowed' : 'cursor-pointer',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors',
+                      selected ? 'border-transparent bg-[#1F7A6C]' : 'border-[#CBBFB0] bg-white',
+                    )}
+                  >
+                    {selected ? <span className="size-[6px] rounded-full bg-white" /> : null}
+                  </span>
+                  <span
+                    className={cn(
+                      'inline-flex size-[30px] shrink-0 items-center justify-center rounded-[8px]',
+                      selected ? 'bg-[#E4F0ED] text-[#186155]' : 'bg-[#F3ECE2] text-[#A79E94]',
+                    )}
+                  >
+                    <Icon />
+                  </span>
+                  <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink">{label}</span>
+                  {showLock ? (
+                    <span className="shrink-0 text-[#B08A4A]">
+                      <LockIcon />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
-          {isLastActiveAdmin ? (
+          {roleLocked ? (
             <div className="mt-[10px] flex items-start gap-[9px] rounded-[10px] border border-[#EDE1D0] bg-[#FBF5EE] px-[13px] py-[10px]">
               <span className="mt-[1px] shrink-0 text-[#B08A4A]">
                 <LockIcon />
               </span>
               <span className="text-[12.5px] leading-[1.5] text-[#7A6A4E]">
-                {t('users.lastAdminNote')}
+                {t('users.lastAdminRoleNote')}
               </span>
             </div>
           ) : null}
 
-          {/* Impersonation — a clone of the Admin row above. Grants test-bar
-              access (profiles.can_impersonate). Real admins are always eligible
-              (eligibility is can_impersonate OR admin), so for an admin the row is
-              rendered implied-on and non-interactive, exactly like the Members
-              roster's toggle. */}
-          <div
-            className={cn(
-              'mt-[10px] flex items-center gap-[12px] rounded-[11px] border px-[14px] py-[12px]',
-              isAdmin || canImpersonate ? 'border-[#CFE6E0] bg-[#F7FBFA]' : 'border-[#E7DECF] bg-white',
-            )}
-          >
-            <Checkbox
-              checked={isAdmin ? true : canImpersonate}
-              locked={isAdmin}
-              onChange={toggleImpersonation}
-              aria-label={
-                isAdmin
-                  ? t('members.testBar.adminLabel', { name })
-                  : t('members.testBar.toggleLabel', { name })
-              }
+          {/* Conditional selectors */}
+          {role === 'teacher' ? (
+            <ChipGroup
+              className="mt-[24px]"
+              label={t('users.schools')}
+              items={axes.centres}
+              selected={schoolIds}
+              onToggle={toggleSchool}
+              emptyLabel={t('users.noSchools')}
             />
-            <span
+          ) : null}
+
+          {role === 'teacher' || role === 'coordinator' ? (
+            <ChipGroup
+              className="mt-[24px]"
+              label={t('users.subjects')}
+              items={axes.subjects}
+              selected={subjectIds}
+              onToggle={toggleSubject}
+              emptyLabel={t('users.noSubjects')}
+              hint={role === 'coordinator' ? t('users.coordinatorAllSchools') : undefined}
+            />
+          ) : null}
+
+          {role === 'admin' ? (
+            <div className="mt-[24px] flex items-center gap-[12px] rounded-[11px] border border-[#CFE6E0] bg-[#F7FBFA] px-[15px] py-[14px]">
+              <span className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#E4F0ED] text-[#186155]">
+                <ShieldIcon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-medium text-[#3A332E]">{t('users.orgWide')}</div>
+                <div className="text-[12px] text-[#8A8178]">{t('users.orgWideNote')}</div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Impersonation — a standalone org-level control (not part of the role
+              model). Grants test-bar access (profiles.can_impersonate). Real admins
+              are always eligible (eligibility is can_impersonate OR admin), so for an
+              admin the row is rendered implied-on and non-interactive. */}
+          <div className="mt-[24px] border-t border-[#EFE7DA] pt-[20px]">
+            <div className="mb-[10px] text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#A79E94]">
+              {t('users.impersonation')}
+            </div>
+            <div
               className={cn(
-                'inline-flex size-[34px] shrink-0 items-center justify-center rounded-[9px]',
-                isAdmin || canImpersonate ? 'bg-[#E4F0ED] text-[#186155]' : 'bg-[#F3ECE2] text-[#8A8178]',
+                'flex items-center gap-[12px] rounded-[11px] border px-[14px] py-[12px]',
+                isAdmin || canImpersonate ? 'border-[#CFE6E0] bg-[#F7FBFA]' : 'border-[#E7DECF] bg-white',
               )}
             >
-              <EyeIcon />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-ink">{t('users.impersonation')}</div>
-              <div
+              <Checkbox
+                checked={isAdmin ? true : canImpersonate}
+                locked={isAdmin}
+                onChange={toggleImpersonation}
+                aria-label={
+                  isAdmin
+                    ? t('members.testBar.adminLabel', { name })
+                    : t('members.testBar.toggleLabel', { name })
+                }
+              />
+              <span
                 className={cn(
-                  'text-[12px]',
-                  isAdmin || canImpersonate ? 'text-[#186155]' : 'text-[#8A8178]',
+                  'inline-flex size-[34px] shrink-0 items-center justify-center rounded-[9px]',
+                  isAdmin || canImpersonate ? 'bg-[#E4F0ED] text-[#186155]' : 'bg-[#F3ECE2] text-[#8A8178]',
                 )}
               >
-                {isAdmin
-                  ? t('users.impersonationAdmin')
-                  : canImpersonate
-                    ? t('users.impersonationOn')
-                    : t('users.impersonationOff')}
-              </div>
-            </div>
-          </div>
-
-          {/* Subject spaces */}
-          <div className="mb-[10px] mt-[22px] flex items-center gap-[9px]">
-            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#B4AA9E]">
-              {t('users.col.spaces')}
-            </span>
-            {isAdmin ? (
-              <span className="rounded-[6px] bg-[#F3ECE2] px-[8px] py-[2px] text-[10.5px] font-semibold text-[#8A8178]">
-                {t('users.notUsedWhileAdmin')}
+                <EyeIcon />
               </span>
-            ) : null}
-          </div>
-
-          <div className={cn(isAdmin && 'pointer-events-none opacity-[.42]')} aria-disabled={isAdmin}>
-            {/* Column headers */}
-            <div className="grid grid-cols-[1fr_72px_96px] items-center border-b border-[#F0EAE1] px-[4px] pb-[8px]">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#B4AA9E]">
-                {t('users.spaceCol')}
-              </span>
-              <span className="text-center text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#B4AA9E]">
-                {t('roles.teacher')}
-              </span>
-              <span className="text-center text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#B4AA9E]">
-                {t('roles.coordinator')}
-              </span>
-            </div>
-
-            {axes.centres.length === 0 || axes.subjects.length === 0 ? (
-              <div className="px-[4px] py-[20px] text-center text-[12.5px] text-[#A79E94]">
-                {t('users.noSpaces')}
-              </div>
-            ) : (
-              axes.centres.map((centre) => (
-                <div key={centre.id}>
-                  <div className="px-[4px] pb-[5px] pt-[13px] text-[12px] font-semibold text-[#5A524B]" dir="auto">
-                    {centre.name}
-                  </div>
-                  {axes.subjects.map((subject) => {
-                    const role = spaceRoles.get(spaceKey(centre.id, subject.id)) ?? null;
-                    return (
-                      <div
-                        key={subject.id}
-                        className="grid grid-cols-[1fr_72px_96px] items-center border-b border-[#F0EAE1] px-[4px] py-[9px]"
-                      >
-                        <span className="text-[13px] text-ink" dir="auto">
-                          {subject.name}
-                        </span>
-                        <span className="flex justify-center">
-                          <Checkbox
-                            checked={role === 'teacher'}
-                            onChange={() => toggleRole(centre.id, subject.id, 'teacher')}
-                            aria-label={`${subject.name} · ${centre.name} · ${t('roles.teacher')}`}
-                          />
-                        </span>
-                        <span className="flex justify-center">
-                          <Checkbox
-                            checked={role === 'coordinator'}
-                            onChange={() => toggleRole(centre.id, subject.id, 'coordinator')}
-                            aria-label={`${subject.name} · ${centre.name} · ${t('roles.coordinator')}`}
-                          />
-                        </span>
-                      </div>
-                    );
-                  })}
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-semibold text-ink">{t('users.impersonation')}</div>
+                <div
+                  className={cn(
+                    'text-[12px]',
+                    isAdmin || canImpersonate ? 'text-[#186155]' : 'text-[#8A8178]',
+                  )}
+                >
+                  {isAdmin
+                    ? t('users.impersonationAdmin')
+                    : canImpersonate
+                      ? t('users.impersonationOn')
+                      : t('users.impersonationOff')}
                 </div>
-              ))
-            )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -485,6 +535,69 @@ export function EditAccessModal({
           {toast}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── chip group (schools / subjects) ─────────────────────────────────────────────
+function ChipGroup({
+  className,
+  label,
+  hint,
+  items,
+  selected,
+  onToggle,
+  emptyLabel,
+}: {
+  className?: string;
+  label: string;
+  hint?: string;
+  items: Array<{ id: string; name: string }>;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  emptyLabel: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="mb-[10px] flex items-baseline gap-[9px]">
+        <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-[#A79E94]">{label}</span>
+        {hint ? <span className="text-[11.5px] font-medium text-[#A79E94]">{hint}</span> : null}
+      </div>
+      {items.length === 0 ? (
+        <div className="text-[12.5px] text-[#A79E94]">{emptyLabel}</div>
+      ) : (
+        <div className="flex flex-wrap gap-[8px]">
+          {items.map((item) => {
+            const checked = selected.has(item.id);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                aria-label={item.name}
+                onClick={() => onToggle(item.id)}
+                className={cn(
+                  'inline-flex items-center gap-[9px] rounded-[9px] border px-[13px] py-[8px] text-[13.5px] transition-colors',
+                  checked
+                    ? 'border-[#1F7A6C] bg-[#F7FBFA] font-semibold text-[#186155]'
+                    : 'border-[#E0D6C7] bg-white font-medium text-[#5A524B]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition-colors',
+                    checked ? 'border-[#1F7A6C] bg-[#1F7A6C]' : 'border-[#CBBFB0] bg-white',
+                  )}
+                >
+                  {checked ? <CheckMark /> : null}
+                </span>
+                <span dir="auto">{item.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -239,7 +239,15 @@
       "spaceCol": "Space",
       "done": "Done",
       "noSpaces": "No subject spaces are set up yet.",
+      "role": "Role",
+      "schools": "Schools",
+      "subjects": "Subjects",
+      "noSchools": "No centres are set up yet.",
+      "noSubjects": "No subjects are set up yet.",
+      "coordinatorAllSchools": "Across all schools",
+      "orgWideNote": "Manages every centre, subject, class, and user.",
       "lastAdminNote": "Last active admin — promote another admin before removing this one.",
+      "lastAdminRoleNote": "Last active admin — promote another admin before changing this role.",
       "selfDeactivateNote": "You can’t deactivate your own account."
     },
     "aiGuide": {

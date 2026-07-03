@@ -18,7 +18,12 @@ import 'server-only';
 // derivation did not.
 
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentProfile, getMyMemberships, type AppRole, type MembershipRole } from '@/lib/auth';
+import {
+  getCurrentProfile,
+  getMyMemberships,
+  type Membership,
+  type MembershipRole,
+} from '@/lib/auth';
 
 // ── Role / access resolution ────────────────────────────────────────────────
 
@@ -54,29 +59,25 @@ export interface ConsoleAccess {
 
 /**
  * Resolve which console tabs the signed-in user gets and where they land.
- * Admin → Centres · Subjects · Classes · Members · Curriculum · AI resource guide
- * · SMARTT objective guide · Users (+ Profile first).
- * Coordinator (non-admin, ≥1 coordinator membership) → Members · Curriculum.
+ * Admin → Centres · Subjects · Classes · Calendar · Curriculum · AI resource guide
+ * · SMARTT objective guide · Users (+ Profile first). The admin Members tab is
+ * retired — user access is managed from the Users-tab "Edit access" modal.
+ * Coordinator (non-admin, ≥1 coordinated subject) → Members · Curriculum.
  * Everyone has Profile. Teacher → Profile only.
  */
 export async function getConsoleAccess(): Promise<ConsoleAccess> {
   const [profile, memberships] = await Promise.all([getCurrentProfile(), getMyMemberships()]);
   const isAdmin = profile?.role === 'admin';
 
-  const coordinatorSpaces: CoordinatorSpace[] = memberships
-    .filter((m) => m.role === 'coordinator')
-    .map((m) => ({
-      schoolId: m.schoolId,
-      subjectId: m.subjectId,
-      schoolName: m.schoolName,
-      subjectName: m.subjectName,
-    }));
+  // Coordinated subjects are school-agnostic (coordinator_subject); admins don't
+  // render the coordinator surface, so skip the read for them.
+  const coordinatorSpaces = isAdmin ? [] : await resolveCoordinatorSpaces(memberships);
   const isCoordinator = !isAdmin && coordinatorSpaces.length > 0;
 
   const tabs: ConsoleTab[] = ['profile'];
   let defaultTab: ConsoleTab = 'profile';
   if (isAdmin) {
-    tabs.push('centres', 'subjects', 'classes', 'calendar', 'members', 'curriculum', 'ai_guide', 'smartt_guide', 'users');
+    tabs.push('centres', 'subjects', 'classes', 'calendar', 'curriculum', 'ai_guide', 'smartt_guide', 'users');
     defaultTab = 'centres';
   } else if (isCoordinator) {
     tabs.push('members', 'curriculum');
@@ -91,6 +92,56 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
     tabs,
     defaultTab,
   };
+}
+
+/**
+ * A coordinator's spaces for the (coordinator-facing) Members tab. Coordinator-ness
+ * is school-agnostic — one `coordinator_subject` row means "this subject at every
+ * school" — so we expand each coordinated subject across all active schools. During
+ * the migration-1→2 transition a coordinator may still carry legacy per-school
+ * `subject_membership` coordinator rows, so we union both sources by subject.
+ */
+async function resolveCoordinatorSpaces(memberships: Membership[]): Promise<CoordinatorSpace[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: coordRows } = await supabase
+    .from('coordinator_subject')
+    .select('subject_id, subjects ( name )')
+    .eq('profile_id', user.id);
+
+  // subjectId → subjectName, deduped across the new table and any legacy rows.
+  const coordinatedSubjects = new Map<string, string | null>();
+  for (const r of (coordRows ?? []) as unknown as Array<{
+    subject_id: string;
+    subjects: { name: string } | null;
+  }>) {
+    coordinatedSubjects.set(r.subject_id, r.subjects?.name ?? null);
+  }
+  for (const m of memberships) {
+    if (m.role === 'coordinator' && !coordinatedSubjects.has(m.subjectId)) {
+      coordinatedSubjects.set(m.subjectId, m.subjectName);
+    }
+  }
+  if (coordinatedSubjects.size === 0) return [];
+
+  const { data: schools } = await supabase
+    .from('schools')
+    .select('id, name')
+    .is('archived_at', null)
+    .order('name');
+  const activeSchools = (schools ?? []) as Array<{ id: string; name: string }>;
+
+  const spaces: CoordinatorSpace[] = [];
+  for (const [subjectId, subjectName] of coordinatedSubjects) {
+    for (const s of activeSchools) {
+      spaces.push({ schoolId: s.id, subjectId, schoolName: s.name, subjectName });
+    }
+  }
+  return spaces;
 }
 
 const spaceKey = (schoolId: string, subjectId: string) => `${schoolId}:${subjectId}`;
@@ -255,39 +306,10 @@ export async function getConsoleClasses(): Promise<ConsoleClassesData> {
   };
 }
 
-// ── Members & roles (admin) ───────────────────────────────────────────────────
-
-export interface PersonMembership {
-  membershipId: string;
-  schoolId: string;
-  subjectId: string;
-  schoolName: string | null;
-  subjectName: string | null;
-  role: MembershipRole;
-  /** Home class ("Year 1") for this person in this space, when visible. */
-  homeClass: string | null;
-}
-
-export interface Person {
-  profileId: string;
-  name: string;
-  /** Global role on `profiles.role`. Admins are always test-bar eligible. */
-  role: AppRole;
-  /**
-   * Whether this user may USE the test bar (`profiles.can_impersonate`). Note
-   * real admins are eligible regardless (eligibility is `can_impersonate` OR
-   * admin), so the toggle renders as implied-on for them.
-   */
-  canImpersonate: boolean;
-  /** Empty → "No access" (no subject_membership rows). */
-  memberships: PersonMembership[];
-}
-
-export interface AdminMembersData {
-  people: Person[];
-  centres: Array<{ id: string; name: string }>;
-  subjects: Array<{ id: string; name: string }>;
-}
+// ── Members & roles ───────────────────────────────────────────────────────────
+// The admin Members tab is retired: user access is now managed from the Users-tab
+// "Edit access" modal (role-first). The coordinator-facing Members surface below
+// (getCoordinatorMembers) stays.
 
 /** Resolve a `teacher_id:school_id:subject_id` → "Year N" home-class map
  *  from the `class_teachers` rows the caller can see (RLS: own only, mostly). */
@@ -304,74 +326,6 @@ function buildHomeClassMap(
     if (!map.has(k)) map.set(k, `Year ${l.classes.year}`);
   }
   return map;
-}
-
-/** One membership entry inside `admin_list_users`' aggregated `memberships` jsonb. */
-interface RosterMembership {
-  membership_id: string;
-  school_id: string;
-  school_name: string | null;
-  subject_id: string;
-  subject_name: string | null;
-  role: MembershipRole;
-}
-
-/** A row of the `admin_list_users()` RPC (0023, extended in 0036). */
-interface RosterRow {
-  user_id: string;
-  full_name: string | null;
-  email: string | null;
-  role: AppRole | null;
-  can_impersonate: boolean | null;
-  memberships: RosterMembership[] | null;
-}
-
-export async function getAdminMembers(): Promise<AdminMembersData> {
-  const supabase = await createClient();
-  // The roster comes from the admin-gated definer RPC so EVERY user is present
-  // (incl. zero-membership newcomers and cross-space testers the RLS-bound
-  // `profiles` read could never see). Home-class + the modal's centre/subject
-  // pickers still read reference/`class_teachers` data via the auth'd client.
-  const [{ data: roster }, { data: ct }, { data: schools }, { data: subjects }] = await Promise.all([
-    supabase.rpc('admin_list_users'),
-    supabase
-      .from('class_teachers')
-      .select('teacher_id, classes ( school_id, subject_id, year )'),
-    supabase.from('schools').select('id, name').is('archived_at', null).order('name'),
-    supabase.from('subjects').select('id, name').is('archived_at', null).order('name'),
-  ]);
-
-  const rosterRows = (roster ?? []) as unknown as RosterRow[];
-  const homeClasses = buildHomeClassMap(
-    (ct ?? []) as unknown as Parameters<typeof buildHomeClassMap>[0],
-  );
-
-  const people: Person[] = rosterRows.map((r) => {
-    const memberships: PersonMembership[] = (r.memberships ?? []).map((m) => ({
-      membershipId: m.membership_id,
-      schoolId: m.school_id,
-      subjectId: m.subject_id,
-      schoolName: m.school_name,
-      subjectName: m.subject_name,
-      role: m.role,
-      homeClass: homeClasses.get(`${r.user_id}:${m.school_id}:${m.subject_id}`) ?? null,
-    }));
-    return {
-      profileId: r.user_id,
-      name: r.full_name?.trim() || 'Unnamed',
-      role: r.role ?? 'teacher',
-      canImpersonate: r.can_impersonate === true,
-      memberships,
-    };
-  });
-
-  people.sort((a, b) => a.name.localeCompare(b.name));
-
-  return {
-    people,
-    centres: (schools ?? []) as Array<{ id: string; name: string }>,
-    subjects: (subjects ?? []) as Array<{ id: string; name: string }>,
-  };
 }
 
 // ── Users (admin-only, org-wide) ──────────────────────────────────────────────

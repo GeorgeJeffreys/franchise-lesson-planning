@@ -413,20 +413,11 @@ export async function coordRemoveMember(input: { membershipId: string }): Promis
   return ok();
 }
 
-/** Coordinator (or admin): promote a teacher to coordinator of the space. */
-export async function coordPromoteMember(input: { membershipId: string }): Promise<ConsoleResult> {
-  const profile = await getCurrentProfile();
-  if (!profile) return fail('You must be signed in.');
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('subject_membership')
-    .update({ role: 'coordinator' })
-    .eq('id', input.membershipId);
-  if (error) return fail(error.message);
-  revalidateConsole();
-  return ok();
-}
+// Coordinator promotion is intentionally NOT a coordinator-facing action anymore:
+// under the role-first model a coordinator manages their subject across ALL schools
+// (`coordinator_subject`), so minting one is an org-level grant that lives only in
+// the admin "Edit access" modal (setUserAccess). A coordinator can still remove a
+// teacher from their space (coordRemoveMember above).
 
 // ── Test-bar access (admin) ───────────────────────────────────────────────────
 

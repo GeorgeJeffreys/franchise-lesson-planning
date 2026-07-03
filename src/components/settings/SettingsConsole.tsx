@@ -4,7 +4,6 @@ import { useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import type {
-  AdminMembersData,
   AdminUser,
   CentreRow,
   ConsoleAccess,
@@ -22,7 +21,7 @@ import { CentresTab } from './console/CentresTab';
 import { SubjectsTab } from './console/SubjectsTab';
 import { ClassesTab } from './console/ClassesTab';
 import { TermCalendarTab } from './console/TermCalendarTab';
-import { AdminMembersTab, CoordinatorMembersTab } from './console/MembersTab';
+import { CoordinatorMembersTab } from './console/MembersTab';
 import { CurriculumTab } from './console/CurriculumTab';
 import { AiGuideTab } from './console/AiGuideTab';
 import { SmarttGuideTab } from './console/SmarttGuideTab';
@@ -36,7 +35,6 @@ export interface SettingsConsoleProps {
   centres?: CentreRow[];
   subjects?: SubjectRow[];
   classesData?: ConsoleClassesData;
-  adminMembers?: AdminMembersData;
   coordSpaces?: CoordSpaceMembers[];
   curriculum?: CurriculumSubjectStatus[];
   resourceGuide?: ResourceGuideVersion | null;
@@ -100,12 +98,8 @@ export function SettingsConsole(props: SettingsConsoleProps) {
         {tab === 'subjects' && props.subjects ? <SubjectsTab subjects={props.subjects} /> : null}
         {tab === 'classes' && props.classesData ? <ClassesTab data={props.classesData} /> : null}
         {tab === 'calendar' && access.isAdmin ? <TermCalendarTab terms={props.terms ?? []} /> : null}
-        {tab === 'members' ? (
-          access.isAdmin && props.adminMembers ? (
-            <AdminMembersTab data={props.adminMembers} />
-          ) : props.coordSpaces ? (
-            <CoordinatorMembersTab spaces={props.coordSpaces} />
-          ) : null
+        {tab === 'members' && props.coordSpaces ? (
+          <CoordinatorMembersTab spaces={props.coordSpaces} />
         ) : null}
         {tab === 'curriculum' && props.curriculum ? (
           <CurriculumTab statuses={props.curriculum} />

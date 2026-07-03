@@ -9,7 +9,6 @@ import { SettingsConsole } from '@/components/settings/SettingsConsole';
 import {
   getActiveResourceGuideVersion,
   getActiveSmarttGuideVersion,
-  getAdminMembers,
   getCentres,
   getConsoleAccess,
   getConsoleClasses,
@@ -19,7 +18,6 @@ import {
   getSubjectSpaceAxes,
   getTerms,
   getUsersAdmin,
-  type AdminMembersData,
   type AdminUser,
   type CentreRow,
   type ConsoleClassesData,
@@ -77,7 +75,6 @@ export default async function SettingsPage() {
   let centres: CentreRow[] | undefined;
   let subjects: SubjectRow[] | undefined;
   let classesData: ConsoleClassesData | undefined;
-  let adminMembers: AdminMembersData | undefined;
   let coordSpaces: CoordSpaceMembers[] | undefined;
   let curriculum: CurriculumSubjectStatus[] | undefined;
   let resourceGuide: ResourceGuideVersion | null | undefined;
@@ -90,12 +87,11 @@ export default async function SettingsPage() {
   let userAxes: SubjectSpaceAxes | undefined;
 
   if (access.isAdmin) {
-    [centres, subjects, classesData, adminMembers, curriculum, resourceGuide, smarttGuide, terms, users, userAxes] =
+    [centres, subjects, classesData, curriculum, resourceGuide, smarttGuide, terms, users, userAxes] =
       await Promise.all([
         getCentres(),
         getSubjects(),
         getConsoleClasses(),
-        getAdminMembers(),
         getCurriculumStatus(),
         getActiveResourceGuideVersion(),
         getActiveSmarttGuideVersion(),
@@ -130,7 +126,6 @@ export default async function SettingsPage() {
           centres={centres}
           subjects={subjects}
           classesData={classesData}
-          adminMembers={adminMembers}
           coordSpaces={coordSpaces}
           curriculum={curriculum}
           resourceGuide={resourceGuide}
