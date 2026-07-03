@@ -1,4 +1,4 @@
--- 0039_coordinator_subject.sql
+-- 0040_coordinator_subject.sql
 --
 -- Role-first access model, migration 1 of 2 (schema + readers). ⚠️ CORE AUTH —
 -- this rewrites three of the access helpers that gate every RLS policy, so review

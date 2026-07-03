@@ -1,4 +1,4 @@
--- 0039_reconciliation_counts.sql — READ-ONLY. Run in the Supabase SQL editor.
+-- 0040_reconciliation_counts.sql — READ-ONLY. Run in the Supabase SQL editor.
 --
 -- These queries size the migration-2 backfill against live data. None of them
 -- write anything. Paste the results back and migration 2 (the backfill) will be

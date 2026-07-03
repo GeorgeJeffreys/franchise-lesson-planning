@@ -100,7 +100,7 @@ export function CoordinatorMembersTab({ spaces }: { spaces: CoordSpaceMembers[] 
                     // Promotion to coordinator is now an org-level (all-schools)
                     // grant, so it lives in the admin "Edit access" modal only — a
                     // coordinator can remove a teacher from their space but not mint
-                    // another coordinator. (See coordinator_subject / migration 0039.)
+                    // another coordinator. (See coordinator_subject / migration 0040.)
                     <GhostButton
                       tone="red"
                       disabled={pending}

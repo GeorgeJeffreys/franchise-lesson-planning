@@ -1,9 +1,10 @@
--- 0040_coordinator_subject_backfill.sql
+-- 0041_coordinator_subject_backfill.sql
 --
 -- Role-first access model, migration 2 of 2: the data backfill + finalisation.
--- ⚠️ CORE AUTH. Requires 0039. Apply immediately after 0039 so existing
+-- ⚠️ CORE AUTH. Requires 0040. Apply immediately after 0040 so existing
 -- coordinators are represented in `coordinator_subject` when the role-first modal
--- goes live.
+-- goes live. (0040 is the coordinator_subject schema migration; note 0039 in this
+-- repo is the unrelated impersonation-role-toggle migration.)
 --
 -- This is written DATA-DRIVEN — it operates on whatever legacy rows exist rather
 -- than hardcoding ids, so it is correct for any live reconciliation counts and is
@@ -74,7 +75,7 @@ as $$
 $$;
 
 -- ── 5. Finalise list_users_admin — coordinator entries from coordinator_subject ─
--- Same signature and admin hard-gate as 0039; only the coordinator subquery is
+-- Same signature and admin hard-gate as 0040; only the coordinator subquery is
 -- simplified (the legacy subject_membership UNION branch is dropped now that those
 -- rows are gone). Teacher spaces are unchanged.
 create or replace function public.list_users_admin()
