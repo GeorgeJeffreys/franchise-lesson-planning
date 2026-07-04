@@ -41,14 +41,25 @@ const COLUMNS =
 // This read is load-bearing: it pulls the whole active curriculum (~6k full-text rows)
 // once and is sliced in memory for four hot consumers (curriculum browse, teacher
 // home / weekly-overview, the create-lesson picker, the editor load-plan) — so it stays
-// cached. The `revalidate: 120` TTL is what makes an upload actually appear without a
-// redeploy: on-demand `revalidateTag` of this LEGACY `unstable_cache` entry is
-// unreliable in Next 16 (unstable_cache is superseded by `use cache`), so we self-heal
-// via stale-while-revalidate — a normal request ≥120s after a sync re-reads the DB. The
-// `revalidateTag('curriculum')` call on sync success is kept as a harmless best-effort
-// fast path (free instant refresh if a future Next makes it reliable), but nothing
-// depends on it. DO NOT remove the TTL — without it the entry caches indefinitely and
-// only a redeploy refreshes it.
+// cached. Three things keep it correct:
+//
+//   • keyParts `…-v2` — the ORIGINAL `curriculum-active-rows` entry was written with NO
+//     `revalidate` (never-stale) back when only 3 subjects had rows, and on-demand
+//     `revalidateTag` never dropped it. It also survived redeploys: the Vercel Data
+//     Cache persists across deployments (a redeploy resets the Full Route Cache, NOT
+//     the Data Cache), so that stuck entry would neither expire nor honor a TTL it was
+//     never written with. Bumping the key orphans it — a fresh, TTL-carrying entry is
+//     written on the next request, so all 7 subjects appear immediately on deploy.
+//   • `revalidate: 120` — self-heals FUTURE syncs via stale-while-revalidate (a normal
+//     request ≥120s after a sync re-reads the DB), because on-demand `revalidateTag` of
+//     this LEGACY `unstable_cache` entry is unreliable in Next 16 (superseded by
+//     `use cache`). DO NOT remove it — without it the entry caches indefinitely.
+//   • `revalidateTag('curriculum')` on sync success is kept as a harmless best-effort
+//     fast path (free instant refresh if a future Next makes it reliable); nothing
+//     depends on it.
+//
+// If a fresh-keyed entry still shows fewer than the active subject count after deploy,
+// the source is misdiagnosed — investigate, don't just bump the key again.
 const fetchActiveRows = unstable_cache(
   async (): Promise<CurriculumLessonRow[]> => {
     const supabase = createAdminClient();
@@ -59,7 +70,7 @@ const fetchActiveRows = unstable_cache(
     if (error) throw new Error(`Curriculum read failed: ${error.message}`);
     return (data ?? []) as unknown as CurriculumLessonRow[];
   },
-  ['curriculum-active-rows'],
+  ['curriculum-active-rows-v2'],
   { tags: [CURRICULUM_CACHE_TAG], revalidate: 120 },
 );
 
