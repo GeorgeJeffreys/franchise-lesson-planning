@@ -17,7 +17,9 @@ export function OwnerAvatar({ owner, size = 20 }: { owner: PlanOwner; size?: num
         height: size,
         background: bg,
         color: fg,
-        fontSize: size <= 20 ? 8.5 : 9,
+        // Larger cards carry a 38px avatar with 12.5px initials; the compact
+        // list/status avatars keep their small type.
+        fontSize: size >= 30 ? 12.5 : size <= 20 ? 8.5 : 9,
       }}
     >
       {owner.initials}

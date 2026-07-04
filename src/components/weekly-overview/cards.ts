@@ -18,8 +18,15 @@ export interface PlanCard {
   subjectName: string;
   /** The centre name to show under the subject, or null to omit (single-centre / org). */
   centreName: string | null;
+  /** The Mon–Fri column (1..5) the plan sits in — the card's "day" in "Mon · P2". */
+  weekday: number;
   /** The displayed day-ordinal — the card's 1-based position in its day's stack. */
   period: number;
+  /**
+   * The lesson-topic line (the card's hero text) — the daily learning outcome,
+   * already stem-cleaned. May be empty; the card degrades to a "Lesson N" fallback.
+   */
+  topic: string;
   status: PlanStatus;
   scope: PlanScope;
   owner: PlanOwner | null;
@@ -76,7 +83,9 @@ export function planCardsForYears(years: BoardYear[], ownerId: string | null): P
         year: p.year,
         subjectName: p.subjectName,
         centreName: p.centreName,
+        weekday: p.weekday,
         period: n,
+        topic: p.dailyOutcome,
         status: p.status,
         scope: p.scope,
         owner: p.owner,

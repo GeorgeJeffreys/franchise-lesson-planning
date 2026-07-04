@@ -1,46 +1,84 @@
 'use client';
 
-// The restored lesson card — verbatim from the pre-reinvention board (commit
-// 5b60faf, "Restore the previous lesson card as the per-slot board unit"):
-//   • CardShell chrome (white, 1px border, 12px radius, inline pending spinner)
-//   • the Calendar variant: time line · class line · status badge + scope chip + owner
-//   • the Status variant:   time line · class line · scope chip, owner on the right
-//   • the "Not started" variant: faint line · class line + teal "Plan" chip
+// The board's planned-lesson card — one visual language shared by the Calendar
+// (day-column) and Status (kanban) views, ported from the grouped Status-board
+// design. A single `PlannedCard` renders both; the thin `CalendarLessonCard` /
+// `StatusLessonCard` wrappers keep the two call sites named.
 //
-// The two text lines, top to bottom: the subtitle line carries the board SUBJECT
-// (e.g. "English") in the muted/subtitle treatment, and the title line carries
-// "Year N" (never an A/B group label) in bold. The period is conveyed by the
-// day column + stack position, not repeated on the card. The small scope chip
-// stays on planned cards. Nothing else is restyled.
+// Anatomy (top → bottom):
+//   • top row:  subject (muted label) over "Year N" (bold)   ·  assignee avatar
+//   • meta row: "Mon · P2" (day · period)                     ·  topic (2 lines)
+//   • foot row: status pill                                   ·  Open / Review
 //
-// In coordinator (`readOnly`) mode the card opens the read-only review view and
-// adds an author + period line, so plans across all teachers stay distinguishable.
+// The topic line is the daily learning outcome (stem-cleaned); when a lesson has
+// none it degrades to "Lesson N" so the line is never empty. The action label is
+// role-driven: a teacher opens the editor ("Open"), a coordinator opens the
+// read-only review surface ("Review") — driven by the same `readOnly` flag that
+// already routes the card's link, not a bespoke prop. "Not started" slots are not
+// cards here — they render as the grouped accordion (see NotStartedGroups).
 
 import { useLocale, useTranslations } from 'next-intl';
 import { CardShell } from '@/components/weekly-overview/CardShell';
 import { StatusChip } from '@/components/weekly-overview/StatusChip';
 import { OwnerAvatar } from '@/components/weekly-overview/OwnerAvatar';
-import type { EmptySlotCard, PlanCard } from '@/components/weekly-overview/cards';
-import { useScopeChooser } from '@/components/weekly-overview/ScopeChooser';
+import type { PlanCard } from '@/components/weekly-overview/cards';
 import { formatNumber } from '@/lib/format';
+import { WEEKDAYS, type Weekday } from '@/lib/week';
 
-/** The subject (and, across centres, the centre) attribution line at a card's top. */
-function CardAttribution({
-  subjectName,
-  centreName,
-}: {
-  subjectName: string;
-  centreName: string | null;
-}) {
+/** The Mon–Fri key (1..5 → 'mon'..'fri') for a card's weekday, clamped in range. */
+function weekdayKey(weekday: number): Weekday {
+  const i = Math.min(5, Math.max(1, Math.trunc(weekday))) - 1;
+  return WEEKDAYS[i];
+}
+
+/**
+ * The shared planned-lesson card. The whole card is a link to the plan (the editor
+ * or the read-only review view), so the "Open / Review" pill is a styled affordance,
+ * not a nested button.
+ */
+function PlannedCard({ card, readOnly = false }: { card: PlanCard; readOnly?: boolean }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
+
+  const dayPeriod = t('card.dayPeriod', {
+    day: t(`weekday.${weekdayKey(card.weekday)}`),
+    n: formatNumber(card.period, locale),
+  });
+  const topic = card.topic.trim() || t('card.lessonN', { n: formatNumber(card.period, locale) });
+
   return (
-    <div dir="auto" className="text-[11.5px] font-semibold text-text-faint">
-      {subjectName}
-      {centreName ? <span className="font-normal text-text-faint"> · {centreName}</span> : null}
-    </div>
+    <CardShell planId={card.planId} canEdit={card.canEdit} readOnly={readOnly}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div dir="auto" className="truncate text-[13px] font-medium text-text-faint">
+            {card.subjectName}
+            {card.centreName ? <span className="text-text-faint"> · {card.centreName}</span> : null}
+          </div>
+          <div className="mt-[2px] text-[20px] font-bold leading-[1.1] text-ink">
+            {t('card.year', { n: formatNumber(card.year, locale) })}
+          </div>
+        </div>
+        {card.owner ? <OwnerAvatar owner={card.owner} size={38} /> : null}
+      </div>
+
+      <div className="mt-[13px]">
+        <div className="text-[11px] font-semibold text-text-faint">{dayPeriod}</div>
+        <p dir="auto" className="mt-[3px] line-clamp-2 text-[13px] leading-[1.4] text-text-muted">
+          {topic}
+        </p>
+      </div>
+
+      <div className="mt-[14px] flex items-center justify-between gap-2">
+        <StatusChip status={card.status} />
+        <span className="inline-flex flex-shrink-0 items-center rounded-[8px] border border-action-border px-[14px] py-[5px] text-[11.5px] font-semibold text-teal">
+          {readOnly ? t('card.review') : t('card.open')}
+        </span>
+      </div>
+    </CardShell>
   );
 }
 
-/** Calendar-view planned card — restored CalendarCard (status badge + scope chip). */
+/** Calendar-view planned card. */
 export function CalendarLessonCard({
   card,
   readOnly = false,
@@ -48,30 +86,10 @@ export function CalendarLessonCard({
   card: PlanCard;
   readOnly?: boolean;
 }) {
-  const t = useTranslations('board');
-  const locale = useLocale();
-  return (
-    <CardShell planId={card.planId} canEdit={card.canEdit} readOnly={readOnly}>
-      <CardAttribution subjectName={card.subjectName} centreName={card.centreName} />
-      {readOnly && card.owner ? (
-        <div dir="auto" className="mt-[2px] truncate text-[11.5px] text-text-muted">
-          {t('card.authorPeriod', {
-            author: card.owner.name,
-            n: formatNumber(card.period, locale),
-          })}
-        </div>
-      ) : null}
-      <div className="mt-[9px] flex items-center justify-between gap-2">
-        <StatusChip status={card.status} />
-        {card.owner ? <OwnerAvatar owner={card.owner} /> : null}
-      </div>
-    </CardShell>
-  );
+  return <PlannedCard card={card} readOnly={readOnly} />;
 }
 
-/** Status-view planned card — restored StatusCard. In coordinator (`readOnly`)
- *  mode the card names the author (the status is the column), so plans across
- *  teachers stay distinguishable. */
+/** Status-view planned card (individual cards in the four real-status columns). */
 export function StatusLessonCard({
   card,
   readOnly = false,
@@ -79,67 +97,5 @@ export function StatusLessonCard({
   card: PlanCard;
   readOnly?: boolean;
 }) {
-  const t = useTranslations('board');
-  const locale = useLocale();
-  return (
-    <CardShell planId={card.planId} canEdit={card.canEdit} readOnly={readOnly}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <CardAttribution subjectName={card.subjectName} centreName={card.centreName} />
-          <div className="mt-[3px] text-[14px] font-semibold">
-            {t('card.year', { n: formatNumber(card.year, locale) })}
-          </div>
-          {readOnly && card.owner ? (
-            <div dir="auto" className="mt-[2px] truncate text-[11.5px] text-text-muted">
-              {t('card.authorPeriod', {
-                author: card.owner.name,
-                n: formatNumber(card.period, locale),
-              })}
-            </div>
-          ) : null}
-        </div>
-        {card.owner ? <OwnerAvatar owner={card.owner} size={21} /> : null}
-      </div>
-    </CardShell>
-  );
-}
-
-/**
- * The "Not started" card — restored NotStartedCard. No plan yet, so it's a button:
- * the whole card (and its teal "Plan" chip) opens the scope chooser for this
- * curriculum lesson, defaulting it onto its natural day (the curriculum period).
- */
-export function NotStartedLessonCard({ card }: { card: EmptySlotCard }) {
-  const t = useTranslations('board');
-  const locale = useLocale();
-  const { openChooser } = useScopeChooser();
-  const open = () =>
-    openChooser({
-      lessonKey: card.lessonKey,
-      year: card.year,
-      centreId: card.centreId,
-      dailyOutcome: card.dailyOutcome,
-      weekday: card.weekday,
-      period: card.period,
-    });
-  return (
-    <button
-      type="button"
-      onClick={open}
-      className="flex items-center justify-between gap-2 rounded-[12px] border border-border bg-surface-subtle px-[13px] py-[11px] text-start transition-colors hover:bg-surface-cream"
-    >
-      <div className="min-w-0">
-        <CardAttribution subjectName={card.subjectName} centreName={card.centreName} />
-        <div className="mt-[2px] text-[14px] font-semibold">
-          {t('card.year', { n: formatNumber(card.year, locale) })}
-        </div>
-      </div>
-      <span className="inline-flex flex-shrink-0 items-center gap-[4px] rounded-badge border border-teal-tint-border bg-teal-tint px-[8px] py-[4px] text-[10.5px] font-bold text-teal">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1F7A6C" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        {t('card.plan')}
-      </span>
-    </button>
-  );
+  return <PlannedCard card={card} readOnly={readOnly} />;
 }

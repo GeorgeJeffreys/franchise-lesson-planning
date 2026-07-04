@@ -52,7 +52,18 @@
     "card": {
       "year": "Year {n}",
       "plan": "Plan",
+      "open": "Open",
+      "review": "Review",
+      "lessonN": "Lesson {n}",
+      "dayPeriod": "{day} · P{n}",
       "authorPeriod": "{author} · Period {n}"
+    },
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri"
     },
     "status": {
       "not_started": "Not started",
@@ -68,6 +79,7 @@
     },
     "statusView": {
       "none": "None",
+      "toPlan": "{count} to plan",
       "showAll": "Show all",
       "showLess": "Show less",
       "moveError": "Could not move the lesson.",
