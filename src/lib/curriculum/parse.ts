@@ -39,6 +39,46 @@ import {
 /** Spreadsheet error sentinels (and the literal "#N/A") collapse to null. */
 const ERROR_RE = /^#(REF|VALUE|N\/?A|NAME|DIV\/?0|NULL|NUM)[!?]?$/i;
 
+/**
+ * Canonical sheet per subject — the exact tab the live `curriculum_lesson` gold master
+ * was built from, for workbooks that ship multiple curriculum-shaped sheets (drafts /
+ * versions). Column-shape heuristics can't tell which draft was actually imported
+ * (Professionalism V1/V2/V4 all parse; Arabic ships two full curricula), so we pin it.
+ * When set, this sheet is used and MUST exist — a rename throws rather than silently
+ * falling back to a wrong draft and orphaning live plans. An explicit `opts.sheet`
+ * still overrides. Verified: each named sheet reproduces its subject's full gold key
+ * set (zero missing).
+ */
+const CANONICAL_SHEET: Record<string, string> = {
+  arabic: 'Arabic Curriculum (2)',
+  professionalism: 'V1',
+};
+
+// ── English weekly-field cleanups (live-DB provenance, NOT migration 0024) ─────────
+//
+// The live English rows carry two manual cleanups applied by out-of-band SQL that was
+// never committed as a migration (0024 backfilled only monthly_lo + grammar_vocabulary;
+// it never touched the weekly fields). They are encoded HERE, in the parser, so the real
+// ingest path (UI upload / the import endpoint) reproduces them — a raw re-parse emits
+// already-cleaned values, and a re-import never reverts them.
+
+/**
+ * Strip a trailing `|<skill>` tag from an English weekly_knowledge_lo
+ * (e.g. "…present simple tense.|Reading"), absorbing any trailing whitespace/newlines
+ * before the pipe. Empties collapse to null.
+ */
+export function cleanEnglishWeeklyKnowledgeLo(value: string | null): string | null {
+  if (value == null) return null;
+  const stripped = value.replace(/\s*\|\s*[A-Za-z]+\s*$/u, '').replace(/\s+$/u, '');
+  return stripped === '' ? null : stripped;
+}
+
+/** Null out a numeric-only English weekly_skills_lo (e.g. "23") — a stray source artefact. */
+export function cleanEnglishWeeklySkillsLo(value: string | null): string | null {
+  if (value == null) return null;
+  return /^\s*\d+(\.\d+)?\s*$/.test(value) ? null : value;
+}
+
 /** First non-empty cell of these rows marks a header-block meta row, not data. */
 const HEADER_MARKERS = ['column header', 'عنوان العمود'];
 const META_MARKERS = ['description', 'الوصف', 'period', 'الفترة الزمنية'];
@@ -298,12 +338,6 @@ function evaluateSheet(name: string, sheet: XLSX.WorkSheet): SheetEval | null {
   return { name, headerRow, match, grain, shaped, fieldCount: f.size, grid, nRows, nCols };
 }
 
-/** Highest `V<n>` in a sheet name (for tie-breaking Professionalism V1/V2/V4). */
-function versionRank(name: string): number {
-  const m = name.match(/v\s*(\d+)/i);
-  return m ? parseInt(m[1], 10) : 0;
-}
-
 interface SheetSelection {
   chosen: SheetEval;
   candidateSheets: string[];
@@ -339,13 +373,15 @@ function selectSheet(workbook: XLSX.WorkBook, requested?: string): SheetSelectio
     return { chosen: shaped[0], candidateSheets: [], ambiguous: false };
   }
 
-  // (a) most mapped fields, (b) highest V<n>, (c) last sheet.
+  // (a) most mapped fields, then (b) FIRST sheet in workbook order. We deliberately do
+  // NOT prefer a higher `V<n>` or the last sheet: the imported draft is not necessarily
+  // the newest tab (gold was built from Professionalism V1, not V4; Arabic's first tab,
+  // not its last). Subjects whose imported draft is genuinely ambiguous are pinned in
+  // CANONICAL_SHEET and never reach this fallback.
   const order = new Map(workbook.SheetNames.map((n, i) => [n, i] as const));
   const ranked = [...shaped].sort(
     (a, b) =>
-      b.fieldCount - a.fieldCount ||
-      versionRank(b.name) - versionRank(a.name) ||
-      (order.get(b.name) ?? 0) - (order.get(a.name) ?? 0),
+      b.fieldCount - a.fieldCount || (order.get(a.name) ?? 0) - (order.get(b.name) ?? 0),
   );
   const chosen = ranked[0];
   return {
@@ -376,7 +412,10 @@ export function parseCurriculumWorkbook(
   const data = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : buffer;
   const workbook = XLSX.read(data, { type: 'buffer' });
 
-  const { chosen, candidateSheets, ambiguous } = selectSheet(workbook, opts.sheet);
+  // Explicit sheet wins; else the subject's pinned canonical sheet (throws if renamed);
+  // else the shape heuristic. See CANONICAL_SHEET.
+  const requestedSheet = opts.sheet ?? CANONICAL_SHEET[subjectCode];
+  const { chosen, candidateSheets, ambiguous } = selectSheet(workbook, requestedSheet);
   const { grid, nRows, headerRow, match, grain } = chosen;
   const { byField } = match;
 
@@ -413,6 +452,14 @@ export function parseCurriculumWorkbook(
 
   const hasWeekCol = byField.has('week');
   const hasPeriodCol = byField.has('period');
+
+  // English weekly-field cleanups run on the ingest path itself (see the functions'
+  // provenance note) — no-ops for every other subject.
+  const isEnglish = subjectCode === 'english';
+  const cleanWeeklyKnowledge = (v: string | null): string | null =>
+    isEnglish ? cleanEnglishWeeklyKnowledgeLo(v) : v;
+  const cleanWeeklySkills = (v: string | null): string | null =>
+    isEnglish ? cleanEnglishWeeklySkillsLo(v) : v;
 
   for (let r = headerRow + 1; r < nRows; r++) {
     // Skip header-block meta rows (the "Description"/"الوصف" row sits just below the
@@ -529,10 +576,12 @@ export function parseCurriculumWorkbook(
         taxonomy_id: rawAt(r, 'lessonIdentifier'),
         monthly_knowledge_lo: value('monthlyKnowledgeLearningOutcome'),
         monthly_skills_lo: value('monthlySkillLearningOutcome'),
-        weekly_knowledge_lo: hasWeekCol
-          ? value('weeklyKnowledgeLearningOutcome')
-          : rawWeeklyKnowledge,
-        weekly_skills_lo: hasWeekCol ? value('weeklySkillLearningOutcome') : rawWeeklySkill,
+        weekly_knowledge_lo: cleanWeeklyKnowledge(
+          hasWeekCol ? value('weeklyKnowledgeLearningOutcome') : rawWeeklyKnowledge,
+        ),
+        weekly_skills_lo: cleanWeeklySkills(
+          hasWeekCol ? value('weeklySkillLearningOutcome') : rawWeeklySkill,
+        ),
         grammar_vocabulary: rawAt(r, 'grammarVocabulary'),
         monthly_lo: value('monthlyLearningOutcome'),
       });

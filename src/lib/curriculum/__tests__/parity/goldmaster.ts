@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseCsv, toCsv } from './csv';
+import { cleanEnglishWeeklyKnowledgeLo, cleanEnglishWeeklySkillsLo } from '../../parse';
 
 // ── Parity harness support: gold-master loading, redaction, English cleanups ──────
 //
@@ -86,42 +87,40 @@ export function hasRedactedGold(): boolean {
   return SUBJECTS.every((s) => existsSync(redactedGoldPath(s)));
 }
 
-// ── English field cleanups (live-DB provenance, NOT migration 0024) ───────────────
+// ── Field normalization + known gold artefacts ───────────────────────────────────
 //
-// The live English rows carry two manual cleanups applied by out-of-band SQL that was
-// never committed as a migration (0024 only backfills monthly_lo + grammar_vocabulary).
-// They are neutralised on BOTH sides of the field spot-check so the known carve-outs
-// don't read as diffs; Phase 1 encodes the same transforms into the parser so a raw
-// re-parse already emits cleaned values.
-//
-//   1. weekly_knowledge_lo — strip a trailing `|<skill>` tag (e.g. "…tense.|Reading"),
-//      absorbing any trailing whitespace/newlines before the pipe.
-//   2. weekly_skills_lo — a numeric-only cell (e.g. "23") is a stray source artefact → null.
+// The English weekly cleanups now live in the parser (src/lib/curriculum/parse.ts,
+// live-DB provenance — NOT migration 0024). The harness imports the SAME functions so
+// its field spot-check normalises both sides identically and can never drift from what
+// the ingest path emits.
 
-/** Strip a trailing `|<skill>` tag (and trailing whitespace) from a knowledge LO. */
-export function cleanWeeklyKnowledgeLo(value: string | null): string | null {
-  if (value == null) return null;
-  const stripped = value.replace(/\s*\|\s*[A-Za-z]+\s*$/u, '').replace(/\s+$/u, '');
-  return stripped === '' ? null : stripped;
-}
-
-/** Null out a numeric-only weekly_skills_lo; otherwise pass through. */
-export function cleanWeeklySkillsLo(value: string | null): string | null {
-  if (value == null) return null;
-  return /^\s*\d+(\.\d+)?\s*$/.test(value) ? null : value;
-}
-
-/** Apply the English cleanups to a (field, value) pair. Subject-scoped to english. */
+/** Apply the parser's English cleanups to a (field, value) pair. Subject-scoped. */
 export function normalizeField(
   subject: string,
   field: TextField,
   value: string | null,
 ): string | null {
   if (subject === 'english') {
-    if (field === 'weekly_knowledge_lo') return cleanWeeklyKnowledgeLo(value);
-    if (field === 'weekly_skills_lo') return cleanWeeklySkillsLo(value);
+    if (field === 'weekly_knowledge_lo') return cleanEnglishWeeklyKnowledgeLo(value);
+    if (field === 'weekly_skills_lo') return cleanEnglishWeeklySkillsLo(value);
   }
   return value;
+}
+
+/**
+ * Gold `lesson_key`s that are known DATA ARTEFACTS of the old out-of-band import, not
+ * real curriculum — excluded from the zero-missing gate (the newer workbooks correctly
+ * omit them). Documented so the carve-out is auditable, not silent.
+ *   • yoga|Y5|Year 5|W5|P5 — month cell is the literal typo "Year 5", and period 5 in a
+ *     period-1-only subject. A corrupt row that shouldn't have been imported.
+ */
+export const KNOWN_GOLD_ARTEFACTS = new Set<string>(['yoga|Y5|Year 5|W5|P5']);
+
+/** Gold keys for a subject with known artefacts removed (the zero-missing baseline). */
+export function goldKeysForGate(subject: Subject): string[] {
+  return loadRedactedGold(subject)
+    .map((r) => r.lesson_key)
+    .filter((k) => !KNOWN_GOLD_ARTEFACTS.has(k));
 }
 
 // ── Loaders ───────────────────────────────────────────────────────────────────────

@@ -192,9 +192,11 @@ test('split Monthly Skill/Knowledge LO map to their own columns, not the combine
     'Week', 'Period #', 'Daily Learning Outcome',
   ];
   const data: CellSpec[] = ['', 'Year 2', 'May', 'Skill: present well', 'Know: etiquette', 1, 'Period 1', 'Practice'];
-  const wb = makeWorkbook({ 'Professionalism V1': [...headerBlock(headers), data] });
+  const wb = makeWorkbook({ 'Science Curriculum': [...headerBlock(headers), data] });
 
-  const { report, lessonRows } = parseCurriculumWorkbook(wb, 'professionalism');
+  // Use a non-pinned subject (science) so this exercises the generic column matcher,
+  // not the professionalism/arabic canonical-sheet pin.
+  const { report, lessonRows } = parseCurriculumWorkbook(wb, 'science');
   const fields = report.columnMap.map((m) => m.canonicalField);
   assert.ok(fields.includes('monthlySkillLearningOutcome'));
   assert.ok(fields.includes('monthlyKnowledgeLearningOutcome'));
@@ -287,23 +289,47 @@ test('hyperlink resources: URL captured though display text says "Click for Reso
   ]);
 });
 
-// ── Multiple candidate sheets → pick V4, flag for review ─────────────────────────
+// ── Multiple candidate sheets (non-pinned subject) → pick FIRST, flag for review ──
+//
+// The heuristic deliberately does NOT prefer a higher V-number or the last sheet: the
+// imported draft is not necessarily the newest tab (gold was built from Professionalism
+// V1, not V4). For a non-pinned subject it falls to (most fields, then first sheet).
 
-test('multiple curriculum sheets: selects the highest version, flags needsReview', () => {
+test('multiple curriculum sheets: selects the FIRST shaped sheet, flags needsReview', () => {
   const headers: CellSpec[] = ['', 'Year', 'Month', 'Week', 'Period #', 'Daily Learning Outcome'];
   const data: CellSpec[] = ['', 'Year 4', 'June', 1, 'Period 1', 'Practice'];
   const block = [...headerBlock(headers), data];
   const wb = makeWorkbook({
     Cover: [['Welcome'], ['not a curriculum sheet']],
-    'Professionalism V1': block,
-    'Professionalism V4': block,
+    'Curriculum A': block,
+    'Curriculum B': block,
   });
 
-  const { report } = parseCurriculumWorkbook(wb, 'professionalism');
-  assert.equal(report.selectedSheet, 'Professionalism V4');
+  const { report } = parseCurriculumWorkbook(wb, 'maths'); // maths is not pinned
+  assert.equal(report.selectedSheet, 'Curriculum A');
   assert.equal(report.needsReview, true);
-  assert.deepEqual(report.candidateSheets, ['Professionalism V1']);
+  assert.deepEqual(report.candidateSheets, ['Curriculum B']);
   assert.ok(report.warnings.some((w) => w.includes('Multiple curriculum-shaped sheets')));
+});
+
+// ── Canonical sheet pin (professionalism/arabic) overrides the heuristic ──────────
+
+test('canonical sheet pin selects the imported draft, not the highest version', () => {
+  const headers: CellSpec[] = ['', 'Year', 'Month', 'Week', 'Period #', 'Daily Learning Outcome'];
+  const data: CellSpec[] = ['', 'Year 4', 'June', 1, 'Period 1', 'Practice'];
+  const block = [...headerBlock(headers), data];
+  // Real professionalism ships V1/V2/V4; gold was built from V1. Order must not matter.
+  const wb = makeWorkbook({ V4: block, V2: block, V1: block });
+
+  const { report } = parseCurriculumWorkbook(wb, 'professionalism');
+  assert.equal(report.selectedSheet, 'V1');
+});
+
+test('canonical sheet pin throws (never silently falls back) when the sheet is absent', () => {
+  const headers: CellSpec[] = ['', 'Year', 'Month', 'Week', 'Period #', 'Daily Learning Outcome'];
+  const data: CellSpec[] = ['', 'Year 4', 'June', 1, 'Period 1', 'Practice'];
+  const wb = makeWorkbook({ V4: [...headerBlock(headers), data] }); // no V1
+  assert.throws(() => parseCurriculumWorkbook(wb, 'professionalism'), /V1/);
 });
 
 // ── A brand-new column does not break the parse; it is surfaced ──────────────────

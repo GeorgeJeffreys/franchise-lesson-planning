@@ -1,23 +1,23 @@
-// Report-only parity: parse each workbook, diff its emitted lesson_key set against the
-// gold master, and print matched / missing / extra per subject (plus field-value diffs
-// on matched keys when the full-text gold is present). NO assertions — this is the
-// "report before fixing" view. The committed pass/fail gate lives in parity.test.ts.
+// Report-only parity view. Parses each workbook and, per subject, prints:
+//   matched / missing (the ZERO-MISSING gate — must be 0) / extra-as-new-content.
+// Extras are new curriculum these newer workbooks contain, NOT failures. With the
+// full-text gold present it also prints field-value DRIFT on matched keys (informational
+// — newer workbooks legitimately edit text; the committed gate does not fail on it).
+// No assertions here; the pass/fail gate is parity.test.ts.
 //
 //   npm run parity:report
 import { readFileSync } from 'node:fs';
 import { parseCurriculumWorkbook } from '../src/lib/curriculum/parse';
 import {
+  KNOWN_GOLD_ARTEFACTS,
   SUBJECTS,
-  TEXT_FIELDS,
   diffKeys,
-  fullGoldPath,
+  goldKeysForGate,
   hasFullGold,
   hasRedactedGold,
   hasWorkbooks,
   loadFullGold,
-  loadRedactedGold,
   normalizeField,
-  redactedGoldPath,
   workbookPath,
   type Subject,
 } from '../src/lib/curriculum/__tests__/parity/goldmaster';
@@ -26,13 +26,11 @@ if (!hasWorkbooks()) {
   console.error('Missing workbooks under the fixtures dir. Place all 7 subject .xlsx first.');
   process.exit(1);
 }
-const useFull = hasFullGold();
-const useRedacted = hasRedactedGold();
-if (!useFull && !useRedacted) {
-  console.error('No gold master found (neither goldmaster/ nor goldmaster-redacted/). Export it first.');
+if (!hasRedactedGold()) {
+  console.error('Missing goldmaster-redacted/. Run `npm run redact:goldmaster` first.');
   process.exit(1);
 }
-console.log(`Gold source: ${useFull ? 'full (goldmaster/)' : 'redacted (goldmaster-redacted/)'}\n`);
+const useFull = hasFullGold();
 
 const SPOT_CHECK_FIELDS = [
   'daily_outcome',
@@ -43,74 +41,73 @@ const SPOT_CHECK_FIELDS = [
   'theme',
 ] as const;
 
-function goldKeys(subject: Subject): string[] {
-  if (useFull) return loadFullGold(subject).map((r) => r.lesson_key ?? '');
-  return loadRedactedGold(subject).map((r) => r.lesson_key);
+function emitted(subject: Subject) {
+  const buf = readFileSync(workbookPath(subject));
+  return parseCurriculumWorkbook(buf, subject, { fileName: `${subject}.xlsx` }).lessonRows;
 }
 
-let anyKeyDiff = false;
-const rows: string[] = [];
+console.log('── zero-missing parity gate (extra = new curriculum, not a failure) ──');
+let allPass = true;
 for (const subject of SUBJECTS) {
-  const buf = readFileSync(workbookPath(subject));
-  const { lessonRows } = parseCurriculumWorkbook(buf, subject, { fileName: `${subject}.xlsx` });
-  const diff = diffKeys(subject, goldKeys(subject), lessonRows.map((r) => r.lesson_key));
-  const ok = diff.missing.length === 0 && diff.extra.length === 0;
-  if (!ok) anyKeyDiff = true;
-  rows.push(
+  const rows = emitted(subject);
+  const diff = diffKeys(subject, goldKeysForGate(subject), rows.map((r) => r.lesson_key));
+  const pass = diff.missing.length === 0;
+  allPass &&= pass;
+  console.log(
     `${subject.padEnd(15)} gold=${String(diff.goldCount).padStart(5)}  emitted=${String(
       diff.emittedCount,
     ).padStart(5)}  matched=${String(diff.matched).padStart(5)}  missing=${String(
       diff.missing.length,
-    ).padStart(4)}  extra=${String(diff.extra.length).padStart(4)}  ${ok ? 'PASS' : 'FAIL'}`,
+    ).padStart(4)}  new-content=${String(diff.extra.length).padStart(4)}  ${pass ? 'PASS' : 'FAIL'}`,
+  );
+  if (diff.missing.length) console.log('   MISSING:', diff.missing.slice(0, 10).join('  '));
+}
+console.log(
+  `\n${allPass ? 'GATE GREEN — every gold key reproduced.' : 'GATE RED — missing keys above.'}` +
+    ` (artefacts excluded: ${[...KNOWN_GOLD_ARTEFACTS].join(', ')})\n`,
+);
+
+// New-content breakdown per subject (years touched).
+console.log('── new content (extra keys) by year ─────────────────────────────────');
+for (const subject of SUBJECTS) {
+  const rows = emitted(subject);
+  const gold = new Set(goldKeysForGate(subject));
+  const extra = rows.filter((r) => !gold.has(r.lesson_key));
+  if (extra.length === 0) {
+    console.log(`${subject.padEnd(15)} none`);
+    continue;
+  }
+  const byYear = new Map<number, number>();
+  for (const r of extra) byYear.set(r.year, (byYear.get(r.year) ?? 0) + 1);
+  console.log(
+    `${subject.padEnd(15)} +${extra.length}  (${[...byYear.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([y, n]) => `Y${y}:${n}`)
+      .join(' ')})`,
   );
 }
 
-console.log('── lesson_key parity (hard gate) ─────────────────────────────────────');
-for (const r of rows) console.log(r);
-console.log('──────────────────────────────────────────────────────────────────────\n');
-
-// Per-subject detail for failing subjects.
-for (const subject of SUBJECTS) {
-  const buf = readFileSync(workbookPath(subject));
-  const { lessonRows } = parseCurriculumWorkbook(buf, subject, { fileName: `${subject}.xlsx` });
-  const diff = diffKeys(subject, goldKeys(subject), lessonRows.map((r) => r.lesson_key));
-  if (diff.missing.length === 0 && diff.extra.length === 0) continue;
-  console.log(`### ${subject} — ${diff.missing.length} missing, ${diff.extra.length} extra`);
-  if (diff.missing.length) console.log('  missing (in gold, not emitted):', diff.missing.slice(0, 12).join('  '));
-  if (diff.extra.length) console.log('  extra   (emitted, not in gold):', diff.extra.slice(0, 12).join('  '));
-  console.log('');
-}
-
-// Field spot-check (only with full-text gold).
-if (useFull && !anyKeyDiff) {
-  console.log('── field spot-check on matched keys (full-text gold) ─────────────────');
+// Field-value DRIFT on matched keys (informational — newer workbooks edit text).
+// Whitespace-insensitive: the Postgres export and the xlsx cell read differ on newline
+// encoding / trailing space, which is not real content drift. Collapse both sides.
+const collapseWs = (s: string | null): string => (s ?? '').replace(/\s+/g, ' ').trim();
+if (useFull) {
+  console.log('\n── field drift on matched keys (whitespace-insensitive; not gated) ───');
   for (const subject of SUBJECTS) {
-    const buf = readFileSync(workbookPath(subject));
-    const { lessonRows } = parseCurriculumWorkbook(buf, subject, { fileName: `${subject}.xlsx` });
-    const emitted = new Map(lessonRows.map((r) => [r.lesson_key, r]));
-    let diffs = 0;
+    const byKey = new Map(emitted(subject).map((r) => [r.lesson_key, r as unknown as Record<string, unknown>]));
+    const perField = new Map<string, number>();
     for (const gold of loadFullGold(subject)) {
-      const key = gold.lesson_key ?? '';
-      const row = emitted.get(key);
+      const row = byKey.get(gold.lesson_key ?? '');
       if (!row) continue;
       for (const f of SPOT_CHECK_FIELDS) {
-        const g = normalizeField(subject, f, gold[f] ?? null);
-        const p = normalizeField(
-          subject,
-          f,
-          (row as unknown as Record<string, unknown>)[f] as string | null,
-        );
-        if ((g ?? '') !== (p ?? '')) {
-          diffs++;
-          if (diffs <= 3) console.log(`  ${subject} ${key} [${f}]\n    gold: ${JSON.stringify(g)}\n    got:  ${JSON.stringify(p)}`);
-        }
+        const g = collapseWs(normalizeField(subject, f, gold[f] ?? null));
+        const p = collapseWs(normalizeField(subject, f, (row[f] as string | null) ?? null));
+        if (g !== p) perField.set(f, (perField.get(f) ?? 0) + 1);
       }
     }
-    console.log(`${subject.padEnd(15)} field diffs on matched keys: ${diffs}`);
+    const summary = [...perField.entries()].map(([f, n]) => `${f}:${n}`).join('  ') || 'clean';
+    console.log(`${subject.padEnd(15)} ${summary}`);
   }
-} else if (useFull) {
-  console.log('(field spot-check skipped — resolve key parity first)');
+} else {
+  console.log('\n(field drift skipped — full-text goldmaster/ not present)');
 }
-void TEXT_FIELDS;
-void fullGoldPath;
-void redactedGoldPath;
