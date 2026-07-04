@@ -401,9 +401,11 @@ export function LessonPlanEditor({
       {/* Working area */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {step === 1 ? (
-          // STEP 1 — Objective: single full-width column, no worksheet, no divider.
+          // STEP 1 — Objective: single FULL-WIDTH column, edge to edge (page
+          // padding only). No reserved right column, no split max-width — the
+          // worksheet pane belongs to steps 2–5 only.
           <section className="min-w-0 flex-1 overflow-visible px-[22px] py-[18px] lg:overflow-y-auto lg:px-[30px]">
-            <div className="mx-auto max-w-[860px]">
+            <div>
               {locked ? (
                 <LockedBanner status={status} onGoToReview={() => goStep(STEP_COUNT)} />
               ) : null}
@@ -523,8 +525,8 @@ export function LessonPlanEditor({
                 WorksheetBuilder instance, editable at every step and every plan
                 status (never wrapped in the plan-lock fieldset); edits autosave
                 through `saveWorksheet`. Scrolls independently past `lg`. */}
-            <section className="min-w-0 flex-1 overflow-visible bg-surface-subtle px-[16px] py-[22px] lg:overflow-y-auto lg:px-[22px]">
-              <div className="mx-auto max-w-[900px]">
+            <section className="min-w-0 flex-1 overflow-visible bg-surface-subtle px-[16px] py-[22px] lg:flex-[1.5] lg:overflow-y-auto lg:px-[22px]">
+              <div className="mx-auto max-w-[1000px]">
                 <WorksheetBuilder
                   value={worksheet}
                   onChange={setWorksheet}
