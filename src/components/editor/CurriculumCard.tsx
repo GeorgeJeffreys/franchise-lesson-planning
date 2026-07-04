@@ -104,21 +104,20 @@ export function CurriculumCard({
       {hasContext ? (
         <>
           <div className="my-[10px] border-t border-[#EDE4D6]" />
-          <div dir="auto" className="text-[11.5px] leading-[1.55] text-[#8A7B66]">
+          {/* Each objective is its own line-broken block — they must not run
+              together inline. */}
+          <div className="flex flex-col gap-[6px] text-[12px] leading-[1.5] text-[#8A7B66]">
             {curriculum.weekLO ? (
-              <>
+              <div dir="auto">
                 <span className="font-semibold text-[#6E6052]">{t('thisWeek')} · </span>
                 {curriculum.weekLO}
-              </>
-            ) : null}
-            {curriculum.weekLO && curriculum.monthlyLO ? (
-              <span aria-hidden className="px-[8px] text-[#CBBBA4]">·</span>
+              </div>
             ) : null}
             {curriculum.monthlyLO ? (
-              <>
+              <div dir="auto">
                 <span className="font-semibold text-[#6E6052]">{t('monthlyObjective')} · </span>
                 {curriculum.monthlyLO}
-              </>
+              </div>
             ) : null}
           </div>
         </>

@@ -106,6 +106,10 @@ export function WorksheetBuilder({
   const [pageHeight, setPageHeight] = useState(1123); // natural (unscaled) height
   const zoomRef = useRef(zoom);
   const initedRef = useRef(false);
+  // Whether the page is tracking fit-to-width. Starts true (default = FIT), and
+  // flips false the moment the teacher manually zooms, so a pane/window resize
+  // keeps the whole page visible without ever fighting a deliberate zoom.
+  const autoFitRef = useRef(true);
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
@@ -295,13 +299,33 @@ export function WorksheetBuilder({
     const avail = vp.clientWidth - CANVAS_PAD_X;
     return clampZoom(avail / PAGE_WIDTH);
   }, []);
-  const fitToWidth = useCallback(() => setZoom(computeFit()), [computeFit]);
+  const fitToWidth = useCallback(() => {
+    autoFitRef.current = true;
+    setZoom(computeFit());
+  }, [computeFit]);
+  // A manual zoom (buttons / keyboard / pinch): stop auto-fitting and apply it.
+  const zoomManual = useCallback((next: React.SetStateAction<number>) => {
+    autoFitRef.current = false;
+    setZoom(next);
+  }, []);
 
   // Initial fit (before paint, no flicker).
   useLayoutEffect(() => {
     if (initedRef.current) return;
     initedRef.current = true;
     setZoom(computeFit());
+  }, [computeFit]);
+
+  // Keep the whole page width visible as the pane/window resizes — but only while
+  // still auto-fitting, so a teacher's manual zoom is never overridden.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (autoFitRef.current) setZoom(computeFit());
+    });
+    ro.observe(vp);
+    return () => ro.disconnect();
   }, [computeFit]);
 
   // Track the page's natural height so the scroll content can be sized to the
@@ -328,13 +352,13 @@ export function WorksheetBuilder({
       if (e.metaKey || e.ctrlKey) {
         if (e.key === '=' || e.key === '+') {
           e.preventDefault();
-          setZoom((z) => clampZoom(round2(z + 0.1)));
+          zoomManual((z) => clampZoom(round2(z + 0.1)));
         } else if (e.key === '-' || e.key === '_') {
           e.preventDefault();
-          setZoom((z) => clampZoom(round2(z - 0.1)));
+          zoomManual((z) => clampZoom(round2(z - 0.1)));
         } else if (e.key === '0') {
           e.preventDefault();
-          setZoom(computeFit());
+          fitToWidth();
         }
       } else if (e.key === 'Escape' && maximised) {
         setMaximised(false);
@@ -342,7 +366,7 @@ export function WorksheetBuilder({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [computeFit, maximised]);
+  }, [maximised, fitToWidth, zoomManual]);
 
   // ── Keyboard undo/redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, Ctrl+Y) ─────────────
   // Handled at the worksheet level for both text and block ops. Plain <input>/
@@ -371,7 +395,7 @@ export function WorksheetBuilder({
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return; // ctrlKey set by Chromium/Firefox for trackpad pinch
       e.preventDefault();
-      setZoom((z) => clampZoom(round2(z * (1 - e.deltaY * 0.01))));
+      zoomManual((z) => clampZoom(round2(z * (1 - e.deltaY * 0.01))));
     };
     vp.addEventListener('wheel', onWheel, { passive: false });
 
@@ -384,7 +408,7 @@ export function WorksheetBuilder({
     const onGestureChange = (e: Event) => {
       e.preventDefault();
       const scale = (e as unknown as { scale: number }).scale ?? 1;
-      setZoom(clampZoom(round2(gestureBase * scale)));
+      zoomManual(clampZoom(round2(gestureBase * scale)));
     };
     const onGestureEnd = (e: Event) => e.preventDefault();
     vp.addEventListener('gesturestart', onGestureStart);
@@ -397,7 +421,7 @@ export function WorksheetBuilder({
       vp.removeEventListener('gesturechange', onGestureChange);
       vp.removeEventListener('gestureend', onGestureEnd);
     };
-  }, []);
+  }, [zoomManual]);
 
   // ── Block actions ─────────────────────────────────────────────────────────
   // All insert paths are index-aware: a block can be added at any position (a
@@ -599,11 +623,11 @@ export function WorksheetBuilder({
           <div style={{ marginInlineStart: 'auto', display: 'inline-flex', alignItems: 'center', gap: 9 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #E7DECF', borderRadius: 999, paddingBlock: 5, paddingInlineStart: 12, paddingInlineEnd: 7 }}>
               <span style={{ fontSize: 11.5, color: '#8A8178' }}>{t('zoom.a4')}</span>
-              <button type="button" onClick={() => setZoom((z) => clampZoom(round2(z - 0.1)))} title={t('zoom.zoomOut')} style={zoomBtn}>
+              <button type="button" onClick={() => zoomManual((z) => clampZoom(round2(z - 0.1)))} title={t('zoom.zoomOut')} style={zoomBtn}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>
               </button>
               <span style={{ fontSize: 11.5, fontWeight: 600, minWidth: 32, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-              <button type="button" onClick={() => setZoom((z) => clampZoom(round2(z + 0.1)))} title={t('zoom.zoomIn')} style={zoomBtn}>
+              <button type="button" onClick={() => zoomManual((z) => clampZoom(round2(z + 0.1)))} title={t('zoom.zoomIn')} style={zoomBtn}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
               </button>
               <button type="button" onClick={fitToWidth} title={t('zoom.fitToWidth')} style={{ ...zoomBtn, width: 'auto', padding: '0 9px', fontSize: 11, fontWeight: 600, color: '#5C544E' }}>
