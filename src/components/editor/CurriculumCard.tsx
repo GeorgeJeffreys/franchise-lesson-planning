@@ -45,6 +45,17 @@ export function CurriculumCard({
 }) {
   const t = useTranslations('wizard.curriculum');
   const [open, setOpen] = useState(defaultExpanded);
+  // React can PRESERVE this instance across the step-1 ⇄ steps-2-5 boundary
+  // (both branches render a <CurriculumCard> at the same tree position), so a
+  // fresh `useState(defaultExpanded)` never runs on step change and the card would
+  // keep step 1's expanded state on step 2. Re-apply the per-view default whenever
+  // it changes — the "adjust state on a prop change" pattern — so the card is
+  // expanded on step 1 and collapsed on steps 2–5, deterministically.
+  const [prevDefault, setPrevDefault] = useState(defaultExpanded);
+  if (defaultExpanded !== prevDefault) {
+    setPrevDefault(defaultExpanded);
+    setOpen(defaultExpanded);
+  }
 
   if (!curriculum) return null;
 
