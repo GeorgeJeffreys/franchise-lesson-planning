@@ -71,26 +71,41 @@
   --color-danger-bg: #fbece8; /* faint tint panel / icon chip */
   --color-danger-border: #f2d6ce;
 
-  /* ── Status palette (Weekly Overview) — fg / bg / border per state ──────── */
+  /* ── Status palette (Weekly Overview) — fg / bg / border / dot per state ───
+   * `-dot` is the brighter mid-tone the board's status-board redesign uses for
+   * the column-header dot and the pill's leading dot — deliberately distinct from
+   * the (darker) pill/heading text tone. `status-idle-dot` is the hollow "Not
+   * started" ring colour. Sampled from the grouped Status-board design export. */
   --color-status-approved: #2e7d5b;
   --color-status-approved-bg: #e2f0e8;
   --color-status-approved-border: #c9e4d5;
+  --color-status-approved-dot: #5fa07c;
 
   --color-status-progress: #b0651e;
   --color-status-progress-bg: #f6ecda;
   --color-status-progress-border: #ecd9be;
+  --color-status-progress-dot: #c98a3c;
 
   --color-status-submitted: #186155;
   --color-status-submitted-bg: #e4f0ed;
   --color-status-submitted-border: #cfe6e0;
+  --color-status-submitted-dot: #5c9e92;
 
   --color-status-review: #b62a5c;
   --color-status-review-bg: #f7e4eb;
   --color-status-review-border: #f0cbd8;
+  --color-status-review-dot: #c56b8a;
 
   --color-status-idle: #9a918b;
   --color-status-idle-bg: #efeae3;
   --color-status-idle-border: #e2dbd0;
+  --color-status-idle-dot: #bdb4a9;
+
+  /* Outline action buttons on the board cards (Plan / Open / Review) — teal text
+   * on a transparent fill with this tinted teal hairline. A shade firmer than
+   * `teal-tint-border` (which fills the "Plan" chip) so an unfilled outline still
+   * reads. From the Status-board design export. */
+  --color-action-border: #b7d6ce;
 
   /* ── Curriculum skill pills (categorical macro-skill colours) ──────────────
    * Sampled from the Curriculum design's Skill column. These are CONTENT

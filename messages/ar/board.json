@@ -52,7 +52,18 @@
     "card": {
       "year": "السنة {n}",
       "plan": "تخطيط",
+      "open": "فتح",
+      "review": "مراجعة",
+      "lessonN": "الدرس {n}",
+      "dayPeriod": "{day} · الحصة {n}",
       "authorPeriod": "{author} · الحصة {n}"
+    },
+    "weekday": {
+      "mon": "الإثنين",
+      "tue": "الثلاثاء",
+      "wed": "الأربعاء",
+      "thu": "الخميس",
+      "fri": "الجمعة"
     },
     "status": {
       "not_started": "لم يبدأ",
@@ -68,6 +79,7 @@
     },
     "statusView": {
       "none": "لا شيء",
+      "toPlan": "{count} بحاجة إلى تخطيط",
       "showAll": "عرض الكل",
       "showLess": "عرض أقل",
       "moveError": "تعذّر نقل الدرس.",

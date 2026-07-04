@@ -1,11 +1,13 @@
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { STATUS_META } from '@/components/weekly-overview/status';
+import { StatusDot } from '@/components/weekly-overview/StatusDot';
 import type { SlotStatus } from '@/types/weekly-overview';
 
 /**
- * The small pill that carries a slot's status at a glance — glyph + label in the
- * status colour tokens. Flat (tint fill, no border, 6px radius) per the design.
+ * The small pill that carries a slot's status at a glance — a mid-tone dot + label
+ * in the status colour tokens. Flat (tint fill, no border, 6px radius) per the
+ * grouped Status-board design.
  */
 export function StatusChip({ status }: { status: SlotStatus }) {
   const t = useTranslations('board');
@@ -17,7 +19,7 @@ export function StatusChip({ status }: { status: SlotStatus }) {
         meta.badge,
       )}
     >
-      <span aria-hidden>{meta.glyph}</span>
+      <StatusDot status={status} size={6} />
       {t(`status.${status}`)}
     </span>
   );

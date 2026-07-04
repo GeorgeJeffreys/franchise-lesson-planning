@@ -14,11 +14,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
-import { STATUS_COLUMN_ORDER, STATUS_META } from '@/components/weekly-overview/status';
-import {
-  StatusLessonCard,
-  NotStartedLessonCard,
-} from '@/components/weekly-overview/LessonCard';
+import { STATUS_COLUMN_ORDER } from '@/components/weekly-overview/status';
+import { StatusDot } from '@/components/weekly-overview/StatusDot';
+import { StatusLessonCard } from '@/components/weekly-overview/LessonCard';
+import { NotStartedGroups } from '@/components/weekly-overview/NotStartedGroups';
 import {
   emptySlotCards,
   planCardsForYears,
@@ -221,57 +220,39 @@ function groupByStatus(
 function ColumnHeader({ status, count }: { status: SlotStatus; count: number }) {
   const t = useTranslations('board');
   const locale = useLocale();
-  const meta = STATUS_META[status];
   return (
-    <div className={cn('mb-[10px] flex items-center justify-between border-b-2 pb-[8px]', meta.rule)}>
-      <span className={cn('inline-flex items-center gap-[6px] text-[12.5px] font-bold', meta.text)}>
-        <span aria-hidden>{meta.glyph}</span> {t(`status.${status}`)}
+    <div className="mb-[10px] flex items-center justify-between gap-2 border-b border-border pb-[10px]">
+      <span className="inline-flex items-center gap-[7px] text-[12.5px] font-semibold text-ink">
+        <StatusDot status={status} size={8} />
+        {t(`status.${status}`)}
       </span>
-      <span className="text-[12px] text-text-faint">{formatNumber(count, locale)}</span>
+      <span className="text-[11.5px] font-semibold text-text-muted">
+        {formatNumber(count, locale)}
+      </span>
+    </div>
+  );
+}
+
+/** The dashed placeholder a status column shows when it holds no cards. */
+function EmptyColumn() {
+  const t = useTranslations('board');
+  return (
+    <div className="rounded-[14px] border border-dashed border-border-strong px-[12px] py-[26px] text-center text-[11.5px] text-text-faint">
+      {t('statusView.none')}
     </div>
   );
 }
 
 /**
- * The "Not started" column: a compact summary, not a long card list. A long roster
- * of identical "Year N · Plan" cards isn't actionable, so by default this collapses
- * to the count plus a "Show all" affordance; the individual cards (each opens the
- * scope chooser) only render on demand. Never a drop target, cards never draggable.
+ * The "Not started" column — grouped by class (subject, year) as a stack of
+ * collapsible group cards (see NotStartedGroups), each showing "N to plan". Never a
+ * drop target; a row opens the scope chooser rather than dragging.
  */
 function NotStartedColumn({ cards }: { cards: EmptySlotCard[] }) {
-  const t = useTranslations('board');
-  const locale = useLocale();
-  const [expanded, setExpanded] = useState(false);
-  const count = cards.length;
-
   return (
     <div>
-      <ColumnHeader status="not_started" count={count} />
-      {count === 0 ? (
-        <div className="py-[8px] text-center text-[11.5px] text-text-faint">
-          {t('statusView.none')}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <div className="rounded-[12px] border border-border bg-surface-subtle px-[13px] py-[11px]">
-            <p className="text-[18px] font-semibold leading-none text-ink">
-              {formatNumber(count, locale)}
-            </p>
-            <p className="mt-[4px] text-[11.5px] text-text-muted">{t('status.not_started')}</p>
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              className="mt-[8px] text-[11.5px] font-semibold text-teal transition-colors hover:text-teal-deep"
-            >
-              {expanded ? t('statusView.showLess') : t('statusView.showAll')}
-            </button>
-          </div>
-          {expanded
-            ? cards.map((card) => <NotStartedLessonCard key={card.key} card={card} />)
-            : null}
-        </div>
-      )}
+      <ColumnHeader status="not_started" count={cards.length} />
+      {cards.length === 0 ? <EmptyColumn /> : <NotStartedGroups cards={cards} />}
     </div>
   );
 }
@@ -284,7 +265,6 @@ function StatusColumn({
   status: PlanStatus;
   cards: PlanCard[];
 }) {
-  const t = useTranslations('board');
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
@@ -300,11 +280,7 @@ function StatusColumn({
         {cards.map((card) => (
           <DraggableStatusCard key={card.key} card={card} />
         ))}
-        {cards.length === 0 ? (
-          <div className="py-[8px] text-center text-[11.5px] text-text-faint">
-            {t('statusView.none')}
-          </div>
-        ) : null}
+        {cards.length === 0 ? <EmptyColumn /> : null}
       </div>
     </div>
   );
@@ -319,7 +295,6 @@ function ReadOnlyStatusColumn({
   status: PlanStatus;
   cards: PlanCard[];
 }) {
-  const t = useTranslations('board');
   return (
     <div>
       <ColumnHeader status={status} count={cards.length} />
@@ -327,11 +302,7 @@ function ReadOnlyStatusColumn({
         {cards.map((card) => (
           <StatusLessonCard key={card.key} card={card} readOnly />
         ))}
-        {cards.length === 0 ? (
-          <div className="py-[8px] text-center text-[11.5px] text-text-faint">
-            {t('statusView.none')}
-          </div>
-        ) : null}
+        {cards.length === 0 ? <EmptyColumn /> : null}
       </div>
     </div>
   );
