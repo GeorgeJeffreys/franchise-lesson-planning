@@ -9,7 +9,7 @@ import type {
   ConsoleAccess,
   ConsoleClassesData,
   ConsoleTab,
-  CoordSpaceMembers,
+  SubjectMember,
   CurriculumSubjectStatus,
   PendingCoordinatorRequest,
   ResourceGuideVersion,
@@ -36,7 +36,8 @@ export interface SettingsConsoleProps {
   centres?: CentreRow[];
   subjects?: SubjectRow[];
   classesData?: ConsoleClassesData;
-  coordSpaces?: CoordSpaceMembers[];
+  /** `null` = load failed (error state); `undefined` = not loaded (non-coordinator). */
+  subjectMembers?: SubjectMember[] | null;
   curriculum?: CurriculumSubjectStatus[];
   resourceGuide?: ResourceGuideVersion | null;
   smarttGuide?: SmarttGuideVersion | null;
@@ -101,8 +102,11 @@ export function SettingsConsole(props: SettingsConsoleProps) {
         {tab === 'subjects' && props.subjects ? <SubjectsTab subjects={props.subjects} /> : null}
         {tab === 'classes' && props.classesData ? <ClassesTab data={props.classesData} /> : null}
         {tab === 'calendar' && access.isAdmin ? <TermCalendarTab terms={props.terms ?? []} /> : null}
-        {tab === 'members' && props.coordSpaces ? (
-          <CoordinatorMembersTab spaces={props.coordSpaces} />
+        {tab === 'members' && access.isCoordinator ? (
+          <CoordinatorMembersTab
+            members={props.subjectMembers ?? null}
+            currentUserId={access.profileId}
+          />
         ) : null}
         {tab === 'curriculum' && props.curriculum ? (
           <CurriculumTab statuses={props.curriculum} />

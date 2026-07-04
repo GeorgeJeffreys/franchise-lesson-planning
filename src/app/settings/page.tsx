@@ -12,7 +12,7 @@ import {
   getCentres,
   getConsoleAccess,
   getConsoleClasses,
-  getCoordinatorMembers,
+  getSubjectMembers,
   getCurriculumStatus,
   getPendingCoordinatorRequests,
   getSubjects,
@@ -22,7 +22,7 @@ import {
   type AdminUser,
   type CentreRow,
   type ConsoleClassesData,
-  type CoordSpaceMembers,
+  type SubjectMember,
   type CurriculumSubjectStatus,
   type PendingCoordinatorRequest,
   type ResourceGuideVersion,
@@ -77,7 +77,9 @@ export default async function SettingsPage() {
   let centres: CentreRow[] | undefined;
   let subjects: SubjectRow[] | undefined;
   let classesData: ConsoleClassesData | undefined;
-  let coordSpaces: CoordSpaceMembers[] | undefined;
+  // `null` distinguishes a load failure (renders the tab's error state) from
+  // "not loaded because not a coordinator" (`undefined`).
+  let subjectMembers: SubjectMember[] | null | undefined;
   let curriculum: CurriculumSubjectStatus[] | undefined;
   let resourceGuide: ResourceGuideVersion | null | undefined;
   let smarttGuide: SmarttGuideVersion | null | undefined;
@@ -106,8 +108,8 @@ export default async function SettingsPage() {
       ]);
   } else if (access.isCoordinator) {
     const subjectIds = [...new Set(access.coordinatorSpaces.map((s) => s.subjectId))];
-    [coordSpaces, curriculum] = await Promise.all([
-      getCoordinatorMembers(),
+    [subjectMembers, curriculum] = await Promise.all([
+      getSubjectMembers().catch(() => null),
       getCurriculumStatus(subjectIds),
     ]);
   }
@@ -131,7 +133,7 @@ export default async function SettingsPage() {
           centres={centres}
           subjects={subjects}
           classesData={classesData}
-          coordSpaces={coordSpaces}
+          subjectMembers={subjectMembers}
           curriculum={curriculum}
           resourceGuide={resourceGuide}
           smarttGuide={smarttGuide}

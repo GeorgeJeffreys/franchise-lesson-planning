@@ -398,16 +398,23 @@ export async function removeMembership(input: { membershipId: string }): Promise
 }
 
 /**
- * Coordinator (or admin): remove a member from a space. RLS (sm_coord_write)
- * restricts a coordinator to their own (centre, subject) — a write outside it is
- * rejected by the database, so no extra server check is needed here.
+ * Coordinator (or admin): remove a teacher from a coordinated subject. In the
+ * school-agnostic model a coordinator owns their subject across every centre, so
+ * removal deletes ALL of that teacher's `subject_membership` rows in the subject
+ * (passed as `membershipIds`). RLS (`sm_coord_write`) restricts a coordinator to
+ * rows within a subject they coordinate — any id outside that is rejected by the
+ * database, so no extra server check is needed here.
  */
-export async function coordRemoveMember(input: { membershipId: string }): Promise<ConsoleResult> {
+export async function coordRemoveMember(input: { membershipIds: string[] }): Promise<ConsoleResult> {
   const profile = await getCurrentProfile();
   if (!profile) return fail('You must be signed in.');
+  if (input.membershipIds.length === 0) return ok();
 
   const supabase = await createClient();
-  const { error } = await supabase.from('subject_membership').delete().eq('id', input.membershipId);
+  const { error } = await supabase
+    .from('subject_membership')
+    .delete()
+    .in('id', input.membershipIds);
   if (error) return fail(error.message);
   revalidateConsole();
   return ok();

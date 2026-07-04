@@ -53,6 +53,8 @@
         "school": "School",
         "subject": "Subject",
         "class": "Class",
+        "spaces": "Subject spaces",
+        "status": "Status",
         "testBar": "Test bar",
         "actions": "Actions"
       },
@@ -82,12 +84,33 @@
       },
       "coordinator": {
         "title": "Members & roles",
-        "empty": "You don’t coordinate any spaces.",
-        "spaceTitle": "{subject} at {school}",
-        "spaceMeta": "· Your space · {count, plural, one {# member} other {# members}}",
-        "promote": "Promote to coordinator",
-        "remove": "Remove",
-        "footnote": "To add a teacher who isn’t here yet, ask them to sign in and complete onboarding for this space, or have an admin assign them. Coordinators can’t browse the full people directory."
+        "searchPlaceholder": "Search name or email…",
+        "manage": "Manage",
+        "you": "YOU",
+        "status": {
+          "active": "Active",
+          "deactivated": "Deactivated"
+        },
+        "emptyMembers": "No teachers have joined your subject yet.",
+        "emptyFiltered": {
+          "title": "No teachers match “{query}”",
+          "body": "Try a different search.",
+          "clear": "Clear search"
+        },
+        "error": {
+          "title": "Couldn't load members",
+          "body": "Something went wrong reaching the server. Your changes are safe.",
+          "retry": "Try again"
+        },
+        "modal": {
+          "title": "Manage {name}",
+          "spacesLabel": "Subject spaces",
+          "removeFrom": "Remove from {subject}",
+          "removeHint": "Removing a teacher takes them out of this subject across every centre. They keep their account and can be re-added later.",
+          "removeError": "Couldn’t remove this member. Please try again.",
+          "done": "Done"
+        },
+        "footnote": "To add a teacher who isn’t here yet, ask them to sign in and complete onboarding for this subject, or have an admin assign them. Coordinators can’t browse the full people directory."
       }
     },
     "subjects": {
