@@ -45,3 +45,10 @@ next-env.d.ts
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Curriculum fixtures — real workbooks + full gold-master CSVs are core IP and must
+# NEVER enter git history. The parity harness reads them from this local path (or the
+# CURRICULUM_FIXTURES_DIR override). Only the redacted, content-free gold master under
+# goldmaster-redacted/ is committed (see test/fixtures/curriculum/README.md).
+/test/fixtures/curriculum/*.xlsx
+/test/fixtures/curriculum/goldmaster/
