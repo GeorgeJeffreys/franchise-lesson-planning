@@ -124,7 +124,7 @@ export function CurriculumCard({
       ) : null}
 
       <div className="mt-[11px] grid grid-cols-1 gap-[9px] sm:grid-cols-2">
-        <div className="rounded-[9px] border border-border bg-surface px-[11px] py-[9px]">
+        <div className="rounded-[9px] border border-[#EDE4D6] bg-transparent px-[11px] py-[9px]">
           <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#A6917A]">
             {t('grammarVocab')}
           </div>
@@ -132,7 +132,7 @@ export function CurriculumCard({
             {curriculum.grammarVocab || '—'}
           </div>
         </div>
-        <div className="rounded-[9px] border border-border bg-surface px-[11px] py-[9px]">
+        <div className="rounded-[9px] border border-[#EDE4D6] bg-transparent px-[11px] py-[9px]">
           <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#A6917A]">
             {t('theme')}
           </div>
