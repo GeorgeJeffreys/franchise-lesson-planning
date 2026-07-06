@@ -76,7 +76,14 @@ function PlannedCard({
             {t('card.year', { n: formatNumber(card.year, locale) })}
           </div>
         </div>
-        {card.owner ? <OwnerAvatar owner={card.owner} size={38} /> : null}
+        {/* Top-right cluster: the delete affordance (eligible cards only, always
+            visible) sits beside the "whose plan" avatar. */}
+        <div className="flex flex-shrink-0 items-center gap-[6px]">
+          {card.canDelete ? (
+            <DeleteLessonControl planId={card.planId} lessonName={lessonName} />
+          ) : null}
+          {card.owner ? <OwnerAvatar owner={card.owner} size={28} /> : null}
+        </div>
       </div>
 
       <div className="mt-[11px]">
@@ -96,14 +103,9 @@ function PlannedCard({
 
       <div className="mt-[12px] flex items-center justify-between gap-2">
         <StatusChip status={card.status} />
-        <div className="flex flex-shrink-0 items-center gap-[6px]">
-          {card.canDelete ? (
-            <DeleteLessonControl planId={card.planId} lessonName={lessonName} />
-          ) : null}
-          <span className="inline-flex flex-shrink-0 items-center rounded-[8px] border border-action-border px-[14px] py-[5px] text-[11.5px] font-semibold text-teal">
-            {readOnly ? t('card.review') : t('card.open')}
-          </span>
-        </div>
+        <span className="inline-flex flex-shrink-0 items-center rounded-[8px] border border-action-border px-[14px] py-[5px] text-[11.5px] font-semibold text-teal">
+          {readOnly ? t('card.review') : t('card.open')}
+        </span>
       </div>
     </CardShell>
   );
