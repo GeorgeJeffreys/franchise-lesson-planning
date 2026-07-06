@@ -1,14 +1,24 @@
 import { AppShell } from '@/components/app-shell/AppShell';
 import { CurriculumBrowse } from '@/components/curriculum/CurriculumBrowse';
-import { getCurriculumBrowseData } from '@/lib/curriculum-browse';
+import { ExplorerTabs, type ExplorerTab } from '@/components/curriculum/ExplorerTabs';
+import { LogicTree } from '@/components/curriculum/LogicTree';
+import { Topics } from '@/components/curriculum/Topics';
+import { SearchSlot } from '@/components/curriculum/SearchSlot';
+import { getCurriculumBrowseData, getExplorerShell } from '@/lib/curriculum-browse';
+import {
+  getCompositionTree,
+  getCurriculumSubjectCapabilities,
+  getTopicsData,
+} from '@/lib/curriculum/composition';
 import { getHeaderProfile } from '@/lib/profile';
 
 // Rendered per-request so the shell reflects the live session and the selected
-// Subject / Year / Week / View (driven by URL search params, so the view is
+// Tab / Subject / Year / Week / View (driven by URL search params, so the view is
 // linkable).
 export const dynamic = 'force-dynamic';
 
 type SearchParams = {
+  tab?: string;
   subject?: string;
   year?: string;
   month?: string;
@@ -16,35 +26,124 @@ type SearchParams = {
   view?: string;
 };
 
+const TABS: ExplorerTab[] = ['calendar', 'tree', 'topics', 'search'];
+
 /**
- * Curriculum browse — a read-only, single-week "zoomed-in" view of the curriculum
- * table, navigated by Subject → Year → Week. All content is curriculum-provided
- * (cream/locked); the only action is "Plan this lesson", which carries a slot into
- * the existing create-from-curriculum flow. The proxy redirects signed-out users.
+ * Curriculum Explorer — a read-only browser over the curriculum with four tabs:
+ * Calendar (the existing single-week/monthly viewer), Logic tree (the outcome
+ * composition, gated on taxonomy), Topics (focus-area/theme spiral), and a Search slot
+ * owned by a separate slice. All content is curriculum-provided (cream/locked); the
+ * only action is "Plan this lesson", which hands a calendar-keyed slot to the existing
+ * create flow. The proxy redirects signed-out users.
  */
 export default async function CurriculumPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { subject, year, month, week, view } = await searchParams;
+  const { tab, subject, year, month, week, view } = await searchParams;
   const yearNum = year ? Number(year) : undefined;
   const weekNum = week ? Number(week) : undefined;
   const resolvedView = view === 'monthly' ? 'monthly' : 'weekly';
+  const activeTab: ExplorerTab = TABS.includes(tab as ExplorerTab) ? (tab as ExplorerTab) : 'calendar';
 
-  const [{ name, subtitle }, data] = await Promise.all([
+  const [{ name, subtitle }, shell] = await Promise.all([
     getHeaderProfile(),
-    getCurriculumBrowseData({
+    getExplorerShell({
       subject: subject || undefined,
       year: Number.isFinite(yearNum) ? yearNum : undefined,
-      month: month || undefined,
-      week: Number.isFinite(weekNum) ? weekNum : undefined,
     }),
   ]);
 
+  // No curriculum synced at all → the Calendar viewer's own empty state.
+  if (!shell) {
+    const data = await getCurriculumBrowseData({ subject: subject || undefined });
+    return (
+      <AppShell name={name} subtitle={subtitle}>
+        <CurriculumBrowse data={data} view={resolvedView} />
+      </AppShell>
+    );
+  }
+
+  const capabilities = await getCurriculumSubjectCapabilities(shell.subjectCode);
+
   return (
     <AppShell name={name} subtitle={subtitle}>
-      <CurriculumBrowse data={data} view={resolvedView} />
+      <ExplorerTabs
+        tab={activeTab}
+        subjectCode={shell.subjectCode}
+        subjectName={shell.subjectName}
+        year={shell.year}
+        hasTaxonomy={capabilities.hasTaxonomy}
+      >
+        <TabBody
+          tab={activeTab}
+          shell={shell}
+          searchParams={{
+            subject: subject || undefined,
+            year: Number.isFinite(yearNum) ? yearNum : undefined,
+            month: month || undefined,
+            week: Number.isFinite(weekNum) ? weekNum : undefined,
+            view: resolvedView,
+          }}
+        />
+      </ExplorerTabs>
     </AppShell>
   );
+}
+
+async function TabBody({
+  tab,
+  shell,
+  searchParams,
+}: {
+  tab: ExplorerTab;
+  shell: NonNullable<Awaited<ReturnType<typeof getExplorerShell>>>;
+  searchParams: {
+    subject?: string;
+    year?: number;
+    month?: string;
+    week?: number;
+    view: 'weekly' | 'monthly';
+  };
+}) {
+  const subjects = shell.subjects.map((s) => ({ code: s.code, name: s.name }));
+
+  if (tab === 'tree') {
+    const tree = await getCompositionTree(shell.subjectCode, shell.year);
+    return (
+      <LogicTree
+        tree={tree}
+        subjects={subjects}
+        subjectName={shell.subjectName}
+        years={shell.years}
+        year={shell.year}
+      />
+    );
+  }
+
+  if (tab === 'topics') {
+    const data = await getTopicsData(shell.subjectCode);
+    return (
+      <Topics
+        data={data}
+        subjects={subjects}
+        subjectName={shell.subjectName}
+        year={shell.year}
+      />
+    );
+  }
+
+  if (tab === 'search') {
+    return <SearchSlot subjectName={shell.subjectName} />;
+  }
+
+  // Calendar — the existing viewer, re-fetched with its own (subject/year/month/week).
+  const data = await getCurriculumBrowseData({
+    subject: searchParams.subject,
+    year: searchParams.year,
+    month: searchParams.month,
+    week: searchParams.week,
+  });
+  return <CurriculumBrowse data={data} view={searchParams.view} embedded />;
 }

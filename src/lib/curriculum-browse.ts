@@ -150,6 +150,40 @@ function sortSubjects(subjects: BrowseSubject[]): BrowseSubject[] {
   });
 }
 
+/** The subject/year context every Explorer tab shares (subjects list, resolved
+ *  subject, its synced years) — without the calendar-specific reads. */
+export interface ExplorerShell {
+  subjects: BrowseSubject[];
+  subjectCode: string;
+  subjectName: string;
+  years: number[];
+  year: number;
+}
+
+/**
+ * Resolve the shared Explorer context: the subject list, the resolved subject
+ * (explicit `?subject=` → active space → English/first), its synced years, and the
+ * resolved year (snap to first). Returns null when no curriculum is synced. Reuses the
+ * SAME resolution as `getCurriculumBrowseData` so every tab agrees on subject/year.
+ */
+export async function getExplorerShell(input: {
+  subject?: string;
+  year?: number;
+}): Promise<ExplorerShell | null> {
+  const codes = await getCurriculumSubjectCodes();
+  if (codes.length === 0) return null;
+  const names = await subjectNames(codes);
+  const subjects = sortSubjects(codes.map((code) => ({ code, name: names.get(code) ?? code })));
+  const active = await getActiveSpace();
+  const subject =
+    subjects.find((s) => s.code === input.subject) ??
+    (active ? subjects.find((s) => s.code === active.subjectCode) : undefined) ??
+    subjects[0];
+  const years = await yearsForSubject(subject.code);
+  const year = input.year != null && years.includes(input.year) ? input.year : (years[0] ?? 0);
+  return { subjects, subjectCode: subject.code, subjectName: subject.name, years, year };
+}
+
 const EMPTY: CurriculumBrowseData = {
   subjects: [],
   years: [],
