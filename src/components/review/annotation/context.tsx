@@ -54,11 +54,6 @@ interface AnnotationContextValue {
   setTab: (tab: ReviewTab) => void;
   filter: AnnotationFilter;
   setFilter: (f: AnnotationFilter) => void;
-  /** Client-side "Unlock for editing" — coordinator suggesting mode. NOT a real
-   *  unlock: it never changes plan status or writes the plan; inline edits become
-   *  suggestions. Meaningful only for a coordinator. */
-  suggesting: boolean;
-  setSuggesting: (v: boolean) => void;
 
   // ── mutations (each refreshes the route) ─────────────────────────────────────
   pending: boolean;
@@ -123,7 +118,6 @@ export function AnnotationProvider({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tab, setTab] = useState<ReviewTab>('lesson');
   const [filter, setFilter] = useState<AnnotationFilter>('open');
-  const [suggesting, setSuggesting] = useState(false);
 
   const editable = status === 'needs_review' || status === 'in_progress';
 
@@ -153,8 +147,6 @@ export function AnnotationProvider({
       setTab,
       filter,
       setFilter,
-      suggesting,
-      setSuggesting,
       pending,
       create: (input) => runAndRefresh(() => createAnnotation(planId, input)),
       reply: (annotationId, body) => runAndRefresh(() => addAnnotationReply(annotationId, body)),
@@ -189,7 +181,7 @@ export function AnnotationProvider({
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, status, role, viewerName, editable, annotations, phaseTitles, activeId, tab, filter, suggesting, pending]);
+  }, [planId, status, role, viewerName, editable, annotations, phaseTitles, activeId, tab, filter, pending]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

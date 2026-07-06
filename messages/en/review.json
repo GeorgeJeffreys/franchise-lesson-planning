@@ -156,10 +156,6 @@
         "textEmptyHint": "Add text…",
         "editHint": "Click to edit inline"
       },
-      "suggesting": {
-        "off": "Unlock for editing",
-        "on": "Done editing"
-      },
       "pointer": {
         "title": "Coordinator feedback to review",
         "body": "Open the review view to accept changes and reply."

@@ -66,11 +66,13 @@ export function PartContent({
   }
 
   /** A description field: plain `Detail` off the review view; an inline `ProseField`
-   *  (tracked-change diff + coordinator edit) on it. Empty fields stay hidden unless a
-   *  coordinator is actively suggesting (so they can add missing content). */
+   *  (tracked-change diff + coordinator edit-in-place) on it. Empty fields stay hidden
+   *  except for a coordinator, who can add missing content in place. */
   const description = (field: 'teacher_does' | 'students_do', label: string, value: string) => {
     if (!ann) return <Detail label={label} value={value} />;
-    const show = value.trim() !== '' || (ann.role === 'coordinator' && ann.suggesting);
+    // A coordinator can edit in place at all times (so empty fields stay addable);
+    // everyone else only sees a field that has content.
+    const show = value.trim() !== '' || ann.role === 'coordinator';
     if (!show) return null;
     return (
       <div className="text-[12.5px] leading-[1.5]">

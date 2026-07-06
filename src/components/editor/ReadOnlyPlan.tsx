@@ -10,7 +10,6 @@ import { PartContent } from '@/components/editor/PartContent';
 import { PhaseRow } from '@/components/review/annotation/PhaseRow';
 import { ObjectiveAnnotations } from '@/components/review/annotation/ObjectiveAnnotations';
 import { ProseField } from '@/components/review/annotation/ProseField';
-import { SuggestingToggle } from '@/components/review/annotation/SuggestingToggle';
 import { blockMinutes, inSessionMinutes, IN_SESSION_TARGET_MINUTES, ROUTINE_BLOCK_TYPES } from '@/lib/blocks';
 import { routinesMinutes } from '@/lib/editor/plan-blocks';
 import { normalizeLinkIt, resolveTechniques, techniqueLabelMap } from '@/lib/editor/link-it';
@@ -141,12 +140,9 @@ export function ReadOnlyPlan({
                 Read only · {SCOPE_LABEL[classContext.scope]}
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <SuggestingToggle />
-              <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
-                {total} / {IN_SESSION_TARGET_MINUTES} min
-              </span>
-            </div>
+            <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
+              {total} / {IN_SESSION_TARGET_MINUTES} min
+            </span>
           </div>
         </div>
       </div>
@@ -160,12 +156,9 @@ export function ReadOnlyPlan({
         <CurriculumBand curriculum={curriculum} />
 
         <section className="mt-[24px]">
-          <div className="mb-[8px] flex items-center gap-[10px]">
-            <h2 className="text-[13px] font-bold uppercase tracking-[0.05em] text-text-faint">
-              SMARTT objective
-            </h2>
-            <ObjectiveAnnotations />
-          </div>
+          <h2 className="mb-[8px] text-[13px] font-bold uppercase tracking-[0.05em] text-text-faint">
+            SMARTT objective
+          </h2>
           <div className="rounded-[11px] border border-border bg-surface px-[15px] py-[13px] text-[14px] leading-[1.5] text-neutral-900">
             <ProseField
               anchorType="objective"
@@ -173,6 +166,9 @@ export function ReadOnlyPlan({
               placeholder="No objective written yet."
             />
           </div>
+          {/* Comment trigger + composer sit BELOW the objective — never a floating
+              box above it (plain-clicking the text now edits it in place). */}
+          <ObjectiveAnnotations />
         </section>
 
         <section className="mt-[24px]">

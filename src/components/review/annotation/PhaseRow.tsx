@@ -7,12 +7,11 @@
 // in the duration / grouping cell for a live suggestion (green once accepted), and a
 // per-row Comment affordance (coordinator).
 //
-// PART B: authoring duration/grouping is now DIRECT INLINE EDITING (the old "Suggest
-// a time" / "Suggest a grouping" buttons are gone). While a coordinator is in
-// suggesting mode, clicking the `{n} min` value opens a stepper and clicking the
-// grouping tag opens a picker; committing creates / updates / withdraws the same
-// dur / enum suggestion the pills and accept/reject already use. Comments stay
-// available regardless of suggesting mode.
+// PART B: authoring duration/grouping is DIRECT INLINE EDITING (the old "Suggest a
+// time" / "Suggest a grouping" buttons are gone). There is no mode — for a coordinator
+// clicking the `{n} min` value opens a stepper in the cell and clicking the grouping
+// tag opens a picker; committing creates / updates / withdraws the same dur / enum
+// suggestion the pills and accept/reject already use. Comments stay available too.
 
 import { useState, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -46,7 +45,8 @@ export function PhaseRow({
   const enumSug = ctx?.suggestionFor(type, 'enum');
   const phaseCards = ctx?.forPhase(type) ?? [];
   const isCoordinator = ctx?.role === 'coordinator';
-  const canEdit = !!isCoordinator && !!ctx?.suggesting;
+  // No mode: a coordinator edits duration/grouping in place at all times.
+  const canEdit = !!isCoordinator;
 
   const pendingDur = ctx
     ? pendingSuggestion(ctx.annotations, { shape: 'dur', anchorType: 'phase_duration', phaseRef: type })
@@ -104,6 +104,15 @@ export function PhaseRow({
 
   // ── grouping cell ────────────────────────────────────────────────────────────
   const groupingCell = (() => {
+    if (editing === 'enum' && phase) {
+      return (
+        <EnumInline
+          seed={(pendingEnum?.toValue as TeachingPhase) ?? phase}
+          onCommit={(p) => void commitEnum(p)}
+          onCancel={() => setEditing(null)}
+        />
+      );
+    }
     if (enumSug && enumSug.status === 'pending') {
       return (
         <Clickable onClick={canEdit ? () => setEditing('enum') : () => focus(enumSug.id)}>
@@ -136,6 +145,18 @@ export function PhaseRow({
   // ── duration cell ────────────────────────────────────────────────────────────
   const minutesLabel = t('annotations.pill.minutes', { n: formatNumber(minutes, locale) });
   const durationCell = (() => {
+    if (editing === 'dur') {
+      return (
+        <span className="ml-auto">
+          <DurInline
+            seed={pendingDur ? Number(pendingDur.toValue) : minutes}
+            onCommit={(v) => void commitDur(v)}
+            onCancel={() => setEditing(null)}
+            locale={locale}
+          />
+        </span>
+      );
+    }
     if (durSug && durSug.status === 'pending') {
       return (
         <Clickable
@@ -173,28 +194,7 @@ export function PhaseRow({
         {durationCell}
       </div>
 
-      {/* Inline dur / enum editors (suggesting mode). */}
-      {editing === 'dur' ? (
-        <div className="mt-[8px]">
-          <DurEditor
-            seed={pendingDur ? Number(pendingDur.toValue) : minutes}
-            onCommit={(v) => void commitDur(v)}
-            onCancel={() => setEditing(null)}
-            locale={locale}
-          />
-        </div>
-      ) : null}
-      {editing === 'enum' && phase ? (
-        <div className="mt-[8px]">
-          <EnumEditor
-            seed={(pendingEnum?.toValue as TeachingPhase) ?? phase}
-            onCommit={(p) => void commitEnum(p)}
-            onCancel={() => setEditing(null)}
-          />
-        </div>
-      ) : null}
-
-      {/* Comment — always available to a coordinator, independent of suggesting mode. */}
+      {/* Comment — always available to a coordinator, independent of the inline edits. */}
       {isCoordinator ? (
         <div className="mt-[8px] flex flex-wrap items-center gap-[7px]">
           <AuthorButton
@@ -349,7 +349,9 @@ export function CommentForm({
   );
 }
 
-function DurEditor({
+/** Compact inline duration editor — the stepper sits in the duration cell itself
+ *  (no box below), committing on ✓ / cancelling on ✕. */
+function DurInline({
   seed,
   onCommit,
   onCancel,
@@ -362,17 +364,17 @@ function DurEditor({
 }) {
   const [value, setValue] = useState(seed);
   return (
-    <AuthoringShell>
-      <div className="flex flex-wrap items-center gap-[9px]">
-        <Stepper value={value} onChange={setValue} min={1} max={60} locale={locale} />
-        <IconButton onClick={() => onCommit(value)} />
-        <CancelLink onClick={onCancel} />
-      </div>
-    </AuthoringShell>
+    <span className="inline-flex items-center gap-[6px]">
+      <Stepper value={value} onChange={setValue} min={1} max={60} locale={locale} />
+      <IconButton onClick={() => onCommit(value)} />
+      <CancelLink onClick={onCancel} />
+    </span>
   );
 }
 
-function EnumEditor({
+/** Compact inline grouping editor — the three tags sit in the grouping cell itself;
+ *  picking one commits immediately. */
+function EnumInline({
   seed,
   onCommit,
   onCancel,
@@ -382,26 +384,24 @@ function EnumEditor({
   onCancel: () => void;
 }) {
   return (
-    <AuthoringShell>
-      <div className="flex flex-wrap items-center gap-[6px]">
-        {PHASE_ORDER.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => onCommit(p)}
-            className="rounded-[8px] border px-[10px] py-[5px] text-[12px] font-semibold transition-colors"
-            style={
-              seed === p
-                ? { background: A.suggestionBg, color: A.suggestionFg, borderColor: A.pillTealBorder }
-                : { background: 'transparent', color: A.tabIdleFg, borderColor: A.tabBorder }
-            }
-          >
-            {PHASE_LABEL[p]}
-          </button>
-        ))}
-        <CancelLink onClick={onCancel} />
-      </div>
-    </AuthoringShell>
+    <span className="inline-flex items-center gap-[5px]">
+      {PHASE_ORDER.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onCommit(p)}
+          className="rounded-[7px] border px-[8px] py-[3px] text-[11px] font-semibold transition-colors"
+          style={
+            seed === p
+              ? { background: A.suggestionBg, color: A.suggestionFg, borderColor: A.pillTealBorder }
+              : { background: 'transparent', color: A.tabIdleFg, borderColor: A.tabBorder }
+          }
+        >
+          {PHASE_LABEL[p]}
+        </button>
+      ))}
+      <CancelLink onClick={onCancel} />
+    </span>
   );
 }
 
