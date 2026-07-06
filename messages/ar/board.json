@@ -40,8 +40,8 @@
     "addLesson": "إضافة درس",
     "add": {
       "chooseYear": "اختر مجموعة السنة",
-      "chooseLesson": "اختر المادة والسنة",
-      "noLesson": "لا يوجد درس",
+      "choose": "اختر صفًا",
+      "noCurriculum": "لا يوجد منهج لهذه الحصة",
       "opening": "جارٍ الفتح…"
     },
     "downloadWeek": "تنزيل الأسبوع",
