@@ -89,7 +89,26 @@
     },
     "search": {
       "placeholder": "ابحث في الدروس",
-      "comingSoon": "البحث قريبًا."
+      "inputAria": "ابحث في دروس {subject}",
+      "filters": "عوامل التصفية",
+      "clearAll": "مسح الكل",
+      "resultCount": "{count, plural, zero {لا نتائج} one {نتيجة واحدة} two {نتيجتان} few {# نتائج} many {# نتيجة} other {# نتيجة}}",
+      "emptyTitle": "ابحث في المنهج",
+      "emptyBody": "ابدأ بالكتابة للبحث في دروس {subject}، أو صفِّ النتائج باستخدام العوامل على اليمين.",
+      "noMatchTitle": "لا توجد دروس مطابقة",
+      "noMatchBody": "جرّب كلمة مختلفة أو أزل بعض عوامل التصفية.",
+      "detailHeading": "الدرس المحدد",
+      "selectResult": "اختر نتيجة لعرض درسها.",
+      "facets": {
+        "year": "السنة",
+        "month": "الشهر",
+        "topic": "الموضوع",
+        "focusArea": "مجال التركيز",
+        "skill": "المهارة اللغوية",
+        "more": "المزيد",
+        "hasResources": "يحتوي على موارد",
+        "grammar": "القواعد والمفردات"
+      }
     },
     "noLessons": "لا توجد دروس لهذا الأسبوع.",
     "emptyState": {

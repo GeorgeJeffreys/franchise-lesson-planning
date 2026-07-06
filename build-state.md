@@ -2,6 +2,77 @@
 
 Living record of what each phase delivered and what comes next. Update as you go.
 
+## Curriculum Explorer — Search tab (instant client-side search + facets) ✅ (this phase)
+
+Replaces the inert "Search is coming soon" slot in the Explorer tab bar with a working
+Search: instant, typo-tolerant search + faceted filter over ONE subject's lessons. The
+corpus is small (≤~1,240 rows/subject) so it loads once and filters in memory — no
+per-keystroke round-trip, no spinner. **No taxonomy dependency**: it reads live columns
+only, so it works fully for every subject (unlike the Logic tree).
+
+### Data layer
+
+- **`src/lib/curriculum/search.ts` — `getSearchData(subject)`**: loads the WHOLE subject
+  (all years) as a `SearchRecord[]` corpus. Whole-subject scope exceeds the PostgREST
+  1000-row cap (English ~1,190), so it **pages with `.range()`** until the last page is
+  short — never silently truncating. Service-role read (global reference data), matching
+  curriculumUtils/composition. Blank-daily-outcome rows dropped (no searchable content /
+  no plan target). Returns distinct year + month axes for the facet lists.
+- **`src/lib/curriculum/search-match.ts` — pure, client-safe matcher** (no server-only,
+  no deps): `normalizeText` (Latin diacritic strip + Arabic letter folding أإآ→ا, ى→ي,
+  ة→ه, harakat/tatweel removed), `tokenize`, bounded `boundedLevenshtein`, `scoreFields`
+  (AND across query tokens; daily-outcome weighted above chips; exact > prefix > substring
+  > fuzzy), and `highlightSegments` (maps normalised match ranges back to ORIGINAL offsets
+  so accents/harakat highlight correctly). Unit-tested (`__tests__/search-match.test.ts`,
+  15 cases incl. Arabic RTL + typo tolerance), wired into `npm test`.
+
+### Facets (subject-conditional — one presence definition, not a fork)
+
+- **Presence reuses #99's capability probe**: `getCurriculumSubjectCapabilities`
+  (composition.ts) EXTENDED with `hasLinguisticSkillText` + `hasGrammarVocabText` (same
+  head-count probe pattern) alongside the existing `hasFocusAreaText`. Each facet is then
+  AND-guarded by the corpus actually offering non-empty values, so a present-but-blank
+  column never renders a dead facet.
+- **Universal**: Year, Month, Topic (theme), Has resources. **Conditional**: Linguistic
+  skill (english, arabic), Focus area (all but english), Grammar & vocabulary (english).
+  **Focus area → Topic cascades** — picking focus areas narrows the Topic options; a
+  selected-then-hidden topic is IGNORED, not deleted (derived in render, no effect), so it
+  re-applies if the focus area is reselected. Within a facet = OR, across facets = AND.
+- The facet SET differs per subject as required: **english** = skill + grammar + topic (no
+  focus area); **maths** = focus area (→ topic cascade), no skill/grammar.
+
+### UI (`src/components/curriculum/Search.tsx`)
+
+- Mirrors the Explorer shell: selector row (subject switch + search box), then the
+  three-column body **facets rail · results · detail rail** — the SAME rail + **"Plan this
+  lesson →"** handoff (`PlanLessonButton`, reuses `createScopedPlan`; no create reimpl).
+- Each result: calendar path (Yr · Month · Wk · P), the daily outcome with the term
+  **highlighted in a NEUTRAL off-palette mark** (weight + `neutral-200/60` grey tint —
+  never cream/teal/pink/red), and its facet chips. Distinct **empty state** (before typing)
+  vs **no-match state**; live result count. Selection is DERIVED (clicked row, else first).
+- **URL-driven `?q=`** (debounced `router.replace`, preserving `?tab=&subject=`) so
+  searches are shareable / back-safe. Subject switch keeps `q`.
+- **RTL-clean**: `dir="auto"` on the box + all free-text; logical padding + `text-start`
+  right-align results under Arabic. Sora throughout. `SearchSlot.tsx` removed.
+
+### i18n
+
+- New `curriculum.search.*` strings (input aria, filters, clearAll, resultCount plural,
+  empty/no-match/detail states, `facets.*`) in **`messages/en`** + **`messages/ar`**.
+  **Arabic is machine-translated — flagged for Kadria's review.** `dir="auto"` retained on
+  free-text.
+
+### Preserve / verify
+
+- Calendar / Logic tree / Topics tabs and their data paths unchanged. **No schema change.**
+- `npx tsc --noEmit` clean · `next build` (Next 16.2.9) passes · `eslint` clean · `npm
+  test` green (search-match 15/15).
+- ⚠️ **Live-row verification (english vs maths facet sets, plan handoff, taxonomy-less
+  subject) NOT run in this environment** — no local Supabase (no CLI/Docker, no
+  `.env.local`). Logic reasoned against the schema + #99 presence probe; the risky
+  matching/highlight core is unit-tested. Should be smoke-tested against a live DB before
+  merge.
+
 ## Lesson board fixes: coordinator review-only · "This week" jump ✅ (this phase)
 
 Ships two more board fixes on top of the class-binding fix below (that one already
