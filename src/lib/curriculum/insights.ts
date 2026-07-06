@@ -16,13 +16,19 @@ import type { HoursPerMonth, TopicsData } from '@/lib/curriculum/composition';
 
 // ── Calendar order ──────────────────────────────────────────────────────────────────
 
-const MONTH_ORDER = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+// The teaching year runs September → June (Alsama), so the hours-per-month chart reads
+// in ACADEMIC order (S O N D J F M A M J), matching the design — not calendar order.
+const ACADEMIC_MONTH_ORDER = [
+  'September', 'October', 'November', 'December', 'January', 'February',
+  'March', 'April', 'May', 'June', 'July', 'August',
 ];
 export function monthIndex(month: string): number {
-  const i = MONTH_ORDER.indexOf(month);
-  return i === -1 ? MONTH_ORDER.length : i;
+  const i = ACADEMIC_MONTH_ORDER.indexOf(month);
+  return i === -1 ? ACADEMIC_MONTH_ORDER.length : i;
+}
+/** Single-letter month initial used for the compact hours-per-month axis. */
+export function monthInitial(month: string): string {
+  return month ? month.charAt(0) : '';
 }
 
 // ── Magnitude → teal ramp ─────────────────────────────────────────────────────────
@@ -43,6 +49,24 @@ export function tealStop(value: number, max: number): string {
   const ratio = Math.min(1, value / max);
   const idx = Math.min(TEAL_STOPS.length - 1, Math.ceil(ratio * TEAL_STOPS.length) - 1);
   return TEAL_STOPS[Math.max(0, idx)];
+}
+
+// The spiral's "deepening" ramp (6 stops, pale → deep). It is POSITIONAL chrome keyed to
+// how many times a topic has recurred — the Nth taught year is one stop deeper — NOT a
+// data-derived complexity signal (none exists). Same positional treatment the Topics
+// spiral already uses; a fully-taught 6-year topic spans all six stops exactly.
+const SPIRAL_STOPS = [
+  'var(--color-chart-teal-1)',
+  'var(--color-chart-teal-2)',
+  'var(--color-chart-teal-3)',
+  'var(--color-chart-teal-4)',
+  'var(--color-chart-teal-5)',
+  'var(--color-chart-teal-6)',
+];
+export function deepeningColor(occurrenceIndex: number, totalTaught: number): string {
+  if (totalTaught <= 1) return SPIRAL_STOPS[SPIRAL_STOPS.length - 1];
+  const idx = Math.round((occurrenceIndex / (totalTaught - 1)) * (SPIRAL_STOPS.length - 1));
+  return SPIRAL_STOPS[Math.min(SPIRAL_STOPS.length - 1, Math.max(0, idx))];
 }
 
 // ── 1) Hours per month (for one year) ───────────────────────────────────────────────
@@ -208,6 +232,30 @@ export interface GapNote {
   topic: string;
   gapYears: number[];
   reappear: number;
+}
+
+/** The not-taught years that fall STRICTLY between a topic's first and last taught year
+ *  — the cells the coverage matrix marks with a red gap-cross. Absent years outside that
+ *  span (before it starts / after it ends) are blank, not gaps. */
+export function interiorGapYears(row: MatrixRow, years: number[]): Set<number> {
+  const taught = years.filter((y) => row.byYear[y] !== undefined);
+  if (taught.length < 2) return new Set();
+  const first = taught[0];
+  const last = taught[taught.length - 1];
+  const set = new Set<number>();
+  for (const y of years) if (y > first && y < last && row.byYear[y] === undefined) set.add(y);
+  return set;
+}
+
+/** The largest hour count in a matrix row — the coverage matrix paints this cell a shade
+ *  deeper than the row's other taught cells. */
+export function rowMax(row: MatrixRow, years: number[]): number {
+  let m = 0;
+  for (const y of years) {
+    const h = row.byYear[y];
+    if (h !== undefined && h > m) m = h;
+  }
+  return m;
 }
 
 export function gapNotes(view: MatrixView): GapNote[] {
