@@ -10,9 +10,10 @@
 //
 // Creation no longer asks "who for" (the audience/scope step) — whose lessons you
 // see is the weekly board's "Everyone / me" view filter, not a creation concern.
-// Every new plan defaults to the centre year-group scope via the existing scope
-// mechanism (createScopedPlan with scope: 'centre'); the teacher drops straight
-// into the 5-step wizard.
+// Instead, the new plan binds to one of the TEACHER'S OWN classes for the slot
+// (createTeacherPlan): auto when they teach exactly one such class, a pick when
+// they teach several, blocked when they teach none. A teacher never creates a
+// read-only `class_id=null` / `scope='centre'` plan.
 
 import {
   createContext,
@@ -24,7 +25,8 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { createScopedPlan } from '@/lib/actions/create-lesson';
+import { cn } from '@/lib/cn';
+import { createTeacherPlan, type EligibleClass } from '@/lib/actions/create-lesson';
 import { usePlanHref } from '@/components/weekly-overview/BoardReturn';
 import { formatNumber } from '@/lib/format';
 
@@ -32,7 +34,7 @@ import { formatNumber } from '@/lib/format';
 export interface ScopeTarget {
   lessonKey: string;
   year: number;
-  /** The centre (school) to create the centre-scoped plan against — the slot's centre. */
+  /** The centre (school) band the plan is created in — scopes the class match. */
   centreId: string;
   dailyOutcome: string;
   /** The Mon–Fri column (1..5) to place the new plan on. */
@@ -147,8 +149,10 @@ function DialogFooter({
 
 /**
  * Confirm step for a fixed curriculum lesson ("Not started" card). The lesson and
- * its year group are already known and the scope defaults to the centre, so there
- * is nothing to ask — one confirm creates the centre-scoped plan and opens it.
+ * its year group are already known, so one confirm binds the plan to the teacher's
+ * own class for the slot and opens it. When the teacher teaches several eligible
+ * classes they pick one first; when they teach none, creation is blocked with a
+ * clear note (no centre plan is ever produced).
  */
 function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose: () => void }) {
   const t = useTranslations('board');
@@ -157,26 +161,41 @@ function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose
   const planHref = usePlanHref();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set when the teacher teaches several classes for this slot — pick one.
+  const [classes, setClasses] = useState<EligibleClass[] | null>(null);
+  // Set when the teacher teaches no class for this slot — creation is blocked.
+  const [blocked, setBlocked] = useState<{ subjectName: string; year: number } | null>(null);
   useEscape(onClose);
 
-  const start = async () => {
+  const start = async (classId?: string) => {
     setBusy(true);
     setError(null);
-    const res = await createScopedPlan({
+    const res = await createTeacherPlan({
       lessonKey: target.lessonKey,
-      scope: 'centre',
-      schoolId: target.centreId,
+      centreId: target.centreId,
       weekday: target.weekday,
       period: target.period,
+      classId,
     });
     if (res.ok) {
       // Carry the current week so the new plan's "back to overview" returns here.
       router.push(planHref(`/plan/${res.planId}`));
       return; // keep the dialog up through the navigation
     }
-    setError(res.error);
     setBusy(false);
+    if (res.reason === 'pick') {
+      setBlocked(null);
+      setClasses(res.classes);
+    } else if (res.reason === 'none') {
+      setClasses(null);
+      setBlocked({ subjectName: res.subjectName, year: res.year });
+    } else {
+      setError(res.error);
+    }
   };
+
+  const classLabel = (c: EligibleClass): string =>
+    `${t('card.year', { n: formatNumber(c.year, locale) })} · ${t(`literacy.${c.literacy}`)}`;
 
   return (
     <Modal label={t('confirm.ariaLabel')} onClose={onClose}>
@@ -192,13 +211,70 @@ function ConfirmLessonDialog({ target, onClose }: { target: ScopeTarget; onClose
         ) : null}
       </div>
 
+      {blocked ? (
+        <p
+          dir="auto"
+          className="mx-[20px] mt-[12px] rounded-[10px] bg-surface-subtle px-[12px] py-[10px] text-[12.5px] leading-[1.45] text-text-muted"
+        >
+          {t('add.noClass', { subject: blocked.subjectName, year: formatNumber(blocked.year, locale) })}
+        </p>
+      ) : null}
+
+      {classes ? (
+        <div className="mx-[20px] mt-[14px]">
+          <p className="mb-[7px] text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">
+            {t('add.chooseClass')}
+          </p>
+          <div className="flex flex-col gap-[6px]">
+            {classes.map((cls) => (
+              <button
+                key={cls.id}
+                type="button"
+                onClick={() => start(cls.id)}
+                disabled={busy}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-[10px] border px-[12px] py-[10px] text-start text-[13px] font-semibold transition-colors',
+                  busy
+                    ? 'cursor-not-allowed border-border text-text-faint'
+                    : 'border-border text-ink hover:border-teal hover:bg-teal-tint hover:text-teal-deep',
+                )}
+              >
+                <span dir="auto">{classLabel(cls)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {error ? (
         <p className="mx-[20px] mt-[12px] rounded-[10px] bg-status-review-bg px-[12px] py-[8px] text-[12.5px] text-status-review">
           {error}
         </p>
       ) : null}
 
-      <DialogFooter label={t('confirm.start')} busy={busy} onCancel={onClose} onConfirm={start} />
+      {blocked ? (
+        <div className="mt-[16px] flex items-center justify-end border-t border-[#F0EAE1] px-[20px] py-[14px]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[13px] font-medium text-neutral-700 transition-colors hover:text-ink"
+          >
+            {t('confirm.cancel')}
+          </button>
+        </div>
+      ) : classes ? (
+        <div className="mt-[16px] flex items-center justify-start border-t border-[#F0EAE1] px-[20px] py-[14px]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[13px] font-medium text-neutral-700 transition-colors hover:text-ink"
+          >
+            {t('confirm.cancel')}
+          </button>
+        </div>
+      ) : (
+        <DialogFooter label={t('confirm.start')} busy={busy} onCancel={onClose} onConfirm={() => start()} />
+      )}
     </Modal>
   );
 }

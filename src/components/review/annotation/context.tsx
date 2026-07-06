@@ -21,7 +21,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Annotation, AnchorType, AnnotationRole } from '@/types/annotation';
-import type { PlanStatus } from '@/types/lesson';
+import type { PlanScope, PlanStatus } from '@/types/lesson';
 import {
   createAnnotation,
   addAnnotationReply,
@@ -38,6 +38,9 @@ export type AnnotationFilter = 'open' | 'resolved';
 interface AnnotationContextValue {
   planId: string;
   status: PlanStatus;
+  /** The plan's scope — a teacher's class plan is editable/resubmittable; a
+   *  centre/org plan is read-only to a teacher, so its action footer is suppressed. */
+  scope: PlanScope;
   /** The viewer's role on this plan — drives authoring vs responding affordances. */
   role: AnnotationRole;
   viewerName: string;
@@ -97,6 +100,7 @@ export function useOptionalAnnotations(): AnnotationContextValue | null {
 export interface AnnotationProviderProps {
   planId: string;
   status: PlanStatus;
+  scope: PlanScope;
   role: AnnotationRole;
   viewerName: string;
   annotations: Annotation[];
@@ -107,6 +111,7 @@ export interface AnnotationProviderProps {
 export function AnnotationProvider({
   planId,
   status,
+  scope,
   role,
   viewerName,
   annotations,
@@ -136,6 +141,7 @@ export function AnnotationProvider({
     return {
       planId,
       status,
+      scope,
       role,
       viewerName,
       editable,
@@ -181,7 +187,7 @@ export function AnnotationProvider({
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, status, role, viewerName, editable, annotations, phaseTitles, activeId, tab, filter, pending]);
+  }, [planId, status, scope, role, viewerName, editable, annotations, phaseTitles, activeId, tab, filter, pending]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

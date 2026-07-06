@@ -41,8 +41,15 @@
     "add": {
       "chooseYear": "اختر مجموعة السنة",
       "choose": "اختر صفًا",
+      "chooseClass": "اختر صفًا",
+      "noClass": "لا تُدرّس صف {subject} · السنة {year} بعد — اطلب من المنسق إضافتك.",
       "noCurriculum": "لا يوجد منهج لهذه الحصة",
       "opening": "جارٍ الفتح…"
+    },
+    "literacy": {
+      "literate": "متعلّم القراءة",
+      "illiterate": "قبل القراءة",
+      "mixed": "مجموعة مختلطة"
     },
     "downloadWeek": "تنزيل الأسبوع",
     "downloadWeekTitle": "تنزيل جميع خطط هذا الأسبوع بصيغة PDF",

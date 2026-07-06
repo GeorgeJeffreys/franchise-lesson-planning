@@ -13,6 +13,11 @@
 //   • exactly 1 → the button creates that lesson directly, no intermediate menu;
 //   • 2 or more → a short, clean menu of full "Subject · Year" labels.
 //
+// Creation binds the plan to one of the TEACHER'S OWN classes for the slot (never a
+// centre plan): `createTeacherPlan` auto-binds when the teacher has exactly one such
+// class, asks them to pick when they have several, and blocks (with a clear note)
+// when they teach none. A teacher never produces a read-only `class_id=null` plan.
+//
 // The menu opens inline (in the column's flow) rather than as an absolute overlay:
 // the board scrolls horizontally (`overflow-x-auto`), which makes vertical overflow
 // a scroll/clip boundary, so an absolutely-positioned dropdown from the bottom-of-
@@ -22,7 +27,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
-import { createScopedPlan } from '@/lib/actions/create-lesson';
+import { createTeacherPlan, type EligibleClass } from '@/lib/actions/create-lesson';
 import { usePlanHref } from '@/components/weekly-overview/BoardReturn';
 import { formatNumber } from '@/lib/format';
 
@@ -78,6 +83,20 @@ function AddButton({
   );
 }
 
+/** The blocked empty state: the teacher teaches no class for this slot. */
+function BlockedNote({ subjectName, year }: { subjectName: string; year: number }) {
+  const t = useTranslations('board');
+  const locale = useLocale();
+  return (
+    <p
+      dir="auto"
+      className="rounded-[7px] bg-surface-subtle px-[9px] py-[7px] text-[11.5px] leading-[1.4] text-text-muted"
+    >
+      {t('add.noClass', { subject: subjectName, year: formatNumber(year, locale) })}
+    </p>
+  );
+}
+
 export function AddLessonMenu({
   weekday,
   choices,
@@ -97,39 +116,77 @@ export function AddLessonMenu({
   const [open, setOpen] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A band that resolved to "you teach several classes here" — the teacher picks one.
+  const [pick, setPick] = useState<{ bandKey: string; classes: EligibleClass[] } | null>(null);
+  // A band that resolved to "you teach no class here" — creation is blocked.
+  const [blocked, setBlocked] = useState<{ bandKey: string; subjectName: string; year: number } | null>(null);
 
   // Only bands with a real curriculum lesson for this slot can be planned; the rest
   // are dropped so the picker never shows a dead "No lesson" row.
   const plannable = choices.filter((c) => c.lessonKey);
   const busy = busyKey !== null;
 
-  const choose = async (choice: AddYearChoice) => {
+  // Create for a band, binding to the teacher's class. `classId` is set only after
+  // the teacher picks from the multi-class picker.
+  const create = async (choice: AddYearChoice, classId?: string) => {
     if (!choice.lessonKey || busy) return;
     setBusyKey(choice.bandKey);
     setError(null);
-    // Whole-centre scope: the column fixes the period/day, month and week, and the
-    // slot names its own centre; the create action resolves subject/year server-side
-    // from the locked key and creates against the passed centre.
-    const res = await createScopedPlan({
+    const res = await createTeacherPlan({
       lessonKey: choice.lessonKey,
-      scope: 'centre',
-      schoolId: choice.centreId,
+      centreId: choice.centreId,
       weekday,
       period: choice.period,
+      classId,
     });
     if (res.ok) {
       // Carry the current week so the new plan's "back to overview" returns here.
       router.push(planHref(`/plan/${res.planId}`));
       return; // keep the affordance up through the navigation
     }
-    setError(res.error);
     setBusyKey(null);
+    if (res.reason === 'pick') {
+      setBlocked(null);
+      setPick({ bandKey: choice.bandKey, classes: res.classes });
+    } else if (res.reason === 'none') {
+      setPick(null);
+      setBlocked({ bandKey: choice.bandKey, subjectName: res.subjectName, year: res.year });
+    } else {
+      setError(res.error);
+    }
   };
 
   const labelFor = (c: AddYearChoice): string => {
     const yearLabel = t('card.year', { n: formatNumber(c.year, locale) });
     return spansMultipleSubjects ? `${c.subjectName} · ${yearLabel}` : yearLabel;
   };
+
+  const classLabel = (c: EligibleClass): string =>
+    `${t('card.year', { n: formatNumber(c.year, locale) })} · ${t(`literacy.${c.literacy}`)}`;
+
+  // The inline class picker for a band the teacher teaches >1 class in.
+  const renderPicker = (choice: AddYearChoice) =>
+    pick && pick.bandKey === choice.bandKey ? (
+      <div className="rounded-[10px] border border-border bg-surface p-[5px]">
+        <div className="px-[9px] pb-[4px] pt-[5px] text-[10px] font-bold uppercase tracking-[0.05em] text-text-faint">
+          {t('add.chooseClass')}
+        </div>
+        {pick.classes.map((cls) => (
+          <button
+            key={cls.id}
+            type="button"
+            onClick={() => create(choice, cls.id)}
+            disabled={busy}
+            className={cn(
+              'flex w-full items-center justify-between gap-[8px] rounded-[8px] px-[9px] py-[8px] text-start text-[12.5px] font-semibold transition-colors',
+              busy ? 'cursor-not-allowed text-text-faint' : 'text-ink hover:bg-teal-tint hover:text-teal-deep',
+            )}
+          >
+            <span dir="auto">{classLabel(cls)}</span>
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   // None plannable → one quiet line, no add affordance and no dead rows.
   if (plannable.length === 0) {
@@ -145,11 +202,16 @@ export function AddLessonMenu({
     const only = plannable[0];
     return (
       <div className="flex flex-col gap-[8px]">
-        <AddButton
-          busy={busy}
-          label={busy ? t('add.opening') : t('addLesson')}
-          onClick={() => choose(only)}
-        />
+        {blocked && blocked.bandKey === only.bandKey ? (
+          <BlockedNote subjectName={blocked.subjectName} year={blocked.year} />
+        ) : (
+          <AddButton
+            busy={busy}
+            label={busy ? t('add.opening') : t('addLesson')}
+            onClick={() => create(only)}
+          />
+        )}
+        {renderPicker(only)}
         {error ? (
           <p className="rounded-[7px] bg-status-review-bg px-[9px] py-[6px] text-[11.5px] text-status-review">
             {error}
@@ -176,29 +238,38 @@ export function AddLessonMenu({
           </div>
           {plannable.map((c) => {
             const rowBusy = busyKey === c.bandKey;
+            const isBlocked = blocked?.bandKey === c.bandKey;
+            const isPicking = pick?.bandKey === c.bandKey;
             return (
-              <button
-                key={c.bandKey}
-                type="button"
-                onClick={() => choose(c)}
-                disabled={busy}
-                className={cn(
-                  'flex w-full items-center justify-between gap-[8px] rounded-[8px] px-[9px] py-[8px] text-start text-[12.5px] font-semibold transition-colors',
-                  busy
-                    ? 'cursor-not-allowed text-text-faint'
-                    : 'text-ink hover:bg-teal-tint hover:text-teal-deep',
-                )}
-              >
-                <span dir="auto">
-                  {labelFor(c)}
-                  {c.centreName ? (
-                    <span className="font-normal text-text-faint"> · {c.centreName}</span>
+              <div key={c.bandKey}>
+                <button
+                  type="button"
+                  onClick={() => create(c)}
+                  disabled={busy}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-[8px] rounded-[8px] px-[9px] py-[8px] text-start text-[12.5px] font-semibold transition-colors',
+                    busy
+                      ? 'cursor-not-allowed text-text-faint'
+                      : 'text-ink hover:bg-teal-tint hover:text-teal-deep',
+                  )}
+                >
+                  <span dir="auto">
+                    {labelFor(c)}
+                    {c.centreName ? (
+                      <span className="font-normal text-text-faint"> · {c.centreName}</span>
+                    ) : null}
+                  </span>
+                  {rowBusy ? (
+                    <span className="text-[11px] font-medium text-text-muted">{t('add.opening')}</span>
                   ) : null}
-                </span>
-                {rowBusy ? (
-                  <span className="text-[11px] font-medium text-text-muted">{t('add.opening')}</span>
+                </button>
+                {isBlocked ? (
+                  <div className="px-[4px] pb-[4px]">
+                    <BlockedNote subjectName={blocked!.subjectName} year={blocked!.year} />
+                  </div>
                 ) : null}
-              </button>
+                {isPicking ? <div className="px-[4px] pb-[4px]">{renderPicker(c)}</div> : null}
+              </div>
             );
           })}
 
