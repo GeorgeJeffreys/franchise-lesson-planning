@@ -21,9 +21,20 @@
     },
     "card2": {
       "titleFocus": "Hours per focus area",
+      "titleSkill": "Hours per linguistic skill",
       "titleTheme": "Hours per theme",
       "themeNote": "Grouped by theme — this subject isn't focus-area structured.",
-      "empty": "No focus-area or theme data recorded for this subject yet."
+      "skillNote": "Grouped by linguistic skill — this subject isn't focus-area structured.",
+      "empty": "No focus-area data recorded for this subject yet.",
+      "emptySkill": "No linguistic-skill data recorded for this subject yet."
+    },
+    "matrix": {
+      "filterPlaceholder": "Filter topics…",
+      "noMatches": "No topics match your filter.",
+      "pageRange": "{from}–{to} of {total}",
+      "prevPage": "Previous page",
+      "nextPage": "Next page",
+      "topicsCount": "{count, plural, one {# topic} other {# topics}}"
     },
     "card3": {
       "title": "Spiralling across years",

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   hoursPerMonthForYear,
   hoursByFocusArea,
+  hoursByLinguisticSkill,
+  canonicalSkill,
   topicMatrix,
   gapNotes,
   tealStop,
@@ -91,6 +93,32 @@ test('theme mode (english) makes each theme a top-level bar with no sub-breakdow
   assert.equal(view.groupedBy, 'theme');
   assert.deepEqual(view.bars.map((b) => b.label), ['Academic language', 'Narrative']);
   assert.equal(view.bars.every((b) => b.topics.length === 0), true);
+});
+
+// ── 2b) Hours by linguistic skill (english fallback) ────────────────────────────────
+
+test('canonicalSkill folds source variants and rejects non-skills', () => {
+  assert.equal(canonicalSkill('reading'), 'Reading');
+  assert.equal(canonicalSkill('READING'), 'Reading');
+  assert.equal(canonicalSkill('Basic Literacy'), 'Basic Literacy');
+  assert.equal(canonicalSkill('Oral'), 'Speaking');
+  assert.equal(canonicalSkill('Teachers Choice'), null);
+  assert.equal(canonicalSkill('E'), null);
+  assert.equal(canonicalSkill(''), null);
+});
+
+test('hoursByLinguisticSkill sums canonicalised skills, drops junk, and shares of total', () => {
+  const view = hoursByLinguisticSkill([
+    { skill: 'Reading', hours: 10 },
+    { skill: 'reading', hours: 5 }, // case variant merges into Reading → 15
+    { skill: 'Writing', hours: 5 },
+    { skill: 'Teachers Choice', hours: 99 }, // junk — dropped
+    { skill: '', hours: 3 }, // blank — dropped
+  ]);
+  assert.equal(view.total, 20);
+  assert.deepEqual(view.bars.map((b) => b.label), ['Reading', 'Writing']); // sorted desc
+  assert.equal(view.bars[0].hours, 15);
+  assert.equal(Math.round(view.bars[0].pct), 75);
 });
 
 // ── 3 & 4) Matrix + gap narrative ───────────────────────────────────────────────────

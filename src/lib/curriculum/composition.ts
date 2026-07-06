@@ -623,3 +623,33 @@ export async function getTopicsData(subject: string): Promise<TopicsData> {
 function isJunkTheme(label: string): boolean {
   return /^[^\p{L}\p{N}]/u.test(label);
 }
+
+// ── Hours per linguistic skill (english's "Hours per focus area" fallback) ───────────
+//
+// English has no focus_area text and ~178 themes, so its bounded, meaningful lens for the
+// "Hours per focus area" card is instead the handful of linguistic skills. The raw grouped
+// counts come from the 0055 RPC; the pure `hoursByLinguisticSkill` derivation canonicalises
+// variant labels into the ~5 canonical skills. FAILS SAFE to an empty list (the card shows
+// its own empty state) when the RPC isn't applied yet or errors, exactly like the
+// capability probes — an optional analytic must never 500 the whole Insights page.
+
+/** One raw (linguistic_skill, hours) grouping — canonicalised in the pure insights layer. */
+export interface LinguisticSkillHours {
+  skill: string;
+  hours: number;
+}
+
+export async function getHoursByLinguisticSkill(subject: string): Promise<LinguisticSkillHours[]> {
+  const supabase = createAdminClient();
+  try {
+    const { data, error } = await supabase.rpc('curriculum_hours_by_linguistic_skill', {
+      p_subject: subject,
+    });
+    if (error) return [];
+    return ((data ?? []) as Array<{ linguistic_skill: string | null; hours: number }>)
+      .map((r) => ({ skill: (r.linguistic_skill ?? '').trim(), hours: Number(r.hours) }))
+      .filter((r) => r.skill !== '');
+  } catch {
+    return [];
+  }
+}
