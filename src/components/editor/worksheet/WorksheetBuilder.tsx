@@ -596,7 +596,9 @@ export function WorksheetBuilder({
         flexDirection: 'column',
         ...(maximised
           ? { position: 'fixed', inset: 0, zIndex: 120, height: '100vh' }
-          : null),
+          : // Fill the worksheet pane so the CHROME (toolbar) is a fixed header and
+            // only the CANVAS scrolls beneath it — the toolbar never scrolls away.
+            { flex: '1 1 auto', minHeight: 0 }),
       }}
     >
       {/* ── CHROME (never zoom-scaled) ───────────────────────────────────── */}
@@ -694,7 +696,9 @@ export function WorksheetBuilder({
         style={{
           background: '#E8E1D6',
           overflow: 'auto',
-          ...(maximised ? { flex: '1 1 auto' } : { height: 'clamp(420px, 64vh, 920px)' }),
+          // Fill the remaining pane height (chrome is the fixed header above);
+          // the page scrolls inside here, so the toolbar stays pinned.
+          ...(maximised ? { flex: '1 1 auto' } : { flex: '1 1 auto', minHeight: 0 }),
         }}
       >
         <div style={{ minWidth: '100%', width: 'fit-content', padding: '38px 20px 40px', boxSizing: 'border-box' }}>

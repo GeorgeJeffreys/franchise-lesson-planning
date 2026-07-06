@@ -84,7 +84,7 @@ export function CurriculumCard({
   }
 
   return (
-    <section className="overflow-hidden rounded-[12px] border border-given-border bg-given px-[14px] py-[12px]">
+    <section className="overflow-hidden rounded-[12px] border border-given-border bg-given px-[14px] py-[10px]">
       <button
         type="button"
         onClick={() => setOpen(false)}

@@ -77,7 +77,7 @@ export function Stepper({
                 </span>
                 <span
                   className={
-                    'hidden whitespace-nowrap text-[14px] sm:block ' +
+                    'hidden whitespace-nowrap text-[13px] sm:block ' +
                     (isCur
                       ? 'font-semibold text-[#2A2422]'
                       : isDone

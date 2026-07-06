@@ -53,23 +53,23 @@ export function WritingStep({
 
   return (
     <>
-      <fieldset disabled={locked} className="mt-[22px] min-w-0 overflow-hidden rounded-[16px] border border-border disabled:opacity-75">
+      <fieldset disabled={locked} className="mt-[16px] min-w-0 overflow-hidden rounded-[16px] border border-border bg-surface disabled:opacity-75">
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-[10px] border-b border-[#EFE8DD] px-6 py-[14px]">
-          <span className="text-[21px] font-bold">{title}</span>
+        <div className="flex flex-wrap items-center gap-[10px] border-b border-[#EFE8DD] px-6 py-[12px]">
+          <span className="text-[18px] font-bold">{title}</span>
           <PhaseSelect
             value={block.phase}
             onChange={(phase) => onPatch({ phase: phase as TeachingPhase | null })}
           />
         </div>
 
-        <div className="flex flex-col gap-[16px] p-5">
+        <div className="flex flex-col gap-[14px] px-6 py-[14px]">
           <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2">
             <div>
               <FieldLabel>{t('teacherDoes')}</FieldLabel>
               <Textarea
                 dir="auto"
-                rows={4}
+                rows={2}
                 value={block.teacher_does}
                 onChange={(e) => onPatch({ teacher_does: e.target.value })}
                 placeholder={t('teacherPlaceholder')}
@@ -80,7 +80,7 @@ export function WritingStep({
               <FieldLabel>{t('studentsDo')}</FieldLabel>
               <Textarea
                 dir="auto"
-                rows={4}
+                rows={2}
                 value={block.students_do}
                 onChange={(e) => onPatch({ students_do: e.target.value })}
                 placeholder={t('studentsPlaceholder')}

@@ -404,13 +404,13 @@ export function LessonPlanEditor({
           // STEP 1 — Objective: single FULL-WIDTH column, edge to edge (page
           // padding only). No reserved right column, no split max-width — the
           // worksheet pane belongs to steps 2–5 only.
-          <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[18px] lg:px-[30px]">
+          <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[12px] lg:px-[30px]">
             <div>
               {locked ? (
                 <LockedBanner status={status} onGoToReview={() => goStep(STEP_COUNT)} />
               ) : null}
               <CurriculumCard curriculum={curriculum} defaultExpanded />
-              <div className="mt-[18px]">
+              <div className="mt-[14px]">
                 <ObjectiveStep
                   remainder={remainder}
                   onChange={setRemainder}
@@ -427,7 +427,7 @@ export function LessonPlanEditor({
         ) : (
           // STEPS 2–5 — split: plan (left) · persistent worksheet (right).
           <>
-            <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[18px] lg:border-e lg:border-[#EFE8DD] lg:px-[30px]">
+            <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[12px] lg:border-e lg:border-[#EFE8DD] lg:px-[30px]">
               <div className="mx-auto max-w-[820px]">
                 {locked && step < STEP_COUNT ? (
                   <LockedBanner status={status} onGoToReview={() => goStep(STEP_COUNT)} />
@@ -435,7 +435,7 @@ export function LessonPlanEditor({
 
                 <CurriculumCard curriculum={curriculum} />
 
-                <div className="mt-[14px]">
+                <div className="mt-[10px]">
                   <ObjectiveBanner remainder={remainder} />
                 </div>
 
@@ -525,8 +525,8 @@ export function LessonPlanEditor({
                 WorksheetBuilder instance, editable at every step and every plan
                 status (never wrapped in the plan-lock fieldset); edits autosave
                 through `saveWorksheet`. Scrolls independently past `lg`. */}
-            <section className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-subtle px-[16px] py-[18px] lg:flex-[1.5] lg:px-[22px]">
-              <div className="mx-auto max-w-[1000px]">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-subtle px-[16px] py-[14px] lg:flex-[1.5] lg:px-[22px]">
+              <div className="mx-auto flex min-h-0 w-full max-w-[1000px] flex-1 flex-col">
                 <WorksheetBuilder
                   value={worksheet}
                   onChange={setWorksheet}

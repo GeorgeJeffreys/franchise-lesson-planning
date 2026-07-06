@@ -228,8 +228,8 @@ export function LinkItStep({
   const t = useTranslations('wizard.linkIt');
   return (
     <>
-      <div className="mt-[22px] text-[21px] font-bold">{t('heading')}</div>
-      <fieldset disabled={locked} className="mt-[14px] min-w-0 rounded-[14px] border border-border bg-surface px-[18px] py-[16px] disabled:opacity-75">
+      <div className="mt-[16px] text-[18px] font-bold">{t('heading')}</div>
+      <fieldset disabled={locked} className="mt-[12px] min-w-0 rounded-[14px] border border-border bg-surface px-[18px] py-[14px] disabled:opacity-75">
         <Section title={t('recap')}>
         {previousDailyLO ? <PreviousOutcomePanel outcome={previousDailyLO} /> : null}
         <textarea
