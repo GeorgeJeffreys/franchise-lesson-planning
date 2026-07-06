@@ -98,6 +98,7 @@ export default async function PlanViewPage({
         <AnnotationProvider
           planId={id}
           status={status}
+          scope={data.plan.scope}
           role={role}
           viewerName={viewerName}
           annotations={annotations}

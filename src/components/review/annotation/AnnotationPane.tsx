@@ -23,6 +23,7 @@ export function AnnotationPane() {
   const {
     planId,
     status,
+    scope,
     role,
     annotations,
     filter,
@@ -140,7 +141,7 @@ export function AnnotationPane() {
       </div>
 
       {/* Footer — role-aware. */}
-      <Footer planId={planId} status={status} role={role} hasAnnotations={total > 0} />
+      <Footer planId={planId} status={status} scope={scope} role={role} hasAnnotations={total > 0} />
     </section>
   );
 }
@@ -191,11 +192,13 @@ function GeneralComposer({
 function Footer({
   planId,
   status,
+  scope,
   role,
   hasAnnotations,
 }: {
   planId: string;
   status: string;
+  scope: string;
   role: string;
   hasAnnotations: boolean;
 }) {
@@ -213,9 +216,12 @@ function Footer({
     });
   };
 
-  // Teacher: hint + Resubmit, on a returned (needs_review) plan.
+  // Teacher: hint + Resubmit, on a returned (needs_review) plan. Only a CLASS plan
+  // is editable/resubmittable by a teacher; a centre/org plan is read-only to them,
+  // so it offers nothing to resubmit — suppress the whole footer (no hint, no
+  // Resubmit) rather than show an action that would be rejected.
   if (role === 'teacher') {
-    if (status !== 'needs_review') return null;
+    if (status !== 'needs_review' || scope !== 'class') return null;
     return (
       <div className="flex-shrink-0 border-t bg-white px-[16px] py-[13px]" style={{ borderColor: A.paneBorder }}>
         <p className="mb-[9px] text-[11.5px] leading-[1.4]" style={{ color: A.hint }}>

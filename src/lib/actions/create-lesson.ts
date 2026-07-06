@@ -204,3 +204,136 @@ export async function createScopedPlan(
   revalidatePath('/');
   return { ok: true, planId: (inserted as { id: string }).id };
 }
+
+// ── Teacher creation: always bind to the teacher's own class ──────────────────
+// A teacher must NEVER create a `class_id=null` / `scope='centre'` plan: a centre
+// plan is read-only to a teacher (only coordinators/admins own centre-wide plans),
+// so a teacher who lands on one can't edit or resubmit it. Every plan a teacher
+// creates binds to one of THEIR classes for the slot's (subject, year, centre):
+//   • exactly one eligible class → auto-bind (scope='class');
+//   • several                    → the teacher picks one before the plan exists;
+//   • none                       → creation is blocked with a clear message.
+// The class is resolved BEFORE insert, so no orphan centre plan is ever produced.
+
+/** One of the teacher's classes eligible to plan a given slot. */
+export interface EligibleClass {
+  id: string;
+  year: number;
+  literacy: 'literate' | 'illiterate' | 'mixed';
+}
+
+export interface CreateTeacherPlanInput {
+  /** The curriculum slot's `lesson_key`. */
+  lessonKey: string;
+  /** The centre (school) band the teacher is planning in — scopes the class match. */
+  centreId: string;
+  /** The Mon–Fri column (1..5) to place the plan on. */
+  weekday?: number;
+  /** The day-ordinal sort hint to write. */
+  period?: number;
+  /** Set once the teacher has picked a class from the multi-class picker. */
+  classId?: string;
+}
+
+export type CreateTeacherPlanResult =
+  | { ok: true; planId: string }
+  /** The teacher teaches several classes for this slot — pick one, then re-call. */
+  | { ok: false; reason: 'pick'; classes: EligibleClass[] }
+  /** The teacher teaches no class for this slot — creation is blocked. */
+  | { ok: false; reason: 'none'; subjectName: string; year: number }
+  | { ok: false; reason: 'error'; error: string };
+
+/** Raw `classes` join shape (untyped client — narrowed by hand). */
+interface RawEligibleClass {
+  id: string;
+  year: number;
+  literacy: EligibleClass['literacy'];
+  school_id: string;
+  subject_id: string;
+  archived_at: string | null;
+}
+
+/**
+ * Create a lesson plan for a curriculum slot, bound to the teacher's own class.
+ * Resolves the caller's eligible classes for the slot's (centre, subject, year)
+ * and either auto-binds (one), asks the caller to pick (several), or blocks (none).
+ * Never produces a `class_id=null` / `scope='centre'` plan.
+ */
+export async function createTeacherPlan(
+  input: CreateTeacherPlanInput,
+): Promise<CreateTeacherPlanResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, reason: 'error', error: 'Not signed in.' };
+
+  const coords = await getCurriculumKeyCoords(input.lessonKey);
+  if (!coords) {
+    return { ok: false, reason: 'error', error: 'That curriculum lesson no longer exists.' };
+  }
+
+  // Subject id + display name from the slot's locked subject code.
+  const { data: subj } = await supabase
+    .from('subjects')
+    .select('id, name')
+    .eq('code', coords.subjectCode)
+    .maybeSingle();
+  const subject = subj as { id: string; name: string } | null;
+  if (!subject) return { ok: false, reason: 'error', error: 'Subject not found for this lesson.' };
+
+  // The caller's own active classes for this slot's (centre, subject, year). RLS
+  // (`class_teachers_select_own`) scopes the read to the caller's assignments.
+  const { data: ctRows } = await supabase
+    .from('class_teachers')
+    .select('classes ( id, year, literacy, school_id, subject_id, archived_at )')
+    .eq('teacher_id', user.id);
+
+  const eligible: EligibleClass[] = ((ctRows ?? []) as unknown as Array<{
+    classes: RawEligibleClass | null;
+  }>)
+    .map((r) => r.classes)
+    .filter(
+      (c): c is RawEligibleClass =>
+        !!c &&
+        !c.archived_at &&
+        c.school_id === input.centreId &&
+        c.subject_id === subject.id &&
+        c.year === coords.year,
+    )
+    .map((c) => ({ id: c.id, year: c.year, literacy: c.literacy }));
+
+  // The teacher has already picked from the multi-class picker — honour it, but
+  // only if it is genuinely one of their eligible classes for this slot.
+  if (input.classId) {
+    if (!eligible.some((c) => c.id === input.classId)) {
+      return { ok: false, reason: 'error', error: 'That class is no longer available.' };
+    }
+    return finishAsClassPlan(input, input.classId);
+  }
+
+  if (eligible.length === 0) {
+    return { ok: false, reason: 'none', subjectName: subject.name, year: coords.year };
+  }
+  if (eligible.length === 1) {
+    return finishAsClassPlan(input, eligible[0].id);
+  }
+  return { ok: false, reason: 'pick', classes: eligible };
+}
+
+/** Delegate to the shared class-scope creation (dedup + insert + revalidate). */
+async function finishAsClassPlan(
+  input: CreateTeacherPlanInput,
+  classId: string,
+): Promise<CreateTeacherPlanResult> {
+  const res = await createScopedPlan({
+    lessonKey: input.lessonKey,
+    scope: 'class',
+    classId,
+    weekday: input.weekday,
+    period: input.period,
+  });
+  return res.ok
+    ? { ok: true, planId: res.planId }
+    : { ok: false, reason: 'error', error: res.error };
+}

@@ -41,8 +41,15 @@
     "add": {
       "chooseYear": "Choose a year group",
       "choose": "Choose a class",
+      "chooseClass": "Choose a class",
+      "noClass": "You don’t teach a {subject} · Year {year} class yet — ask your coordinator to add you.",
       "noCurriculum": "No curriculum for this slot",
       "opening": "Opening…"
+    },
+    "literacy": {
+      "literate": "Literate",
+      "illiterate": "Pre-literate",
+      "mixed": "Mixed group"
     },
     "downloadWeek": "Download week",
     "downloadWeekTitle": "Download every plan for this week as a PDF",

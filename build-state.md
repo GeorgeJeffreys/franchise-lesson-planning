@@ -2,7 +2,58 @@
 
 Living record of what each phase delivered and what comes next. Update as you go.
 
-## Inline coordinator review — Part B interaction correction (edit-in-place, no mode) ✅ (this phase)
+## Lesson creation binds to the teacher's class (kill silent read-only centre plans) ✅ (this phase)
+
+Fixes the broken teacher → coordinator → teacher loop: a teacher could create a plan
+with `class_id=null` / `scope='centre'`, which is read-only to them, so they'd see a
+read-only plan **and** a "Resubmit" button (a contradiction) and could never edit or
+resubmit it.
+
+### A — creation always binds to one of the teacher's own classes
+
+- **The centre fallback was in the two teacher creation entry points**, both hardcoding
+  `createScopedPlan({ scope: 'centre', … })`: `ScopeChooser`'s `ConfirmLessonDialog`
+  ("Not started" card) and `AddLessonMenu`'s per-column "+ Add lesson". Neither bound to
+  a class — every teacher-created plan was a centre plan.
+- **New server action `createTeacherPlan`** (`src/lib/actions/create-lesson.ts`) resolves
+  the caller's **eligible classes** = their `class_teachers` **active** classes matching
+  the slot's `(subject_id, year, school_id)` (subject/year derived server-side from the
+  locked `lesson_key`; centre from the band). Then:
+  - **exactly one** → auto-bind, delegating to `createScopedPlan({ scope: 'class', classId })`;
+  - **several** → returns `{ reason: 'pick', classes }`; the teacher picks one (labelled
+    by year + literacy) **before** the plan is created, then re-calls with `classId`;
+  - **none** → returns `{ reason: 'none', subjectName, year }`; creation is **blocked**
+    with *"You don't teach a {subject} · Year {year} class yet — ask your coordinator…"*
+    and **no plan is inserted**.
+  The class is resolved **before** insert — no orphan centre plan is ever produced.
+  NB: since migration 0018 makes `(school_id, subject_id, year)` unique on active
+  classes, `literacy` is the only distinguisher, so ">1 eligible" is effectively defensive.
+- Both entry points now call `createTeacherPlan` and render the pick / blocked states
+  inline (modal for `ConfirmLessonDialog`, inline panel for `AddLessonMenu`).
+- `createScopedPlan`'s `centre` / `org` branches are **untouched** — kept for any future
+  coordinator/admin centre-wide creation. No current caller creates centre plans.
+
+### B — read-only plans show no teacher actions
+
+- The plan's `scope` is threaded into the annotation context (`AnnotationProvider` ←
+  `/plan/[id]/view`). In `AnnotationPane`'s `Footer`, the **teacher** branch now returns
+  null unless `scope === 'class'`, so a centre/org (read-only) plan shows **no Resubmit
+  and no "address the feedback" hint**. Coordinator controls and the class-plan teacher
+  footer are unchanged.
+
+### i18n
+
+- New `board.add.chooseClass`, `board.add.noClass`, and `board.literacy.{literate,
+  illiterate,mixed}` in **`messages/en`** and **`messages/ar`**. **Arabic needs Kadria's
+  review.** All free-text uses `dir="auto"`.
+
+### Preserve / verify
+
+- Coordinator/admin centre creation, the annotation/review layer, `decidePlan` +
+  submit/resubmit, the editor/board, and RLS are unchanged. **No schema change.**
+- `npx tsc --noEmit` clean · `next build` (Next 16.2.9) passes · `eslint` clean.
+
+## Inline coordinator review — Part B interaction correction (edit-in-place, no mode) ✅ (previous phase)
 
 Supersedes the "Unlock for editing" entry UX from Part B. Scope, the `text`-suggestion
 plumbing, and every guardrail are unchanged — only the entry gesture changed.
