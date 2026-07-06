@@ -22,8 +22,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { CalendarLessonCard } from '@/components/weekly-overview/LessonCard';
-import { AddLessonMenu, type AddYearChoice } from '@/components/weekly-overview/AddLessonMenu';
-import type { PlanCard } from '@/components/weekly-overview/cards';
+import { GhostLessonCard } from '@/components/weekly-overview/GhostLessonCard';
+import { emptySlotCards, type EmptySlotCard, type PlanCard } from '@/components/weekly-overview/cards';
 import { WEEKDAYS, addDays, todayInBeirut } from '@/lib/week';
 import { formatDate, formatNumber } from '@/lib/format';
 import { reorderPlans, type PlanPlacement } from '@/lib/actions/lesson-plan';
@@ -40,30 +40,30 @@ const COLUMNS = WEEKDAYS.map((key, i) => ({ key, weekday: i + 1 }));
  * lost). A card's "Period N" is its 1-based position within its year's stack on
  * that day (top = Period 1), re-derived live so it stays correct as cards move.
  *
- * Teachers add a lesson from a column's "+ Add lesson" picker (choose a year group,
- * then one of that year's curriculum lessons for the week). Cards can be dragged to
- * reorder within a day or move to another day — only your own cards are draggable
- * (RLS blocks writing others'); shared cards sort into the column by their stored
- * placement. The owner filter and drag are mutually exclusive: while a specific
- * person is filtered in, the stack is a read view and dragging is disabled.
+ * The curriculum fixes a lesson per period (Mon = P1 … Fri = P5). A lesson the
+ * teacher hasn't started shows as a GHOST card in its home column — selecting it
+ * runs the create path and opens the editor (`GhostLessonCard`). Started lessons
+ * show as normal plan cards and can be dragged to reorder within a day or move to
+ * another day — only your own cards are draggable (RLS blocks writing others');
+ * shared cards sort into the column by their stored placement. Ghosts are not
+ * plans, so they never drag. The owner filter and drag are mutually exclusive:
+ * while a specific person is filtered in, the stack is a read view and dragging is
+ * disabled.
  */
 export function CalendarView({
   years,
   ownerId,
   mondayDate,
   readOnly = false,
-  spansMultipleSubjects = false,
   spansMultipleCentres = false,
 }: {
   years: BoardYear[];
   ownerId: string | null;
   /** The shown week's real Monday (`YYYY-MM-DD`) from `term_week`, or null when no row. */
   mondayDate: string | null;
-  /** Coordinator review mode: no drag, no "+ Add lesson", cards open the review view. */
+  /** Coordinator review mode: no drag, no ghost cards, cards open the review view. */
   readOnly?: boolean;
-  /** Board spans >1 subject — "+ Add lesson" labels each choice with its subject. */
-  spansMultipleSubjects?: boolean;
-  /** Board spans >1 centre — "+ Add lesson" choices carry their centre label. */
+  /** Board spans >1 centre — ghost cards carry their centre label. */
   spansMultipleCentres?: boolean;
 }) {
   const t = useTranslations('board');
@@ -87,28 +87,22 @@ export function CalendarView({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  /**
-   * The lightweight year-group dropdown's choices for a column. The column IS a
-   * curriculum period (Mon = Period 1 … Fri = Period 5), so each year resolves to
-   * the single curriculum lesson for (year, this period) in the current month/week.
-   * A year with no such lesson is offered disabled (graceful empty state). The
-   * day-ordinal is the next slot in that year's stack on this column.
-   */
-  // Only bands the viewer may AUTHOR in (a class they teach) offer "+ Add lesson".
-  // A coordinator reviewing a subject they don't teach gets no add cells — review
-  // only. `createTeacherPlan` remains the authoritative guard on the create path.
-  const addChoicesFor = (weekday: number): AddYearChoice[] =>
-    years
-      .filter((band) => band.canAuthor)
-      .map((band) => ({
-        bandKey: band.key,
-        year: band.year,
-        subjectName: band.subjectName,
-        centreId: band.centreId,
-        centreName: spansMultipleCentres ? band.centreName : null,
-        lessonKey: band.lessons.find((l) => l.period === weekday)?.lessonKey ?? null,
-        period: byDay[weekday].filter((p) => p.groupKey === band.key).length + 1,
-      }));
+  // Not-started curriculum lessons → ghost cards, grouped by their home column.
+  // Derived with the SAME set-difference the Status view uses (`emptySlotCards`):
+  // a lesson already covered by a plan of any scope in its band is dropped, so the
+  // Calendar ghost and the Status "Not started" card behave identically. Each
+  // card's `weekday` is its home column (curriculum period → Mon..Fri; a null-period
+  // weekly-grain lesson lands in Monday). Coordinators review, so their read-only
+  // board shows no ghosts. `emptySlotCards` already filters to authorable bands.
+  const ghostsByDay: Record<number, EmptySlotCard[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  if (!readOnly) {
+    for (const card of emptySlotCards(years, spansMultipleCentres)) {
+      ghostsByDay[clampWeekday(card.weekday)].push(card);
+    }
+    for (const w of [1, 2, 3, 4, 5]) {
+      ghostsByDay[w].sort((a, b) => a.period - b.period || a.subjectName.localeCompare(b.subjectName));
+    }
+  }
 
   const activePlan = activeId
     ? [byDay[1], byDay[2], byDay[3], byDay[4], byDay[5]].flat().find((p) => p.id === activeId) ?? null
@@ -207,11 +201,10 @@ export function CalendarView({
                 weekday={weekday}
                 mondayDate={mondayDate}
                 cards={byDay[weekday]}
+                ghosts={ghostsByDay[weekday]}
                 ownerId={ownerId}
                 dragEnabled={dragEnabled}
                 readOnly={readOnly}
-                addChoices={addChoicesFor(weekday)}
-                spansMultipleSubjects={spansMultipleSubjects}
               />
             ))}
           </div>
@@ -304,27 +297,24 @@ function toPlanCard(plan: BoardPlan): PlanCard {
   };
 }
 
-/** A weekday column: header, the day's card stack (all years), and "+ Add lesson". */
+/** A weekday column: header, the day's plan-card stack (all years), then ghost cards. */
 function DayColumn({
   weekday,
   mondayDate,
   cards,
+  ghosts,
   ownerId,
   dragEnabled,
   readOnly,
-  addChoices,
-  spansMultipleSubjects,
 }: {
   weekday: number;
   mondayDate: string | null;
   cards: BoardPlan[];
+  /** Not-started curriculum lessons whose home column is this day. */
+  ghosts: EmptySlotCard[];
   ownerId: string | null;
   dragEnabled: boolean;
   readOnly: boolean;
-  /** Resolved band choices for this column's "+ Add lesson" dropdown. */
-  addChoices: AddYearChoice[];
-  /** Board spans >1 subject — the add menu labels each choice with its subject. */
-  spansMultipleSubjects: boolean;
 }) {
   const t = useTranslations('board');
   const locale = useLocale();
@@ -388,16 +378,14 @@ function DayColumn({
           ))}
         </SortableContext>
 
-        {/* Coordinators review existing plans; they don't author, so no add affordance.
-            `addChoices` is pre-filtered to bands the viewer teaches — empty means the
-            viewer authors nothing in view (pure reviewer), so no add affordance either. */}
-        {readOnly || addChoices.length === 0 ? null : (
-          <AddLessonMenu
-            weekday={weekday}
-            choices={addChoices}
-            spansMultipleSubjects={spansMultipleSubjects}
-          />
-        )}
+        {/* Not-started curriculum lessons for this day render as ghost cards below
+            the plan stack — selecting one creates the plan and opens the editor.
+            Ghosts are unowned, so they're hidden while a specific person is filtered
+            in (the owner filter is a read view). `ghosts` is already empty on the
+            coordinator (read-only) board and for bands the viewer can't author. */}
+        {ownerId
+          ? null
+          : ghosts.map((ghost) => <GhostLessonCard key={ghost.key} card={ghost} />)}
       </div>
     </div>
   );

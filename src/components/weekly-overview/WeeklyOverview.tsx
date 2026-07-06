@@ -157,7 +157,6 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
             ownerId={null}
             mondayDate={data.mondayDate}
             readOnly={data.boardReadOnly}
-            spansMultipleSubjects={data.spansMultipleSubjects}
             spansMultipleCentres={data.spansMultipleCentres}
           />
         )}

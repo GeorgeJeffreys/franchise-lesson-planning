@@ -38,13 +38,9 @@
       "period": "الحصة {n}",
       "today": "اليوم"
     },
-    "addLesson": "إضافة درس",
     "add": {
-      "chooseYear": "اختر مجموعة السنة",
-      "choose": "اختر صفًا",
       "chooseClass": "اختر صفًا",
       "noClass": "لا تُدرّس صف {subject} · السنة {year} بعد — اطلب من المنسق إضافتك.",
-      "noCurriculum": "لا يوجد منهج لهذه الحصة",
       "opening": "جارٍ الفتح…"
     },
     "literacy": {
@@ -64,7 +60,8 @@
       "review": "مراجعة",
       "lessonN": "الدرس {n}",
       "dayPeriod": "{day} · الحصة {n}",
-      "authorPeriod": "{author} · الحصة {n}"
+      "authorPeriod": "{author} · الحصة {n}",
+      "planAria": "خطِّط: {topic}"
     },
     "weekday": {
       "mon": "الإثنين",

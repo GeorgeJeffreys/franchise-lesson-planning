@@ -38,13 +38,9 @@
       "period": "Period {n}",
       "today": "Today"
     },
-    "addLesson": "Add lesson",
     "add": {
-      "chooseYear": "Choose a year group",
-      "choose": "Choose a class",
       "chooseClass": "Choose a class",
       "noClass": "You don’t teach a {subject} · Year {year} class yet — ask your coordinator to add you.",
-      "noCurriculum": "No curriculum for this slot",
       "opening": "Opening…"
     },
     "literacy": {
@@ -64,7 +60,8 @@
       "review": "Review",
       "lessonN": "Lesson {n}",
       "dayPeriod": "{day} · P{n}",
-      "authorPeriod": "{author} · Period {n}"
+      "authorPeriod": "{author} · Period {n}",
+      "planAria": "Plan: {topic}"
     },
     "weekday": {
       "mon": "Mon",
