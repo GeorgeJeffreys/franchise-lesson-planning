@@ -70,6 +70,13 @@ export interface ParsedCurriculumRow {
   /** Subject-level LO (constant per subject); yearly/annual LO (constant per subject+year). Added by 0049. */
   subject_learning_outcome: string | null;
   annual_learning_outcome: string | null;
+  /**
+   * 1-based row number in the source workbook sheet (`CurriculumRecord.sourceRow`),
+   * persisted to `curriculum_lesson.source_row` (migration 0054) so the Curriculum Gaps
+   * reconcile page can show/copy/export the original spreadsheet row. Null only when the
+   * parser cannot determine it.
+   */
+  source_row: number | null;
 }
 
 /** One active curriculum row with no daily outcome — the "unresolved" inspector list. */

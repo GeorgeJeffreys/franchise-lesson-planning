@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import type { CurriculumSubjectStatus } from '@/lib/console';
@@ -32,7 +33,13 @@ type CurriculumSyncState =
   | { kind: 'success'; summary: string }
   | { kind: 'error'; badgeAt: string; message: string };
 
-export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[] }) {
+export function CurriculumTab({
+  statuses,
+  isAdmin,
+}: {
+  statuses: CurriculumSubjectStatus[];
+  isAdmin: boolean;
+}) {
   const t = useTranslations('settings');
   if (statuses.length === 0) {
     return (
@@ -46,13 +53,13 @@ export function CurriculumTab({ statuses }: { statuses: CurriculumSubjectStatus[
   return (
     <div className="space-y-[18px]">
       {statuses.map((s) => (
-        <CurriculumCard key={s.subjectId} status={s} />
+        <CurriculumCard key={s.subjectId} status={s} isAdmin={isAdmin} />
       ))}
     </div>
   );
 }
 
-function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
+function CurriculumCard({ status, isAdmin }: { status: CurriculumSubjectStatus; isAdmin: boolean }) {
   const router = useRouter();
   const t = useTranslations('settings');
   const locale = useLocale();
@@ -157,6 +164,21 @@ function CurriculumCard({ status }: { status: CurriculumSubjectStatus }) {
                   {t('curriculum.action.refresh')}
                 </GhostButton>
               )}
+              {/* Admin-only entry to the per-subject Curriculum Gaps reconcile page.
+                  This is the wire-up the whole reconcile task hinges on: the standing
+                  affordance that turns the sync result into an actionable review of
+                  every gap/placeholder/guard row for this subject. */}
+              {isAdmin ? (
+                <Link
+                  href={`/settings/curriculum/${encodeURIComponent(status.code)}`}
+                  className="inline-flex items-center gap-[6px] rounded-[8px] border border-[#CFE6E0] bg-[#E4F0ED] px-[12px] py-[7px] text-[12.5px] font-semibold text-[#186155] hover:bg-[#d9ebe6]"
+                >
+                  {t('curriculum.action.reviewGaps')}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="rtl:-scale-x-100" aria-hidden>
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </Link>
+              ) : null}
               {/* Persistent whenever the LIVE unresolved count > 0 (not just the
                   transient post-upload success state). Opens the inspector list. */}
               {unresolved > 0 ? (

@@ -153,6 +153,7 @@
         "retry": "إعادة المزامنة",
         "refresh": "تحديث الآن",
         "reviewUnresolved": "مراجعة {count} غير محلولة",
+        "reviewGaps": "مراجعة الفجوات",
         "upload": "رفع ملف .xlsx"
       },
       "reviewModal": {

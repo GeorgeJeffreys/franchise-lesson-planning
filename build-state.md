@@ -73,6 +73,86 @@ only, so it works fully for every subject (unlike the Logic tree).
   matching/highlight core is unit-tested. Should be smoke-tested against a live DB before
   merge.
 
+## Curriculum Gaps reconcile — per-subject, admin-only ✅ (this phase)
+
+Ports the `CurriculumGaps` design into the app stack: a per-subject, admin-only page
+that classifies every active `curriculum_lesson` row into six reconcile states, with
+facets/sort/search/expand + plain-language fix guidance, wired to REAL data. Reached
+from a new **"Review gaps"** link on each Settings → Curriculum sync card (the whole
+point of the task — the sync result now leads somewhere).
+
+### Phase 0 (read-only findings, then built against them)
+
+- The importer persists **no per-row gaps report and no source-row mapping** — only the
+  aggregate `curriculum_sync_run`. `placed/placeholder/unmapped/missing` are
+  reconstructable live; **guard** is sourced from the last successful run's
+  `warnings.skippedReferencedKeys`; **duplicate-collision cannot exist live**
+  (`lesson_key` is UNIQUE and import collisions are never recorded) so the live
+  duplicate bucket only ever holds malformed codes (surfaced, documented, not faked);
+  **srow + filename were not persisted**.
+- Rather than fake/omit, the proposed importer fix is realised — see migration below.
+
+### Done
+
+- **One classifier, reused rules** (`src/lib/curriculum/gaps.ts`) —
+  `classifyCurriculumRow` derives all six states from the SAME foundation the #99
+  coverage gate uses: `parseTaxonomyId` + the gate's "well-formed EXCLUDES the S0/K0
+  sentinel" rule (the **OR** form matching SQL 0053's two `split_part(...) <> …`
+  conditions — deliberately NOT `isFlatArtefact`, which is an AND for the spiral
+  signal). Precedence guard > missing > unmapped > placed > placeholder > duplicate, so
+  each row lands in exactly one facet and counts partition the total. Unit-tested
+  (`__tests__/gaps.test.ts`, 7 cases incl. the OR-vs-AND distinction + guard override).
+- **Provenance persisted** — migration `0054_curriculum_import_provenance.sql` adds
+  `curriculum_lesson.source_row` (the `srow` the parser already computes) +
+  `curriculum_sync_run.source_filename`, both additive/nullable. Threaded through
+  `parse.ts` → `ParsedCurriculumRow` (`sync.ts` writes it via `...row`) and the upload
+  path (`actions.ts`/`route.ts` → `import.ts` → `sync.ts` records the filename). Rows/
+  runs predating 0054 read null; the page degrades (Row = "—", copy-locator uses the
+  lesson_key, a "source rows appear after re-import" note) until the subject is
+  re-imported.
+- **Server loader** (`src/lib/curriculum/gaps-report.ts`, admin-only) —
+  `getCurriculumGapsReport(subjectCode)` loads active rows, classifies them, sources the
+  guard set from the latest successful run's warnings, counts live plan references for
+  guard rows, and computes every facet/year count from the classified rows (nothing
+  hardcoded).
+- **Route** `src/app/settings/curriculum/[subject]` (admin-gated via `getConsoleAccess`,
+  redirects non-admins) rendering the client **`CurriculumGaps`**
+  (`src/components/curriculum/reconcile/`): action bar (subject + source filename),
+  **Export gaps** (client CSV of the filtered rows — srow/code/status/reason + locating
+  fields), **Re-validate** (teal primary → `router.refresh()` re-runs the live
+  classification), status facets w/ live counts, year select, text search, sortable
+  columns, row-expand with segment fields + the per-state fix panel, empty/empty-data
+  states. Counts computed from real rows.
+- **Wire-up** — `CurriculumTab` gains an admin-only **"Review gaps"** link to the
+  reconcile route (`SettingsConsole` passes `isAdmin`).
+- **Design** — tri-severity palette entirely from tokens: errors reuse `--color-gap`
+  (the error-surfacing rust, explicitly ≠ destructive `#b23a2e`), placeholder reuses the
+  amber `status-progress` family, placed reuses teal; only the slate **guard** tone was
+  added to `globals.css`. Sora throughout, RTL-clean (logical `ms/me/ps/pe/border-s`,
+  `dir="auto"` on free text, `rtl:-scale-x-100` on directional chevrons).
+- **i18n** — new `reconcile` namespace (`messages/{en,ar}/reconcile.json`) +
+  `settings.curriculum.action.reviewGaps`. **Arabic machine-translated — flagged for
+  Kadria.**
+
+### Decisions flagged
+
+- **Segment-name copy** follows the foundation, not the mock: the unmapped fix names the
+  code `Focus area.Skill-LO.Knowledge-LO.Hour` (segment 1 is the Focus Area per
+  `taxonomy.ts`, NOT "linguistic skill").
+- **"Open in workbook"** had no real deep-link target (an uploaded .xlsx isn't
+  live-editable), so it is **replaced by "Copy locator"** (subject · source · row/key) —
+  no faked link. "Copy row N" copies the source-row reference.
+- **duplicate** — the collision half can't occur in live data; the fix copy says so.
+
+### Verified
+
+- `npx tsc --noEmit` clean · `next build` (Next 16.2.9) passes · `eslint` clean · unit
+  tests green (incl. new `gaps` suite + updated `parse` fixture for `source_row`).
+- **Not exercised against a live DB** (no Docker/Supabase/SSO in this workspace, as in
+  prior phases). **Migration 0054 must be applied** and each subject **re-imported** for
+  `source_row`/`source_filename` to populate; the classification/facets/guard work
+  against existing rows immediately once 0054 is applied.
+
 ## Lesson board fixes: coordinator review-only · "This week" jump ✅ (this phase)
 
 Ships two more board fixes on top of the class-binding fix below (that one already

@@ -84,7 +84,12 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Run the import ──
-  const result = await importCurriculumWorkbook({ buffer, subjectCode, source });
+  const result = await importCurriculumWorkbook({
+    buffer,
+    subjectCode,
+    source,
+    fileName: fileName || undefined,
+  });
   if (result.status === 'error') {
     return NextResponse.json(result, { status: 422 });
   }

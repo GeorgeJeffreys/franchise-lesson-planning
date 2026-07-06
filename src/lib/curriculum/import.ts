@@ -17,6 +17,8 @@ interface ImportArgs {
   buffer: Buffer | ArrayBuffer;
   subjectCode: string;
   source: CurriculumSyncSource;
+  /** Original workbook filename, when known — recorded on the run for the reconcile UI. */
+  fileName?: string;
 }
 
 export async function importCurriculumWorkbook(

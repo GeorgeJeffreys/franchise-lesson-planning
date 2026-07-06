@@ -109,7 +109,7 @@ export function SettingsConsole(props: SettingsConsoleProps) {
           />
         ) : null}
         {tab === 'curriculum' && props.curriculum ? (
-          <CurriculumTab statuses={props.curriculum} />
+          <CurriculumTab statuses={props.curriculum} isAdmin={access.isAdmin} />
         ) : null}
         {tab === 'ai_guide' && access.isAdmin ? (
           <AiGuideTab active={props.resourceGuide ?? null} />

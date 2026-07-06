@@ -1,0 +1,130 @@
+{
+  "reconcile": {
+    "backToCurriculum": "Settings · Curriculum",
+    "title": "Curriculum gaps",
+    "actions": {
+      "export": "Export gaps",
+      "revalidate": "Re-validate",
+      "revalidating": "Re-validating…",
+      "copyRow": "Copy row {n}",
+      "copyLocator": "Copy locator",
+      "copied": "Copied"
+    },
+    "source": {
+      "upload": "Uploaded workbook",
+      "n8n": "Synced from SharePoint (n8n)",
+      "sharepoint": "SharePoint",
+      "unknown": "No import recorded yet"
+    },
+    "search": {
+      "placeholder": "Search codes, outcomes…"
+    },
+    "facets": {
+      "statusHeading": "Status"
+    },
+    "status": {
+      "all": "All statuses",
+      "placed": "Valid · placed",
+      "placeholder": "Placeholder S0.K0",
+      "unmapped": "No code",
+      "missing": "No outcome",
+      "duplicate": "Duplicate / parse",
+      "guard": "Guard-protected"
+    },
+    "flag": {
+      "placed": "Valid",
+      "placeholder": "Placeholder",
+      "unmapped": "No code",
+      "missing": "No outcome",
+      "duplicate": "Dup / parse",
+      "guard": "Guarded"
+    },
+    "table": {
+      "showing": "Showing <strong>{shown}</strong> of {total} rows",
+      "year": "Year",
+      "yearAll": "All years",
+      "yearLabel": "Year {year}",
+      "clear": "Clear",
+      "sortedBy": "Sorted by {field} · click a column to sort",
+      "blankCode": "(blank)",
+      "noOutcome": "(no outcome text)",
+      "noResources": "(none)"
+    },
+    "note": {
+      "sourceRowsPending": "Source workbook rows appear after the next re-import of this subject."
+    },
+    "cols": {
+      "row": "Row",
+      "year": "Year",
+      "week": "Wk",
+      "period": "Pd",
+      "lessonId": "Lesson id",
+      "dailyLo": "Daily LO",
+      "skill": "Skill",
+      "topic": "Topic",
+      "theme": "Theme",
+      "resources": "Resources",
+      "status": "Status"
+    },
+    "sort": {
+      "srow": "row",
+      "year": "year",
+      "week": "week",
+      "period": "period",
+      "lessonId": "lesson id",
+      "skill": "skill",
+      "dailyLo": "outcome",
+      "theme": "theme",
+      "status": "status"
+    },
+    "expand": {
+      "focusArea": "Focus area",
+      "skillLo": "Skill LO",
+      "knowledgeLo": "Knowledge LO",
+      "hour": "Hour",
+      "dailyLoFull": "Daily outcome (full)",
+      "lessonKey": "Lesson key"
+    },
+    "fix": {
+      "title": {
+        "placed": "Placed.",
+        "placeholder": "Placeholder S0.K0.",
+        "unmapped": "No lesson code.",
+        "missing": "No daily outcome text.",
+        "duplicate": "Duplicate / unparseable code.",
+        "guard": "Guard-protected."
+      },
+      "body": {
+        "placed": "Valid, unique code — present in the curriculum logic tree.",
+        "placeholder": "The code parses but points at the placeholder Skill / Knowledge sentinel (S0 / K0). Replace S0/K0 with real learning-outcome numbers before re-import.",
+        "unmapped": "The lesson identifier is blank, so this row can't be placed in the outcome tree. Assign a real code (Focus area.Skill-LO.Knowledge-LO.Hour) in the source workbook.",
+        "missing": "A required field (daily outcome) is empty, so no usable outcome forms. Add the outcome text or remove the row.",
+        "duplicate": "The identifier is malformed and doesn't parse to a well-formed code. (A lesson-key collision can't occur — keys are unique.) Give it a unique, well-formed code.",
+        "guard": "Re-import would have archived this, but live lesson plans reference it — the guard kept it. Working as intended; unlink the plans first to change it."
+      },
+      "guardReferenced": "Referenced by {count} live plans."
+    },
+    "empty": {
+      "title": "No rows match these filters",
+      "clear": "Clear filters"
+    },
+    "emptyData": {
+      "title": "No active curriculum rows",
+      "body": "This subject has no active curriculum rows to reconcile yet."
+    },
+    "csv": {
+      "sourceRow": "Source row",
+      "lessonKey": "Lesson key",
+      "code": "Current code",
+      "status": "Status",
+      "reason": "Reason",
+      "year": "Year",
+      "month": "Month",
+      "week": "Week",
+      "period": "Period",
+      "skill": "Skill",
+      "theme": "Theme",
+      "dailyOutcome": "Daily outcome"
+    }
+  }
+}
