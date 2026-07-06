@@ -81,7 +81,12 @@ export async function importCurriculumAction(
   }
 
   const buffer = await file.arrayBuffer();
-  const result = await importCurriculumWorkbook({ buffer, subjectCode, source: 'upload' });
+  const result = await importCurriculumWorkbook({
+    buffer,
+    subjectCode,
+    source: 'upload',
+    fileName: file.name,
+  });
   if (result.status === 'error') {
     return { ok: false, message: result.error ?? 'Import failed.' };
   }

@@ -669,6 +669,9 @@ export function parseCurriculumWorkbook(
         // column. Both denormalise onto every row of their scope (see migration 0049).
         subject_learning_outcome: subjectLOConst,
         annual_learning_outcome: value('annualLearningOutcome'),
+        // 1-based source sheet row (same value carried on the canonical record above),
+        // persisted for the Curriculum Gaps reconcile page (migration 0054).
+        source_row: r + 1,
       });
     } else {
       skippedLessonRows++;

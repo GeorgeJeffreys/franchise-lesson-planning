@@ -158,6 +158,20 @@
   --color-gap-border: #e7c9bf;
   --color-flag-bar: #d8b7ac; /* the "unusually low" month bar (clay, dashed) */
 
+  /* ── Curriculum Gaps reconcile — the slate "guard" tone ────────────────────
+   * The per-subject reconcile page uses a tri-severity palette that REUSES existing
+   * tokens: genuine errors (unmapped / missing / duplicate) borrow the error-surfacing
+   * `--color-gap` rust (explicitly ≠ delete-red #b23a2e — there are no destructive
+   * actions on that page); the placeholder headline bucket borrows the amber
+   * `--color-status-progress` family; and valid/placed rows borrow teal. Only the
+   * slate "guard" tone — a working-as-intended, non-error state ("re-import would
+   * archive this but live plans reference it") — had no token, so it lives here.
+   * Sampled from the Curriculum Gaps design export. */
+  --color-guard: #3e535c;
+  --color-guard-bg: #eef1f3;
+  --color-guard-border: #d6dfe2;
+  --color-guard-dot: #8aa0a8;
+
   /* ── Radius ────────────────────────────────────────────────────────────── */
   --radius-badge: 6px;
   --radius-sm: 8px;

@@ -46,19 +46,31 @@ export interface SyncArgs {
   source: CurriculumSyncSource;
   /** Optional explicit sheet name (mirrors the parser/script `--sheet`). */
   sheet?: string;
+  /**
+   * Original workbook filename, when the caller has it (in-app upload / multipart
+   * endpoint). Recorded on the run (`curriculum_sync_run.source_filename`, migration
+   * 0054) for the Curriculum Gaps reconcile action bar; null for sources that supply none.
+   */
+  fileName?: string;
 }
 
 export async function syncCurriculumWorkbook(
   supabase: SupabaseClient,
   args: SyncArgs,
 ): Promise<CurriculumSyncResult> {
-  const { buffer, subjectCode, source, sheet } = args;
+  const { buffer, subjectCode, source, sheet, fileName } = args;
   const runTimestamp = new Date().toISOString();
 
   // Open a sync run first so even a parse failure is recorded.
   const { data: runRow } = await supabase
     .from('curriculum_sync_run')
-    .insert({ subject_code: subjectCode, source, started_at: runTimestamp, status: 'running' })
+    .insert({
+      subject_code: subjectCode,
+      source,
+      source_filename: fileName ?? null,
+      started_at: runTimestamp,
+      status: 'running',
+    })
     .select('id')
     .maybeSingle();
   const runId = (runRow as { id: string } | null)?.id ?? null;

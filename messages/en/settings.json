@@ -153,6 +153,7 @@
         "retry": "Retry sync",
         "refresh": "Refresh now",
         "reviewUnresolved": "Review {count} unresolved",
+        "reviewGaps": "Review gaps",
         "upload": "Upload .xlsx"
       },
       "reviewModal": {

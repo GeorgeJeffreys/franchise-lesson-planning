@@ -103,6 +103,7 @@ test('English: sheet/header/grain detected; helper excluded; English mapping int
     monthly_lo: 'Monthly: letters',
     subject_learning_outcome: 'Read & write',
     annual_learning_outcome: 'Annual: literacy',
+    source_row: 9, // 5 blank rows + 3-row header block (header at row 7) → P1 at sheet row 9
   });
 
   // P2: hierarchical cells forward-filled from P1; per-row theme/grammar blank → null.
