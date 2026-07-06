@@ -221,6 +221,19 @@ html:lang(ar) body {
 }
 
 /*
+ * Inline coordinator suggesting (review view): a prose field is edited in place via
+ * contentEditable — the rendered text IS the edit surface, no box below. An empty
+ * field shows a faint placeholder through a non-editable pseudo-element, so the caret
+ * target stays visible without the placeholder ever becoming real content
+ * (textContent stays empty). Direction follows the field's own dir="auto".
+ */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa5a0;
+  pointer-events: none;
+}
+
+/*
  * Diagonal stripe wash used on the login brand panel (from the Login design).
  * It's a painted texture, not a token, so it lives here as a utility.
  */

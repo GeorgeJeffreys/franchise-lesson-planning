@@ -2,7 +2,37 @@
 
 Living record of what each phase delivered and what comes next. Update as you go.
 
-## Inline coordinator review — suggesting mode / tracked changes (Part B) ✅ (this phase)
+## Inline coordinator review — Part B interaction correction (edit-in-place, no mode) ✅ (this phase)
+
+Supersedes the "Unlock for editing" entry UX from Part B. Scope, the `text`-suggestion
+plumbing, and every guardrail are unchanged — only the entry gesture changed.
+
+- **No mode / no toggle.** The `SuggestingToggle` and the `suggesting` context flag are
+  removed. For a coordinator on the review view the prose fields (objective,
+  `teacher_does`, `students_do`) and the duration/grouping are **directly editable at
+  all times**. Edits are still captured as `plan_annotations` suggestions — no plan
+  writes; the plan changes only on a teacher accept.
+- **Edit in the words, not a box below.** `ProseField` now edits via
+  **`contentEditable`** on the rendered text node itself (styled identically — same
+  font/size/weight/line-height/colour, `dir="auto"` for RTL — so zero layout shift and
+  no separate box). Not-editing = the tracked-change diff; a coordinator click swaps to
+  the plain proposed text (`to_value`) in place; commit on blur/Enter, Escape reverts.
+  Plain text only (paste coerced to text via `insertText`, Enter never inserts a
+  newline). Empty fields show a placeholder via a `:empty::before` pseudo (globals.css)
+  so `textContent` stays empty. Uncontrolled (seeded once via `key`) so React never
+  clobbers the edit.
+- **dur/enum edit inline in their cells** — the stepper / grouping picker now render in
+  the duration / grouping cell itself (no box below), not an authoring shell.
+- **Comment composer no longer floats above.** Plain-clicking text now edits, so the
+  per-line **Comment** button stays the distinct comment trigger; its composer renders
+  **beneath** the line — the objective's `ObjectiveAnnotations` (badge + Comment button +
+  composer) moved below the objective box; phase composers were already below the row.
+- All guardrails stand: `from_value` pinned, re-edits move only `to_value`, revert
+  withdraws, no-op on zero net change, clamped `textDiffSegments`, never write the plan
+  on a coordinator edit. `tsc` + `next build` + `eslint` green. No SQL (0046 from Part B
+  still applies for the withdraw-delete).
+
+## Inline coordinator review — suggesting mode / tracked changes (Part B) ✅ (previous phase)
 
 Builds the half Part A deferred: the coordinator's **direct inline editing captured as
 tracked changes**. The button-based suggestion authoring ("Suggest a time", grouping

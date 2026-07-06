@@ -1,23 +1,24 @@
 'use client';
 
 // Inline prose field for the review view — the SMARTT objective and a block's
-// teacher_does / students_do. It renders three ways:
-//   • no annotation provider (the editor's Review step, a non-member view) → the
-//     PLAIN text, byte-for-byte (a bare text node, no wrapper) — suggesting mode
-//     never leaks off /view.
-//   • a pending `text` suggestion exists → the tracked-change diff (pre · struck del ·
-//     inserted ins · post), clicking focuses its card (or re-opens the editor for the
-//     authoring coordinator).
-//   • coordinator + suggesting mode, no pending suggestion → an editable target; on
-//     blur the edit commits as a `text` suggestion (create / update / withdraw).
+// teacher_does / students_do. There is NO suggesting "mode": for a coordinator the
+// text is directly editable AT ALL TIMES, edited IN PLACE (the rendered text node is
+// the edit surface — a contentEditable, styled identically, so there's no box below
+// and zero layout shift). Plain text only; RTL honoured via dir="auto".
+//
+//   • no provider (editor Review step, non-member view) → the PLAIN text, byte-identical.
+//   • a pending `text` suggestion → the tracked-change diff (pre · struck del · ins ·
+//     post). A coordinator clicks it to edit the proposal (to_value) in place; a
+//     teacher/other member clicks it to focus its pane card.
+//   • coordinator, no pending suggestion → the value, directly editable in place.
 //
 // The plan is NEVER written here — only plan_annotations. `from_value` is pinned to
-// the field's stored text at first creation; re-edits move only `to_value`, and an
-// edit back to the original withdraws the suggestion (no empty diff).
+// the field's stored text at first creation; re-edits move only `to_value`; an edit
+// back to the original withdraws it; a click with no change is a no-op.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { textDiffSegments } from '@/lib/review/textDiff';
+import { textDiffSegments, type DiffSegments } from '@/lib/review/textDiff';
 import { useOptionalAnnotations } from './context';
 import { pendingSuggestion } from './finders';
 import { A } from './tokens';
@@ -30,43 +31,30 @@ export function ProseField({
   placeholder,
 }: {
   anchorType: 'objective' | 'phase_description';
-  /** block.type for a phase_description; omitted for the objective. */
   phaseRef?: string;
-  /** the description field for a phase_description; omitted for the objective. */
   field?: 'teacher_does' | 'students_do';
-  /** the field's current stored text. */
   value: string;
-  /** muted placeholder when empty (objective only). */
   placeholder?: string;
 }) {
   const ctx = useOptionalAnnotations();
   const t = useTranslations('review');
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  // Only used to swap a pending DIFF into its in-place editor for the coordinator.
+  const [editingDiff, setEditingDiff] = useState(false);
 
-  // No provider → plain text, byte-identical (the editor Review step never wraps
-  // PartContent in a provider, so this is the path there).
+  // No provider → plain text, byte-identical (the editor's Review step path).
   if (!ctx) return <>{value || renderPlaceholder(placeholder)}</>;
 
   const pending = pendingSuggestion(ctx.annotations, { shape: 'text', anchorType, phaseRef, blockRef: field });
-  const canEdit = ctx.role === 'coordinator' && ctx.suggesting;
+  const canEdit = ctx.role === 'coordinator';
   const base = pending?.fromValue ?? value;
 
-  const startEdit = () => {
-    setDraft(pending?.toValue ?? value);
-    setEditing(true);
-  };
-
-  const commit = async () => {
-    const next = draft;
-    setEditing(false);
-    const nt = next.trim();
+  const commit = async (nextRaw: string) => {
+    const nt = nextRaw.trim();
     const bt = base.trim();
     if (pending) {
-      // Edited back to the original → withdraw; unchanged → nothing; else revise to_value.
-      if (nt === bt) await ctx.remove(pending.id);
-      else if (nt === (pending.toValue ?? '').trim()) return;
-      else await ctx.update(pending.id, next);
+      if (nt === bt) await ctx.remove(pending.id); // reverted → withdraw
+      else if (nt === (pending.toValue ?? '').trim()) return; // unchanged
+      else await ctx.update(pending.id, nextRaw);
     } else {
       if (nt === bt) return; // no net change → create nothing
       await ctx.create({
@@ -76,71 +64,135 @@ export function ProseField({
         phaseRef: phaseRef ?? null,
         blockRef: field ?? null,
         fromValue: base,
-        toValue: next,
+        toValue: nextRaw,
         note: t('annotations.author.textNoteDefault'),
       });
     }
   };
 
-  if (editing) {
-    return (
-      <textarea
-        dir="auto"
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => void commit()}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            setEditing(false);
-          }
-        }}
-        rows={2}
-        className="block w-full resize-none rounded-[8px] border bg-white px-[9px] py-[6px] text-[13.5px] leading-[1.5] text-ink outline-none focus:border-teal"
-        style={{ borderColor: A.textareaBorder }}
-      />
-    );
+  // A member who cannot author: read-only diff (if pending) or plain text.
+  if (!canEdit) {
+    if (pending) {
+      const segs = textDiffSegments(pending.fromValue ?? '', pending.toValue ?? '');
+      return <DiffText segs={segs} onClick={() => ctx.setActiveId(pending.id)} />;
+    }
+    return <>{value || renderPlaceholder(placeholder)}</>;
   }
 
-  if (pending) {
+  // Coordinator + a pending suggestion, not yet editing → show the diff; a click
+  // swaps it to the in-place editor seeded with the proposal.
+  if (pending && !editingDiff) {
     const segs = textDiffSegments(pending.fromValue ?? '', pending.toValue ?? '');
-    return (
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={canEdit ? startEdit : () => ctx.setActiveId(pending.id)}
-        className="cursor-pointer"
-        title={canEdit ? t('annotations.author.editHint') : undefined}
-      >
-        {segs.pre}
-        {segs.del ? (
-          <span className="line-through" style={{ color: A.fromFg }}>
-            {segs.del}
-          </span>
-        ) : null}
-        {segs.ins ? <span style={{ color: A.toFg }}>{segs.ins}</span> : null}
-        {segs.post}
-      </span>
-    );
+    return <DiffText segs={segs} title={t('annotations.author.editHint')} onClick={() => setEditingDiff(true)} />;
   }
 
-  if (canEdit) {
-    return (
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={startEdit}
-        className="cursor-text rounded-[4px] px-[2px] transition-colors hover:bg-[#EEF6F3]"
-        style={{ boxShadow: `inset 0 -1px 0 ${A.pillTealBorder}` }}
-        title={t('annotations.author.editHint')}
-      >
-        {value || <span style={{ color: A.hint }}>{placeholder ?? t('annotations.author.textEmptyHint')}</span>}
-      </span>
-    );
-  }
+  // Directly editable in place. Editing the pending proposal seeds `to_value` (caret
+  // to end); otherwise the plain value is editable and a native click sets the caret.
+  const seed = pending ? pending.toValue ?? '' : value;
+  return (
+    <InlineEditable
+      key={seed}
+      initial={seed}
+      placeholder={placeholder ?? t('annotations.author.textEmptyHint')}
+      caretEnd={editingDiff}
+      onCommit={(text) => {
+        setEditingDiff(false);
+        void commit(text);
+      }}
+      onCancel={() => setEditingDiff(false)}
+    />
+  );
+}
 
-  return <>{value || renderPlaceholder(placeholder)}</>;
+/** The tracked-change diff, rendered inline (clickable). */
+function DiffText({ segs, onClick, title }: { segs: DiffSegments; onClick: () => void; title?: string }) {
+  return (
+    <span dir="auto" role="button" tabIndex={0} onClick={onClick} title={title} className="cursor-pointer">
+      {segs.pre}
+      {segs.del ? (
+        <span className="line-through" style={{ color: A.fromFg }}>
+          {segs.del}
+        </span>
+      ) : null}
+      {segs.ins ? <span style={{ color: A.toFg }}>{segs.ins}</span> : null}
+      {segs.post}
+    </span>
+  );
+}
+
+/** A contentEditable span that edits plain text in place. Uncontrolled: `initial` is
+ *  rendered as the child ONCE (stable via the caller's `key`), so React never clobbers
+ *  the user's edit; the value is read from the DOM on commit. Enter / blur commit,
+ *  Escape reverts. Paste is coerced to plain text. dir="auto" for RTL. */
+function InlineEditable({
+  initial,
+  placeholder,
+  caretEnd,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  placeholder: string;
+  caretEnd: boolean;
+  onCommit: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const cancelled = useRef(false);
+
+  useEffect(() => {
+    if (!caretEnd) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, [caretEnd]);
+
+  return (
+    <span
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      tabIndex={0}
+      dir="auto"
+      data-placeholder={placeholder}
+      className="rounded-[3px] px-[1px] outline-none transition-colors focus:bg-[#F1F7F4]"
+      style={{ boxShadow: `inset 0 -1px 0 ${A.pillTealBorder}` }}
+      onBlur={() => {
+        if (cancelled.current) {
+          cancelled.current = false;
+          onCancel();
+          return;
+        }
+        onCommit(ref.current?.textContent ?? '');
+      }}
+      onPaste={(e) => {
+        // Plain text only — strip any formatting from the pasted content.
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).blur(); // → onBlur → commit
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelled.current = true;
+          if (ref.current) ref.current.textContent = initial;
+          ref.current?.blur();
+        }
+      }}
+    >
+      {initial}
+    </span>
+  );
 }
 
 function renderPlaceholder(placeholder?: string) {
