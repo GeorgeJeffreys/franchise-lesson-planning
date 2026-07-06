@@ -124,28 +124,6 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
               view={view}
             />
             <ViewToggle view={view} onChange={changeView} />
-            {/* Recycle bin — the per-teacher trash of soft-deleted lessons. */}
-            <Link
-              href="/trash"
-              aria-label={t('trash.link')}
-              title={t('trash.link')}
-              className="inline-flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-[9px] border border-border text-text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                <path d="M10 11v6M14 11v6" />
-              </svg>
-            </Link>
             {/* §1 — compact download control. A single-subject board keeps the plain
                 icon button; a user-wide board turns it into a subject picker (each
                 choice exports that subject's week via the same /api/pdf/week route). */}
@@ -182,6 +160,18 @@ export function WeeklyOverview({ data, view: initialView }: { data: BoardData; v
             spansMultipleCentres={data.spansMultipleCentres}
           />
         )}
+
+        {/* Quiet entry to the per-teacher recycle bin — a text link in the board
+            footer, deliberately NOT a trash-can control in the top toolbar (delete
+            lives per-card). */}
+        <div className="mt-[26px] border-t border-border pt-[14px]">
+          <Link
+            href="/trash"
+            className="text-[12.5px] font-medium text-text-muted underline underline-offset-2 hover:text-ink"
+          >
+            {t('trash.link')}
+          </Link>
+        </div>
       </div>
     </ScopeChooserProvider>
     </BoardReturnProvider>

@@ -76,7 +76,9 @@ export function DeleteLessonControl({
           setOpen(true);
         }}
         onPointerDown={swallow}
-        className="inline-flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-[8px] text-text-faint opacity-0 transition-colors hover:bg-danger-bg hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+        // Always visible on eligible cards (a hover-only delete is undiscoverable
+        // on touch) — a quiet faint-grey icon that warms to danger-red on hover.
+        className="inline-flex h-[24px] w-[24px] flex-shrink-0 items-center justify-center rounded-[7px] text-text-faint transition-colors hover:bg-danger-bg hover:text-danger"
       >
         <TrashIcon />
       </button>
