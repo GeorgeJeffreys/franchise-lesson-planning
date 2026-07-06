@@ -40,10 +40,10 @@ export function PractiseStep({
   const t = useTranslations('wizard');
   const withWorksheet = showWorksheet && !!onWorksheetChange && !!context && !!vocabulary;
   return (
-    <fieldset disabled={locked} className="mt-[22px] min-w-0 overflow-hidden rounded-[16px] border border-border bg-surface disabled:opacity-75">
+    <fieldset disabled={locked} className="mt-[16px] min-w-0 overflow-hidden rounded-[16px] border border-border bg-surface disabled:opacity-75">
       {/* Block header */}
-      <div className="flex flex-wrap items-center gap-[14px] border-b border-[#EFE8DD] px-6 py-[14px]">
-        <span className="text-[21px] font-bold">{t('practise.title')}</span>
+      <div className="flex flex-wrap items-center gap-[14px] border-b border-[#EFE8DD] px-6 py-[12px]">
+        <span className="text-[18px] font-bold">{t('practise.title')}</span>
         <PhaseSelect
           value={block.phase}
           onChange={(phase) => onPatch({ phase: phase as TeachingPhase | null })}

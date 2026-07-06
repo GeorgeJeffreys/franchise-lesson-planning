@@ -126,9 +126,9 @@ export function ObjectiveStep({
 
   return (
     <div className="mt-1.5">
-      <div className="text-[21px] font-bold">{t('heading')}</div>
+      <div className="text-[18px] font-bold">{t('heading')}</div>
 
-      <div className="mt-[18px] flex flex-wrap gap-1.5">
+      <div className="mt-[14px] flex flex-wrap gap-1.5">
         {SMARTT_LETTERS.map((l) => (
           <SmarttPill key={l.key} label={l.label} result={checkResult?.[l.key]} />
         ))}
@@ -136,7 +136,7 @@ export function ObjectiveStep({
 
       {/* "Yours" — a pink block holding a white field. The stem is baked in and
           non-editable; the teacher writes only the remainder. */}
-      <div className="mt-4 rounded-[14px] border border-mine-border bg-mine p-[15px]">
+      <div className="mt-3 rounded-[14px] border border-mine-border bg-mine p-[13px]">
         {/* A click anywhere on this field (the stem, the padding) drops the caret
             into the editable region — except clicks already inside the editable
             (which position the caret naturally) and clicks on the Aya button. When

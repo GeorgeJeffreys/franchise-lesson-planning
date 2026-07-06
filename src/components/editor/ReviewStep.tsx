@@ -142,7 +142,7 @@ export function ReviewStep({
   return (
     <div className="mt-[22px]">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-[21px] font-bold">{t('review.heading')}</div>
+        <div className="text-[18px] font-bold">{t('review.heading')}</div>
         <div className="flex flex-wrap items-center gap-4">
           {status === 'approved' ? (
             <a
@@ -172,7 +172,7 @@ export function ReviewStep({
       {/* Required materials */}
       <div className="mt-4 rounded-[13px] border border-border px-4 py-[15px]">
         <div className="mb-2.5 flex items-center justify-between gap-2.5">
-          <span className="text-[12px] font-bold uppercase tracking-[0.05em] text-neutral-700">
+          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-neutral-700">
             {t('review.requiredMaterials')}
           </span>
           <span className="text-[11px] text-neutral-400">{t('review.materialsHint')}</span>

@@ -71,7 +71,7 @@ export function EditorSubHeader({
       </Link>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-[10px]">
-          <span className="text-[20px] font-bold">
+          <span className="text-[18px] font-bold">
             {t('subheader.year', { year: formatNumber(classContext.year, locale) })}
             {scopeSuffix ? ` · ${scopeSuffix}` : ''}
           </span>

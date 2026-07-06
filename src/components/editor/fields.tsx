@@ -4,13 +4,13 @@ import { cn } from '@/lib/cn';
 /** Small uppercase label above an editor field. */
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="text-[12px] font-semibold text-neutral-700">{children}</label>
+    <label className="text-[11px] font-semibold text-neutral-700">{children}</label>
   );
 }
 
 const TEXTAREA_BASE =
-  'w-full rounded-md border border-border bg-surface-subtle px-3 py-[11px] ' +
-  'font-sans text-[13.5px] leading-[1.55] text-neutral-900 ' +
+  'w-full rounded-md border border-border bg-surface-subtle px-3 py-[9px] ' +
+  'font-sans text-[13.5px] leading-[1.5] text-neutral-900 ' +
   'placeholder:text-neutral-400 outline-none resize-y ' +
   'focus:border-teal focus:bg-surface';
 
