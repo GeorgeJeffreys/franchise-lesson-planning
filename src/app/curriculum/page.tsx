@@ -3,7 +3,7 @@ import { CurriculumBrowse } from '@/components/curriculum/CurriculumBrowse';
 import { ExplorerTabs, type ExplorerTab } from '@/components/curriculum/ExplorerTabs';
 import { LogicTree } from '@/components/curriculum/LogicTree';
 import { Topics } from '@/components/curriculum/Topics';
-import { SearchSlot } from '@/components/curriculum/SearchSlot';
+import { Search } from '@/components/curriculum/Search';
 import { getCurriculumBrowseData, getExplorerShell } from '@/lib/curriculum-browse';
 import {
   getCompositionTree,
@@ -11,6 +11,7 @@ import {
   getTopicsData,
   type SubjectCapabilities,
 } from '@/lib/curriculum/composition';
+import { getSearchData } from '@/lib/curriculum/search';
 import { getHeaderProfile } from '@/lib/profile';
 import { getConsoleAccess } from '@/lib/console';
 
@@ -26,6 +27,7 @@ type SearchParams = {
   month?: string;
   week?: string;
   view?: string;
+  q?: string;
 };
 
 const TABS: ExplorerTab[] = ['calendar', 'tree', 'topics', 'search'];
@@ -43,7 +45,7 @@ export default async function CurriculumPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { tab, subject, year, month, week, view } = await searchParams;
+  const { tab, subject, year, month, week, view, q } = await searchParams;
   const yearNum = year ? Number(year) : undefined;
   const weekNum = week ? Number(week) : undefined;
   const resolvedView = view === 'monthly' ? 'monthly' : 'weekly';
@@ -92,6 +94,7 @@ export default async function CurriculumPage({
             month: month || undefined,
             week: Number.isFinite(weekNum) ? weekNum : undefined,
             view: resolvedView,
+            q: q || undefined,
           }}
         />
       </ExplorerTabs>
@@ -114,6 +117,7 @@ async function TabBody({
     month?: string;
     week?: number;
     view: 'weekly' | 'monthly';
+    q?: string;
   };
 }) {
   const subjects = shell.subjects.map((s) => ({ code: s.code, name: s.name }));
@@ -153,7 +157,17 @@ async function TabBody({
   }
 
   if (tab === 'search') {
-    return <SearchSlot subjectName={shell.subjectName} />;
+    const searchData = await getSearchData(shell.subjectCode);
+    return (
+      <Search
+        data={searchData}
+        capabilities={capabilities}
+        subjects={subjects}
+        subjectCode={shell.subjectCode}
+        subjectName={shell.subjectName}
+        initialQuery={searchParams.q ?? ''}
+      />
+    );
   }
 
   // Calendar — the existing viewer, re-fetched with its own (subject/year/month/week).

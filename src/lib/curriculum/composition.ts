@@ -383,10 +383,15 @@ export async function getInsightsAggregates(
 //     presence: a subject with only a thin sliver of taxonomy (IT ~22%) would build a
 //     misleadingly sparse tree, so it stays disabled. `total`/`wellFormed` also drive
 //     the disclosure banner (rows not mapped to the taxonomy are shown, not dropped).
-//   * hasFocusAreaText  → the Topics focus-area tier (everyone EXCEPT english).
+//   * hasFocusAreaText  → the Topics focus-area tier + Search Focus-Area facet
+//     (everyone EXCEPT english).
 //   * hasWeeklyText     → the Logic-tree strand cards (english, it).
-// Probed with head-only COUNT queries / a two-number RPC (no bulk rows), so the
-// PostgREST 1000-row cap never applies.
+//   * hasLinguisticSkillText → the Search "Linguistic skill" facet (english, arabic).
+//   * hasGrammarVocabText    → the Search "Grammar/vocabulary" facet (english only).
+// The last two exist so the Search tab reads its SUBJECT-CONDITIONAL facet presence from
+// this ONE capability probe rather than forking a second definition. Probed with
+// head-only COUNT queries / a two-number RPC (no bulk rows), so the PostgREST 1000-row
+// cap never applies.
 
 /**
  * The minimum fraction of a subject's rows that must carry a REAL well-formed taxonomy
@@ -419,6 +424,10 @@ export interface SubjectCapabilities {
   logicTreeEnabled: boolean;
   hasFocusAreaText: boolean;
   hasWeeklyText: boolean;
+  /** Any row carries `linguistic_skill` text — the Search skill facet (english, arabic). */
+  hasLinguisticSkillText: boolean;
+  /** Any row carries `grammar_vocabulary` text — the Search grammar facet (english). */
+  hasGrammarVocabText: boolean;
 }
 
 export async function getCurriculumSubjectCapabilities(
@@ -453,7 +462,7 @@ export async function getCurriculumSubjectCapabilities(
     }
   };
 
-  const [coverage, fa, wk] = await Promise.all([
+  const [coverage, fa, wk, ls, gv] = await Promise.all([
     coverageOf(),
     countOf(() =>
       supabase
@@ -471,6 +480,22 @@ export async function getCurriculumSubjectCapabilities(
         .eq('subject_code', subject)
         .or('weekly_skills_lo.not.is.null,weekly_knowledge_lo.not.is.null'),
     ),
+    countOf(() =>
+      supabase
+        .from('curriculum_lesson')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('subject_code', subject)
+        .not('linguistic_skill', 'is', null),
+    ),
+    countOf(() =>
+      supabase
+        .from('curriculum_lesson')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('subject_code', subject)
+        .not('grammar_vocabulary', 'is', null),
+    ),
   ]);
 
   const taxonomyCoverage = coverage.total > 0 ? coverage.wellFormed / coverage.total : 0;
@@ -482,6 +507,8 @@ export async function getCurriculumSubjectCapabilities(
     logicTreeEnabled: taxonomyCoverage >= TAXONOMY_COVERAGE_MIN,
     hasFocusAreaText: fa > 0,
     hasWeeklyText: wk > 0,
+    hasLinguisticSkillText: ls > 0,
+    hasGrammarVocabText: gv > 0,
   };
 }
 
