@@ -35,6 +35,8 @@ export function ReadOnlyPlan({
   decisionBar,
   rightRail,
   backHref = '/',
+  editHref,
+  editLabel,
 }: {
   data: EditorPlanData;
   /** Coordinator decision bar, rendered at the top of the content column when the
@@ -46,6 +48,13 @@ export function ReadOnlyPlan({
   rightRail?: ReactNode;
   /** Where "‹ This week" returns — the board week this plan was opened from. */
   backHref?: string;
+  /** When set, render an "Edit plan" action in the header that leaves this read-only
+   *  view for the editor. The page passes this ONLY for the plan's author while the
+   *  plan is editable (`in_progress` / `needs_review`); a non-author or a
+   *  `submitted`/`approved` plan gets no button (undefined). `editLabel` is the
+   *  translated caption, resolved by the async page. */
+  editHref?: string;
+  editLabel?: string;
 }) {
   const { plan, classContext, curriculum, activitiesByBlock, resourceBank } = data;
   const total = inSessionMinutes(plan.blocks);
@@ -140,9 +149,26 @@ export function ReadOnlyPlan({
                 Read only · {SCOPE_LABEL[classContext.scope]}
               </span>
             </div>
-            <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
-              {total} / {IN_SESSION_TARGET_MINUTES} min
-            </span>
+            <div className="flex flex-wrap items-center gap-[14px]">
+              {/* Author-only escape hatch from this read-only surface into the editor.
+                  Rendered only when the page passes editHref (creator + editable
+                  plan), so a coordinator / non-author never sees it. */}
+              {editHref ? (
+                <Link
+                  href={editHref}
+                  className="inline-flex items-center gap-[6px] rounded-[10px] bg-teal px-[13px] py-[7px] text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  {editLabel}
+                </Link>
+              ) : null}
+              <span className={`text-[13.5px] font-bold ${onTarget ? 'text-[#2E7D5B]' : 'text-[#B0651E]'}`}>
+                {total} / {IN_SESSION_TARGET_MINUTES} min
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -67,6 +67,25 @@ export default async function PlanViewPage({
   const isMemberViewer = canDecide || isCreator;
   const role = canDecide ? 'coordinator' : 'teacher';
 
+  // The plan's AUTHOR may leave this read-only surface for the editor while the plan
+  // is still editable (a draft, or one returned for changes) — matching the editor's
+  // own lock (`in_progress` / `needs_review` unlocked). A non-author (incl. a
+  // reviewing coordinator) or a `submitted`/`approved` plan gets no editor affordance.
+  // Carry the FULL board query (month/week/view) through so returning from the editor
+  // lands on the same week AND the same board tab.
+  const canAuthorEdit = isCreator && (status === 'needs_review' || status === 'in_progress');
+  let editHref: string | undefined;
+  let editLabel: string | undefined;
+  if (canAuthorEdit) {
+    const q = new URLSearchParams();
+    if (month) q.set('month', month);
+    if (week) q.set('week', week);
+    if (view) q.set('view', view);
+    const qs = q.toString();
+    editHref = qs ? `/plan/${id}?${qs}` : `/plan/${id}`;
+    editLabel = (await getTranslations('review'))('readonly.editPlan');
+  }
+
   const annotations = isMemberViewer
     ? await getPlanAnnotations(id, data.plan.created_by)
     : [];
@@ -106,10 +125,10 @@ export default async function PlanViewPage({
           annotations={annotations}
           phaseTitles={phaseTitles}
         >
-          <ReadOnlyPlan data={data} decisionBar={null} rightRail={<AnnotationPane />} backHref={backHref} />
+          <ReadOnlyPlan data={data} decisionBar={null} rightRail={<AnnotationPane />} backHref={backHref} editHref={editHref} editLabel={editLabel} />
         </AnnotationProvider>
       ) : (
-        <ReadOnlyPlan data={data} decisionBar={draftNote} rightRail={null} backHref={backHref} />
+        <ReadOnlyPlan data={data} decisionBar={draftNote} rightRail={null} backHref={backHref} editHref={editHref} editLabel={editLabel} />
       )}
     </AppShell>
   );

@@ -1224,3 +1224,50 @@ available as the secondary. No destructive red; exactly one filled-teal button a
 - Footer's open count derives from the same `openCount`/`isOpenAnnotation` the pane's
   "Open · N" renders, so `Open · 0` ⇒ Approve primary and `Open · 1+` ⇒ Return primary,
   in lockstep with the pane in every case.
+
+## Phase 10 — Teacher can edit a returned plan from the review view ✅ (this phase)
+
+On the coordinator-returned review view (`/plan/[id]/view`, status `needs_review`), the
+author could work the annotation pane (reply / accept-reject / resolve) but had **no way
+into the editor** to make free edits — the read-only surface was a dead-end. Added an
+**"Edit plan"** affordance that leaves the read-only view for the full editor.
+
+### Phase 0 cause — missing affordance (NOT a gate bug)
+
+- The editor lock is `locked = status === 'submitted' || status === 'approved'`
+  (`LessonPlanEditor.tsx`), so `needs_review` / `in_progress` are already editable for
+  the author, and `/plan/[id]` only redirects a **non-author** coordinator to `/view`.
+- `/view` renders `ReadOnlyPlan`, whose "Read only · …" badge is expected chrome for
+  that surface — not a class-plan read-only gate bug.
+- The board card (`CardShell`) and bell outcome already route the author to the editor.
+  The single gap was the **view → editor** link. The editor already points the teacher
+  the other way (Review-step "coordinator feedback" pointer → `/view`), so the two are
+  now mutually reachable faces of the same plan.
+
+### Done
+
+- **`ReadOnlyPlan`**: new optional `editHref` / `editLabel` props render a teal primary
+  **"Edit plan"** button in the header's right cluster (by the min-total, near the
+  title — deliberately not on the read-only badge). Renders only when `editHref` is set.
+- **`/plan/[id]/view/page.tsx`**: gate `canAuthorEdit = isCreator && (needs_review ||
+  in_progress)`; builds `editHref = /plan/[id]` carrying the **full** board query
+  (`month` / `week` / `view`) so returning lands on the same week AND the same
+  calendar/status tab; resolves the label via `getTranslations('review')`. Passed to
+  both `ReadOnlyPlan` renders (pane-mounted and plain). `submitted`/`approved`,
+  non-authors, and reviewing coordinators get `undefined` → no button.
+- **i18n**: `review.readonly.editPlan` added to `messages/en` + `messages/ar`.
+  ⚠️ **Arabic flagged for Kadria** ("تعديل الخطة").
+
+### Preserved (no change)
+
+- Editor lock, `decidePlan`, submit/resubmit, the annotation layer, RLS, the
+  coordinator view. `/view` stays the returned-plan landing spot (teacher sees *why* it
+  came back), with Edit one click away. **No schema / no SQL.**
+
+### Verified
+
+- `npx tsc --noEmit` clean · `next build` (Next 16.2.9) passes · `eslint` clean.
+- Visibility gate is exactly `isCreator && (needs_review || in_progress)`: a **coordinator**
+  reviewing the same plan is not the creator → `editHref` undefined → **no "Edit plan"**
+  button (their footer stays Approve / Return). Submitted/approved and centre/non-author
+  views show nothing new.
