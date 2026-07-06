@@ -11,6 +11,7 @@ import { TestUserBar } from '@/components/app-shell/TestUserBar';
 import { getBellNotifications } from '@/lib/notifications';
 import { getImpersonationState } from '@/lib/test-impersonation';
 import { getSpaceSwitcher } from '@/lib/active-space';
+import { getConsoleAccess } from '@/lib/console';
 
 type AppShellProps = {
   /** The signed-in user's display name (full_name, falling back to email). */
@@ -29,11 +30,14 @@ type AppShellProps = {
  * unread dot shows only when that list is non-empty.
  */
 export async function AppShell({ name, subtitle, children }: AppShellProps) {
-  const [impersonation, notifications, spaces] = await Promise.all([
+  const [impersonation, notifications, spaces, access] = await Promise.all([
     getImpersonationState(),
     getBellNotifications(),
     getSpaceSwitcher(),
+    getConsoleAccess(),
   ]);
+  // Coordinator/admin only — surfaces the Curriculum split-button dropdown (Insights).
+  const canSeeInsights = access.isAdmin || access.isCoordinator;
 
   // Dev-only RTL preview toggle, surfaced in the user menu. Gated on an explicit
   // flag (NOT NODE_ENV) so it can be exercised in production, which doubles as
@@ -85,7 +89,7 @@ export async function AppShell({ name, subtitle, children }: AppShellProps) {
           </span>
         </Link>
 
-        <TopNav />
+        <TopNav canSeeInsights={canSeeInsights} />
 
         {/* Right cluster: bell · user */}
         <div className="ms-auto flex items-center gap-[10px]">

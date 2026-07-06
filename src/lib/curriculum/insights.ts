@@ -12,7 +12,7 @@
 // taxonomy `S0/K0` flat artefact never reaches here (TopicsData is focus_area/theme, and
 // #99 already discounts it), so placeholders can't masquerade as real content.
 
-import type { HoursPerMonth, TopicsData } from '@/lib/curriculum/composition';
+import type { HoursPerMonth, LinguisticSkillHours, TopicsData } from '@/lib/curriculum/composition';
 
 // ── Calendar order ──────────────────────────────────────────────────────────────────
 
@@ -172,6 +172,59 @@ export function hoursByFocusArea(data: TopicsData): FocusAreaView {
   const total = bars.reduce((s, b) => s + b.hours, 0);
   for (const b of bars) b.pct = total > 0 ? (b.hours / total) * 100 : 0;
   return { groupedBy, total, bars };
+}
+
+// ── 2b) Hours by linguistic skill (english fallback for the focus-area card) ─────────
+//
+// English carries no focus_area and ~178 themes, so "hours per theme" is an unbounded,
+// low-signal list. Its bounded, meaningful lens is instead the ~5 canonical linguistic
+// skills. The 0055 RPC returns raw (skill, hours) groupings whose labels vary in
+// casing/spelling and include non-skill junk ("Teachers Choice", single-letter
+// placeholders); we fold each raw label into ONE canonical skill and drop anything that
+// isn't a linguistic skill, then sum. Bars sort by hours desc — the same visual language
+// as the focus-area bars.
+
+/** The canonical linguistic skills, each with the source-variant patterns it absorbs. */
+const CANONICAL_SKILLS: { canonical: string; test: RegExp }[] = [
+  { canonical: 'Basic Literacy', test: /literacy/i }, // before "reading"/"writing" catch-alls
+  { canonical: 'Listening', test: /listen/i },
+  { canonical: 'Reading', test: /read/i },
+  { canonical: 'Speaking', test: /speak|oral|talk/i },
+  { canonical: 'Writing', test: /writ/i },
+];
+
+/** Fold a raw source label into its canonical linguistic skill, or null when it is not a
+ *  linguistic skill (junk like "Teachers Choice" / "E" / "L", or blank). */
+export function canonicalSkill(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  for (const c of CANONICAL_SKILLS) if (c.test.test(s)) return c.canonical;
+  return null;
+}
+
+export interface SkillBar {
+  label: string;
+  hours: number;
+  pct: number;
+}
+export interface SkillView {
+  total: number;
+  bars: SkillBar[];
+}
+
+export function hoursByLinguisticSkill(raw: LinguisticSkillHours[]): SkillView {
+  const byCanonical = new Map<string, number>();
+  for (const r of raw) {
+    const c = canonicalSkill(r.skill);
+    if (!c || r.hours <= 0) continue;
+    byCanonical.set(c, (byCanonical.get(c) ?? 0) + r.hours);
+  }
+  const bars = [...byCanonical.entries()]
+    .map(([label, hours]) => ({ label, hours, pct: 0 }))
+    .sort((a, b) => b.hours - a.hours || a.label.localeCompare(b.label));
+  const total = bars.reduce((s, b) => s + b.hours, 0);
+  for (const b of bars) b.pct = total > 0 ? (b.hours / total) * 100 : 0;
+  return { total, bars };
 }
 
 // ── 3 & 4) Topic × year matrix (shared spine) ───────────────────────────────────────

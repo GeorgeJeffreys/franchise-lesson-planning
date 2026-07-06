@@ -2,29 +2,33 @@
 
 // Curriculum → Insights (coordinator/admin, read-only). A faithful port of the Alsama
 // "Curriculum health" Claude Design: a title row (subject picker) over a 2×2 grid of
-// analytics cards — Hours per month · Hours per focus area · Spiralling across years ·
-// Coverage & gaps.
+// FIXED-SIZE analytics cards — Hours per month · Hours per focus area · Spiralling across
+// years · Coverage & gaps.
 //
-// The DESIGN is ported verbatim (spacing, the teal magnitude ramp, the clay/red gap
-// tones, the deepening spiral, the coverage matrix with red gap-crosses and the callout).
-// The DATA is real, not the mock's Maths-shaped constants: chart 1 ← hoursPerMonth
-// (calendar count), charts 2–4 ← focus_area/theme (`TopicsData`, #99's cleaned logic —
-// the live per-subject signal; english falls back to a relabelled "by theme" view). Each
-// card owns an empty-state so a subject lacking an analytic's data shows "not available
-// yet" instead of a misleading full-looking chart. The spiral's deepening is POSITIONAL
-// (Nth recurrence), never a fabricated complexity signal.
+// FIXED-SIZE DASHBOARD. Every card is capped to a data-INDEPENDENT height so the dashboard
+// looks the same regardless of how much data a subject has. No card grows to fit its data:
+// long content scrolls or PAGINATES within the capped card. English is the stress case
+// (~178 themes) — its focus-area card falls back to the ~5 linguistic skills, and its two
+// topic matrices paginate (15 rows/page) behind a filter box rather than rendering all rows.
+//
+// The DESIGN is ported verbatim (spacing, the teal magnitude ramp, the clay/red gap tones,
+// the deepening spiral, the coverage matrix with red gap-crosses and the callout). The DATA
+// is real: chart 1 ← hoursPerMonth (calendar count), charts 2–4 ← focus_area/theme (#99's
+// cleaned logic — the live per-subject signal). The spiral's deepening is POSITIONAL (Nth
+// recurrence), never a fabricated complexity signal.
 
-import { useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { SubjectOption } from './explorer-ui';
-import type { HoursPerMonth, TopicsData } from '@/lib/curriculum/composition';
+import type { HoursPerMonth, LinguisticSkillHours, TopicsData } from '@/lib/curriculum/composition';
 import {
   hoursPerMonthForYear,
   hoursByFocusArea,
+  hoursByLinguisticSkill,
   topicMatrix,
   gapNotes,
   deepeningColor,
@@ -46,6 +50,15 @@ const SEGMENT_STOPS = [
   'var(--color-chart-teal-1)',
 ];
 
+// Fixed card heights — the invariant that keeps the dashboard the same size regardless of
+// data length. Row 1 (hours-per-month · focus area) is compact; row 2 (the two topic
+// matrices) is taller to hold ~15 paginated rows plus a legend/callout. Within a grid row
+// both cards stretch to the taller, so each row reads as one band.
+const ROW1_HEIGHT = 300;
+const ROW2_HEIGHT = 520;
+/** Rows shown per page in the ENGLISH (theme-mode) matrices before the pager kicks in. */
+const ROWS_PER_PAGE = 15;
+
 export function CurriculumInsights({
   subjects,
   subjectCode,
@@ -53,6 +66,7 @@ export function CurriculumInsights({
   year,
   hoursPerMonth,
   topics,
+  linguisticSkills,
 }: {
   subjects: SubjectOption[];
   subjectCode: string;
@@ -63,6 +77,9 @@ export function CurriculumInsights({
   year: number;
   hoursPerMonth: HoursPerMonth[];
   topics: TopicsData;
+  /** Raw (skill, hours) groupings — canonicalised into the ~5 linguistic skills that back
+   *  the ENGLISH fallback of the focus-area card. Empty for focus-area subjects. */
+  linguisticSkills: LinguisticSkillHours[];
 }) {
   const t = useTranslations('insights');
   const locale = useLocale();
@@ -102,7 +119,7 @@ export function CurriculumInsights({
             yearName={yearName}
             onYear={(y) => go({ year: y })}
           />
-          <FocusAreaCard topics={topics} />
+          <FocusAreaCard topics={topics} linguisticSkills={linguisticSkills} />
           <SpiralCard topics={topics} yearName={yearName} />
           <CoverageCard topics={topics} yearName={yearName} explorerHref={explorerHref} />
         </div>
@@ -113,22 +130,32 @@ export function CurriculumInsights({
 
 // ── Shared chrome ────────────────────────────────────────────────────────────────────
 
+/** A fixed-height analytics card: a non-shrinking header, a `flex-1` body that owns its own
+ *  overflow (scroll/paginate), and an optional non-shrinking footer (legend/callout/pager).
+ *  `height` is the data-independent cap; `bodyClassName` tunes how the body handles overflow. */
 function Card({
   title,
   headerRight,
+  footer,
+  height,
+  bodyClassName,
   children,
 }: {
   title: string;
   headerRight?: React.ReactNode;
+  footer?: React.ReactNode;
+  height: number;
+  bodyClassName?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[15px] border border-[#ECE3D5] bg-surface p-[18px]">
-      <div className="mb-[16px] flex items-center justify-between gap-[10px]">
+    <section className="flex flex-col rounded-[15px] border border-[#ECE3D5] bg-surface p-[18px]" style={{ height }}>
+      <div className="mb-[14px] flex shrink-0 items-center justify-between gap-[10px]">
         <span className="text-[14px] font-semibold text-ink">{title}</span>
         {headerRight}
       </div>
-      {children}
+      <div className={cn('min-h-0 flex-1', bodyClassName)}>{children}</div>
+      {footer ? <div className="mt-[14px] shrink-0">{footer}</div> : null}
     </section>
   );
 }
@@ -178,7 +205,7 @@ function LensChip({
 function EmptyState({ message }: { message: string }) {
   const t = useTranslations('insights');
   return (
-    <div className="flex min-h-[150px] flex-col items-center justify-center rounded-[10px] border border-dashed border-[#E0D6C7] bg-[#FBFAF6] px-[16px] py-[26px] text-center">
+    <div className="flex h-full flex-col items-center justify-center rounded-[10px] border border-dashed border-[#E0D6C7] bg-[#FBFAF6] px-[16px] py-[26px] text-center">
       <p dir="auto" className="text-[13px] text-text-muted">{message}</p>
       <p className="mt-[6px] text-[11px] text-text-faint">{t('fillsInNote')}</p>
     </div>
@@ -221,6 +248,8 @@ function HoursPerMonthCard({
     <Card
       title={t('card1.title')}
       headerRight={<LensChip label={yearName(year)} years={years} value={year} yearName={yearName} onSelect={onYear} />}
+      height={ROW1_HEIGHT}
+      bodyClassName="flex flex-col justify-center"
     >
       {view.bars.length === 0 ? (
         <EmptyState message={t('card1.empty')} />
@@ -257,32 +286,51 @@ function HoursPerMonthCard({
   );
 }
 
-// ── 2) Hours per focus area / theme ─────────────────────────────────────────────────
+// ── 2) Hours per focus area / linguistic skill ──────────────────────────────────────
+//
+// focus_area subjects: one bar per focus area, each broken down by its topics. ENGLISH (no
+// focus_area, ~178 themes): fall back to one bar per canonical linguistic skill. Either way
+// the list is short, and the body scrolls within the fixed card if it ever overflows.
 
-function FocusAreaCard({ topics }: { topics: TopicsData }) {
+function FocusAreaCard({
+  topics,
+  linguisticSkills,
+}: {
+  topics: TopicsData;
+  linguisticSkills: LinguisticSkillHours[];
+}) {
   const t = useTranslations('insights');
   const locale = useLocale();
-  const view = useMemo(() => hoursByFocusArea(topics), [topics]);
-  const isTheme = view.groupedBy === 'theme';
+  const isSkillMode = topics.groupedBy === 'theme';
+  const focusView = useMemo(() => hoursByFocusArea(topics), [topics]);
+  const skillView = useMemo(() => hoursByLinguisticSkill(linguisticSkills), [linguisticSkills]);
+
+  // In skill mode the bars are the canonical skills (no sub-topic breakdown); otherwise the
+  // focus-area bars (each with a topic breakdown). Normalise both to the same bar shape.
+  const bars = isSkillMode
+    ? skillView.bars.map((b) => ({ label: b.label, hours: b.hours, pct: b.pct, topics: [] as { topic: string; hours: number }[] }))
+    : focusView.bars.map((b) => ({ label: b.label, hours: b.hours, pct: b.pct, topics: b.topics }));
 
   return (
     <Card
-      title={isTheme ? t('card2.titleTheme') : t('card2.titleFocus')}
+      title={isSkillMode ? t('card2.titleSkill') : t('card2.titleFocus')}
       headerRight={<LensChip label={t('allYears')} />}
+      height={ROW1_HEIGHT}
+      bodyClassName="overflow-y-auto pe-[4px]"
     >
-      {view.bars.length === 0 ? (
-        <EmptyState message={t('card2.empty')} />
+      {bars.length === 0 ? (
+        <EmptyState message={isSkillMode ? t('card2.emptySkill') : t('card2.empty')} />
       ) : (
         <div className="flex flex-col gap-[15px]">
-          {isTheme ? (
-            <p dir="auto" className="-mt-[4px] text-[11px] text-text-faint">{t('card2.themeNote')}</p>
+          {isSkillMode ? (
+            <p dir="auto" className="-mt-[4px] text-[11px] text-text-faint">{t('card2.skillNote')}</p>
           ) : null}
-          {view.bars.map((b, i) => {
-            const segs = b.topics.length > 0 ? b.topics : [{ topic: b.label ?? '', hours: b.hours }];
+          {bars.map((b, i) => {
+            const segs = b.topics.length > 0 ? b.topics : [{ topic: b.label, hours: b.hours }];
             return (
-              <div key={`${b.label ?? 'x'}-${i}`}>
+              <div key={`${b.label}-${i}`}>
                 <div className="mb-[5px] flex items-baseline justify-between gap-[10px]">
-                  <span dir="auto" className="min-w-0 truncate text-[13px] font-medium text-[#3A332E]">{b.label ?? t('card2.titleTheme')}</span>
+                  <span dir="auto" className="min-w-0 truncate text-[13px] font-medium text-[#3A332E]">{b.label}</span>
                   <span className="shrink-0 whitespace-nowrap text-[12px] tabular-nums text-[#6C6259]">
                     {t('hoursShort', { n: formatNumber(b.hours, locale) })} · {formatNumber(Math.round(b.pct), locale)}%
                   </span>
@@ -317,69 +365,217 @@ function FocusAreaCard({ topics }: { topics: TopicsData }) {
   );
 }
 
-// ── 3) Spiralling across years ──────────────────────────────────────────────────────
+// ── Shared topic-matrix scaffold (cards 3 & 4) ───────────────────────────────────────
+//
+// Both matrices share the same long-list taming: focus_area subjects group rows under
+// COLLAPSIBLE Focus Areas (the whole grid scrolls within the fixed card); ENGLISH (theme
+// mode) keeps per-theme rows but PAGINATES them (15/page) behind a FILTER box — never
+// rendering all ~178 rows. The two cards differ only in their cell renderer and footer, so
+// this component owns the layout and takes those as props.
 
-function SpiralCard({ topics, yearName }: { topics: TopicsData; yearName: (y: number) => string }) {
+function MatrixScaffold({
+  title,
+  headerRight,
+  view,
+  yearName,
+  labelWidth,
+  emptyMessage,
+  renderCell,
+  footer,
+}: {
+  title: string;
+  headerRight?: React.ReactNode;
+  view: MatrixView;
+  yearName: (y: number) => string;
+  labelWidth: number;
+  emptyMessage: string;
+  renderCell: (row: MatrixRow, year: number, taughtYears: number[]) => React.ReactNode;
+  footer?: React.ReactNode;
+}) {
   const t = useTranslations('insights');
-  const view = useMemo(() => topicMatrix(topics), [topics]);
-  const rows = useMemo(() => view.groups.flatMap((g) => g.rows), [view]);
-  const cols = `172px repeat(${view.years.length}, 1fr)`;
+  const locale = useLocale();
+  const isTheme = view.groupedBy === 'theme';
+  const cols = `${labelWidth}px repeat(${view.years.length}, minmax(38px, 1fr))`;
+
+  const [filter, setFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Theme mode: flatten (single group), filter, then page.
+  const allRows = useMemo(() => view.groups.flatMap((g) => g.rows), [view]);
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? allRows.filter((r) => r.topic.toLowerCase().includes(q)) : allRows;
+  }, [allRows, filter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const pageRows = filtered.slice(clampedPage * ROWS_PER_PAGE, clampedPage * ROWS_PER_PAGE + ROWS_PER_PAGE);
+  const from = filtered.length === 0 ? 0 : clampedPage * ROWS_PER_PAGE + 1;
+  const to = clampedPage * ROWS_PER_PAGE + pageRows.length;
+
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   return (
-    <Card title={t('card3.title')} headerRight={<LensChip label={t('allYears')} />}>
-      {rows.length === 0 ? (
-        <EmptyState message={t('card3.empty')} />
+    <Card title={title} headerRight={headerRight} height={ROW2_HEIGHT} bodyClassName="flex flex-col" footer={footer}>
+      {view.groups.length === 0 ? (
+        <EmptyState message={emptyMessage} />
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <div className="grid min-w-max items-center gap-[6px]" style={{ gridTemplateColumns: cols }}>
-              <span />
-              {view.years.map((y) => (
-                <span key={y} className="text-center text-[10px] text-[#A79E94]">{yearName(y)}</span>
-              ))}
-              {rows.map((row, ri) => {
-                const taughtYears = view.years.filter((y) => row.byYear[y] !== undefined);
-                return (
-                  <SpiralRow key={`${row.topic}-${ri}`} row={row} years={view.years} taughtYears={taughtYears} />
-                );
-              })}
+          {isTheme ? (
+            <div className="relative mb-[10px] shrink-0">
+              <SearchIcon />
+              <input
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value);
+                  setPage(0);
+                }}
+                dir="auto"
+                placeholder={t('matrix.filterPlaceholder')}
+                aria-label={t('matrix.filterPlaceholder')}
+                className="w-full rounded-[8px] border border-border bg-surface py-[7px] pe-[10px] ps-[30px] text-[12px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
+              />
             </div>
+          ) : null}
+
+          <div className="min-h-0 flex-1 overflow-auto">
+            {isTheme && filtered.length === 0 ? (
+              <p className="pt-[24px] text-center text-[12.5px] text-text-muted">{t('matrix.noMatches')}</p>
+            ) : (
+              <div className="grid min-w-max items-center gap-[5px] pe-[2px]" style={{ gridTemplateColumns: cols }}>
+                <span />
+                {view.years.map((y) => (
+                  <span key={y} className="text-center text-[10px] text-[#A79E94]">{yearName(y)}</span>
+                ))}
+                {isTheme
+                  ? pageRows.map((row, ri) => (
+                      <MatrixRowCells key={`${row.topic}-${ri}`} row={row} years={view.years} renderCell={renderCell} />
+                    ))
+                  : view.groups.map((g, gi) => {
+                      const key = g.faLabel ?? `g-${gi}`;
+                      const open = !collapsed.has(key);
+                      return (
+                        <Fragment key={key}>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(key)}
+                            aria-expanded={open}
+                            className="flex items-center gap-[7px] py-[5px] text-start"
+                            style={{ gridColumn: '1 / -1' }}
+                          >
+                            <GroupChevron open={open} />
+                            <span dir="auto" className="text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#9A7B5C]">
+                              {g.faLabel ?? t('card2.titleFocus')}
+                            </span>
+                            <span className="text-[10px] text-[#A79E94]">
+                              {t('matrix.topicsCount', { count: g.rows.length })}
+                            </span>
+                          </button>
+                          {open
+                            ? g.rows.map((row, ri) => (
+                                <MatrixRowCells key={`${row.topic}-${ri}`} row={row} years={view.years} renderCell={renderCell} />
+                              ))
+                            : null}
+                        </Fragment>
+                      );
+                    })}
+              </div>
+            )}
           </div>
-          <div className="mt-[16px] flex flex-wrap gap-[16px]">
-            <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
-              <span className="inline-flex">
-                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-1)' }} />
-                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-3)' }} />
-                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-6)' }} />
+
+          {isTheme && filtered.length > 0 ? (
+            <div className="mt-[10px] flex shrink-0 items-center justify-between gap-[10px] border-t border-[#F0EAE1] pt-[10px]">
+              <span className="text-[11px] tabular-nums text-[#8A8178]">
+                {t('matrix.pageRange', {
+                  from: formatNumber(from, locale),
+                  to: formatNumber(to, locale),
+                  total: formatNumber(filtered.length, locale),
+                })}
               </span>
-              {t('card3.taughtDeepening')}
-            </span>
-            <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
-              <span className="size-[10px] rounded-[2px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
-              {t('card3.notTaught')}
-            </span>
-          </div>
+              <span className="flex items-center gap-[6px]">
+                <PagerButton label={t('matrix.prevPage')} disabled={clampedPage <= 0} onClick={() => setPage(clampedPage - 1)} dir="prev" />
+                <span className="text-[11px] tabular-nums text-[#8A8178]">
+                  {formatNumber(clampedPage + 1, locale)} / {formatNumber(totalPages, locale)}
+                </span>
+                <PagerButton label={t('matrix.nextPage')} disabled={clampedPage >= totalPages - 1} onClick={() => setPage(clampedPage + 1)} dir="next" />
+              </span>
+            </div>
+          ) : null}
         </>
       )}
     </Card>
   );
 }
 
-function SpiralRow({ row, years, taughtYears }: { row: MatrixRow; years: number[]; taughtYears: number[] }) {
+/** One topic row as bare grid items (label + a cell per year). `display:contents` lets the
+ *  label and cells participate directly in the parent matrix grid. */
+function MatrixRowCells({
+  row,
+  years,
+  renderCell,
+}: {
+  row: MatrixRow;
+  years: number[];
+  renderCell: (row: MatrixRow, year: number, taughtYears: number[]) => React.ReactNode;
+}) {
+  const taughtYears = years.filter((y) => row.byYear[y] !== undefined);
   return (
-    <>
-      <span dir="auto" className="truncate text-[12px] text-[#3A332E] [overflow-wrap:anywhere]">{row.topic}</span>
-      {years.map((y) => {
-        const taught = row.byYear[y] !== undefined;
-        if (!taught) {
-          return (
-            <span key={y} className="h-[20px] rounded-[5px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
-          );
-        }
-        const occ = taughtYears.indexOf(y);
-        return <span key={y} className="h-[20px] rounded-[5px]" style={{ background: deepeningColor(occ, taughtYears.length) }} />;
-      })}
-    </>
+    <div className="contents">
+      <span dir="auto" className="truncate text-[11.5px] text-[#3A332E] [overflow-wrap:anywhere]">{row.topic}</span>
+      {years.map((y) => renderCell(row, y, taughtYears))}
+    </div>
+  );
+}
+
+// ── 3) Spiralling across years ──────────────────────────────────────────────────────
+
+function SpiralCard({ topics, yearName }: { topics: TopicsData; yearName: (y: number) => string }) {
+  const t = useTranslations('insights');
+  const view = useMemo(() => topicMatrix(topics), [topics]);
+
+  const renderCell = (row: MatrixRow, y: number, taughtYears: number[]) => {
+    const taught = row.byYear[y] !== undefined;
+    if (!taught) {
+      return (
+        <span key={y} className="h-[20px] rounded-[5px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
+      );
+    }
+    const occ = taughtYears.indexOf(y);
+    return <span key={y} className="h-[20px] rounded-[5px]" style={{ background: deepeningColor(occ, taughtYears.length) }} />;
+  };
+
+  return (
+    <MatrixScaffold
+      title={t('card3.title')}
+      headerRight={<LensChip label={t('allYears')} />}
+      view={view}
+      yearName={yearName}
+      labelWidth={172}
+      emptyMessage={t('card3.empty')}
+      renderCell={renderCell}
+      footer={
+        <div className="flex flex-wrap gap-[16px]">
+          <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
+            <span className="inline-flex">
+              <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-1)' }} />
+              <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-3)' }} />
+              <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-6)' }} />
+            </span>
+            {t('card3.taughtDeepening')}
+          </span>
+          <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
+            <span className="size-[10px] rounded-[2px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
+            {t('card3.notTaught')}
+          </span>
+        </div>
+      }
+    />
   );
 }
 
@@ -398,7 +594,32 @@ function CoverageCard({
   const locale = useLocale();
   const view = useMemo(() => topicMatrix(topics), [topics]);
   const notes = useMemo(() => gapNotes(view), [view]);
-  const cols = `150px repeat(${view.years.length}, 1fr)`;
+  const gapAria = t('card4.gapAria');
+
+  const renderCell = (row: MatrixRow, y: number) => {
+    const hours = row.byYear[y];
+    if (hours !== undefined) {
+      const rMax = rowMax(row, view.years);
+      return (
+        <span
+          key={y}
+          className="flex h-[26px] items-center justify-center rounded-[5px] text-[11px] font-semibold tabular-nums"
+          style={{ background: hours >= rMax ? 'var(--color-coverage-hi)' : 'var(--color-coverage-lo)', color: 'var(--color-coverage-text)' }}
+        >
+          {formatNumber(hours, locale)}
+        </span>
+      );
+    }
+    const gaps = interiorGapYears(row, view.years);
+    if (gaps.has(y)) {
+      return (
+        <span key={y} className="flex h-[26px] items-center justify-center rounded-[5px] border-[1.5px] border-gap bg-gap-bg text-gap" aria-label={gapAria}>
+          <CrossIcon />
+        </span>
+      );
+    }
+    return <span key={y} className="h-[26px] rounded-[5px]" style={{ background: 'var(--color-cell-blank)' }} />;
+  };
 
   const gapText = (gapYears: number[]) =>
     gapYears.length === 1
@@ -407,7 +628,7 @@ function CoverageCard({
   const primary = notes[0];
 
   return (
-    <Card
+    <MatrixScaffold
       title={t('card4.title')}
       headerRight={
         <span className="flex items-center gap-[8px]">
@@ -417,91 +638,51 @@ function CoverageCard({
           ) : null}
         </span>
       }
-    >
-      {view.groups.length === 0 ? (
-        <EmptyState message={t('card4.empty')} />
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <div className="grid min-w-max items-center gap-[5px]" style={{ gridTemplateColumns: cols }}>
-              <span />
-              {view.years.map((y) => (
-                <span key={y} className="text-center text-[10px] text-[#A79E94]">{yearName(y)}</span>
-              ))}
-              {view.groups.map((g, gi) => (
-                <CoverageGroup key={`${g.faLabel ?? 'g'}-${gi}`} group={g} years={view.years} gapAria={t('card4.gapAria')} />
-              ))}
-            </div>
+      view={view}
+      yearName={yearName}
+      labelWidth={150}
+      emptyMessage={t('card4.empty')}
+      renderCell={renderCell}
+      footer={
+        primary ? (
+          <div className="flex items-center gap-[8px] rounded-[9px] border border-gap-border bg-gap-bg px-[12px] py-[9px]">
+            <WarningIcon />
+            <span dir="auto" className="flex-1 text-[12.5px] text-[#7A4436] [overflow-wrap:anywhere]">
+              {t.rich('card4.gapNarrative', {
+                topic: primary.topic,
+                gap: gapText(primary.gapYears),
+                reappear: yearName(primary.reappear),
+                b: (chunks) => <b className="font-semibold">{chunks}</b>,
+              })}
+            </span>
+            <Link href={explorerHref} className="whitespace-nowrap text-[12px] font-semibold text-gap" aria-label={t('openInExplorer')}>
+              {t('openInExplorer')}
+              <span aria-hidden> →</span>
+            </Link>
           </div>
-
-          {primary ? (
-            <div className="mt-[14px] flex items-center gap-[8px] rounded-[9px] border border-gap-border bg-gap-bg px-[12px] py-[9px]">
-              <WarningIcon />
-              <span dir="auto" className="flex-1 text-[12.5px] text-[#7A4436] [overflow-wrap:anywhere]">
-                {t.rich('card4.gapNarrative', {
-                  topic: primary.topic,
-                  gap: gapText(primary.gapYears),
-                  reappear: yearName(primary.reappear),
-                  b: (chunks) => <b className="font-semibold">{chunks}</b>,
-                })}
-              </span>
-              <Link href={explorerHref} className="whitespace-nowrap text-[12px] font-semibold text-gap" aria-label={t('openInExplorer')}>
-                {t('openInExplorer')}
-                <span aria-hidden> →</span>
-              </Link>
-            </div>
-          ) : null}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function CoverageGroup({ group, years, gapAria }: { group: MatrixView['groups'][number]; years: number[]; gapAria: string }) {
-  const locale = useLocale();
-  return (
-    <>
-      {group.faLabel ? (
-        <span dir="auto" className="pt-[4px] text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#9A7B5C]" style={{ gridColumn: '1 / -1' }}>
-          {group.faLabel}
-        </span>
-      ) : null}
-      {group.rows.map((row, ri) => {
-        const gaps = interiorGapYears(row, years);
-        const rMax = rowMax(row, years);
-        return (
-          <div key={`${row.topic}-${ri}`} className="contents">
-            <span dir="auto" className="truncate text-[11.5px] text-[#3A332E] [overflow-wrap:anywhere]">{row.topic}</span>
-            {years.map((y) => {
-              const hours = row.byYear[y];
-              if (hours !== undefined) {
-                return (
-                  <span
-                    key={y}
-                    className="flex h-[26px] items-center justify-center rounded-[5px] text-[11px] font-semibold tabular-nums"
-                    style={{ background: hours >= rMax ? 'var(--color-coverage-hi)' : 'var(--color-coverage-lo)', color: 'var(--color-coverage-text)' }}
-                  >
-                    {formatNumber(hours, locale)}
-                  </span>
-                );
-              }
-              if (gaps.has(y)) {
-                return (
-                  <span key={y} className="flex h-[26px] items-center justify-center rounded-[5px] border-[1.5px] border-gap bg-gap-bg text-gap" aria-label={gapAria}>
-                    <CrossIcon />
-                  </span>
-                );
-              }
-              return <span key={y} className="h-[26px] rounded-[5px]" style={{ background: 'var(--color-cell-blank)' }} />;
-            })}
-          </div>
-        );
-      })}
-    </>
+        ) : undefined
+      }
+    />
   );
 }
 
 // ── Small primitives ─────────────────────────────────────────────────────────────────
+
+function PagerButton({ label, disabled, onClick, dir }: { label: string; disabled: boolean; onClick: () => void; dir: 'prev' | 'next' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="inline-flex size-[26px] items-center justify-center rounded-[7px] border border-border bg-surface text-[#5C544E] transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="rtl:-scale-x-100">
+        {dir === 'prev' ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+      </svg>
+    </button>
+  );
+}
 
 function PillSelect({
   ariaLabel,
@@ -541,6 +722,45 @@ function Chevron({ className }: { className?: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
       <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function GroupChevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={open ? '#9A7B5C' : '#B4AA9E'}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={cn('shrink-0', !open && 'rtl:-scale-x-100')}
+    >
+      {open ? <path d="M6 9l6 6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#B6ABA0"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="pointer-events-none absolute start-[10px] top-1/2 -translate-y-1/2"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" />
     </svg>
   );
 }

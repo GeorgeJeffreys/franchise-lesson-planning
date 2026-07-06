@@ -3,7 +3,11 @@ import { getTranslations } from 'next-intl/server';
 import { AppShell } from '@/components/app-shell/AppShell';
 import { CurriculumInsights } from '@/components/curriculum/CurriculumInsights';
 import { getExplorerShell } from '@/lib/curriculum-browse';
-import { getInsightsAggregates, getTopicsData } from '@/lib/curriculum/composition';
+import {
+  getHoursByLinguisticSkill,
+  getInsightsAggregates,
+  getTopicsData,
+} from '@/lib/curriculum/composition';
 import { getConsoleAccess } from '@/lib/console';
 import { getHeaderProfile } from '@/lib/profile';
 
@@ -57,10 +61,14 @@ export default async function CurriculumInsightsPage({
   }
 
   // Chart 1 ← hoursPerMonth (calendar count); charts 2/3/4 ← focus_area/theme (live).
-  // Both are DB-side GROUP BY aggregates (0050/0051 RPCs), never a capped bulk read.
-  const [aggregates, topics] = await Promise.all([
+  // `linguisticSkills` backs the ENGLISH fallback of card 2 (no focus_area, ~178 themes →
+  // group by the ~5 linguistic skills instead); it fails safe to [] for subjects/DBs where
+  // the 0055 aggregate has no data. All are DB-side GROUP BY aggregates (0050/0051/0055
+  // RPCs), never a capped bulk read.
+  const [aggregates, topics, linguisticSkills] = await Promise.all([
     getInsightsAggregates(shell.subjectCode),
     getTopicsData(shell.subjectCode),
+    getHoursByLinguisticSkill(shell.subjectCode),
   ]);
 
   return (
@@ -73,6 +81,7 @@ export default async function CurriculumInsightsPage({
         year={shell.year}
         hoursPerMonth={aggregates.hoursPerMonth}
         topics={topics}
+        linguisticSkills={linguisticSkills}
       />
     </AppShell>
   );
