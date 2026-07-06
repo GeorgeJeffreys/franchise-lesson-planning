@@ -1,5 +1,8 @@
 {
   "review": {
+    "readonly": {
+      "editPlan": "تعديل الخطة"
+    },
     "comments": {
       "title": "تعليقات المنسّق",
       "draftTitle": "مراجعة المنسّق",

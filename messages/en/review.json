@@ -1,5 +1,8 @@
 {
   "review": {
+    "readonly": {
+      "editPlan": "Edit plan"
+    },
     "comments": {
       "title": "Coordinator comments",
       "draftTitle": "Coordinator review",
