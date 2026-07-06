@@ -40,8 +40,8 @@
     "addLesson": "Add lesson",
     "add": {
       "chooseYear": "Choose a year group",
-      "chooseLesson": "Choose a subject and year",
-      "noLesson": "No lesson",
+      "choose": "Choose a class",
+      "noCurriculum": "No curriculum for this slot",
       "opening": "Opening…"
     },
     "downloadWeek": "Download week",
