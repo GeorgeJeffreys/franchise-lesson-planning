@@ -1,4 +1,4 @@
--- 0048_curriculum_outcome_columns.sql
+-- 0049_curriculum_outcome_columns.sql
 --
 -- Adds the two OUTCOME-LEVEL columns the curriculum surfaces need at the top of the
 -- Logic-tree spine (Subject → Yearly → S.K group → hours) and as an Insights axis:
@@ -32,7 +32,7 @@
 --   It is regenerated exactly as 0024 was — by running the SAME importer
 --   (src/lib/curriculum/parse.ts → parseCurriculumWorkbook) over the workbook and
 --   emitting UPDATEs keyed by the stable lesson_key / (subject_code, year) — and
---   committed as a follow-up numbered migration (0049_backfill_*). For the other
+--   committed as a follow-up numbered migration (0051_backfill_*). For the other
 --   seven subjects the values populate when their workbook is (re)imported through
 --   the normal ingest path, which will set these columns going forward.
 --

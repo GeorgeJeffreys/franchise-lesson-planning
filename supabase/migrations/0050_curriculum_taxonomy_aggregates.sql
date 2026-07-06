@@ -1,4 +1,4 @@
--- 0049_curriculum_taxonomy_aggregates.sql
+-- 0050_curriculum_taxonomy_aggregates.sql
 --
 -- The SQL foundation both read-only curriculum surfaces (the Logic-tree Explorer and
 -- the coordinator Insights page) sit on. Two parts:
@@ -28,7 +28,7 @@
 -- every user). Grants mirror curriculum_active_subjects (0047).
 --
 -- PROVENANCE / HOW TO APPLY: applied by hand in the Supabase SQL editor like
--- 0010/0015/0024/0044/0047/0048; committed idempotently (CREATE OR REPLACE) so the
+-- 0010/0015/0024/0044/0047/0049; committed idempotently (CREATE OR REPLACE) so the
 -- schema stays the locked source of truth and `supabase db reset` reproduces it. The
 -- agent never executes SQL. Re-running is safe.
 

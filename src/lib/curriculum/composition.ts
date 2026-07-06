@@ -14,7 +14,7 @@ import 'server-only';
 // empty-but-valid tree / empty aggregates rather than throwing, so per-subject
 // verification VALIDATES this layer rather than reshapes it. Placeholder rows
 // ("E.*"/"L.*") are excluded from the tree; the flat `*.S0.K0.*` artefact is discounted
-// from the spiral (in the SQL, migration 0049).
+// from the spiral (in the SQL, migration 0050).
 //
 // SCOPING & THE 1000-ROW CAP.
 //   * `getCompositionTree(subject, year)` is scoped to ONE (subject, year) — at most a
@@ -22,7 +22,7 @@ import 'server-only';
 //     (identical to curriculumUtils' scoped reads).
 //   * `getInsightsAggregates(subject)` spans a WHOLE subject (English ~1190 rows > the
 //     PostgREST 1000 cap), so it NEVER slices a bulk read: it calls the aggregate RPCs
-//     from 0049, which GROUP BY in the DB and return small result sets.
+//     from 0050, which GROUP BY in the DB and return small result sets.
 //
 // Reads use the service-role client because curriculum is global reference data,
 // identical for every authenticated user (see @/lib/supabase/admin), matching
@@ -67,14 +67,14 @@ export interface CompositionGroup {
 /** One year of a subject — the Yearly node. */
 export interface CompositionYear {
   year: number;
-  yearlyOutcome: string | null; // annual_learning_outcome (0048)
+  yearlyOutcome: string | null; // annual_learning_outcome (0049)
   groups: CompositionGroup[];
 }
 
 /** The full tree for a subject (one year when `year` is passed). */
 export interface CompositionTree {
   subject: string;
-  subjectOutcome: string | null; // subject_learning_outcome (0048)
+  subjectOutcome: string | null; // subject_learning_outcome (0049)
   years: CompositionYear[];
 }
 
@@ -247,7 +247,7 @@ export interface CoverageCell {
 
 /**
  * One spiral cell — an S.K topic's presence (hour count) in a year. Flat `S0.K0`
- * artefacts are already discounted (0049). v1 has NO depth proxy: no source column
+ * artefacts are already discounted (0050). v1 has NO depth proxy: no source column
  * expresses increasing complexity across years, so this is presence/recurrence only.
  */
 export interface SpiralCell {
@@ -275,7 +275,7 @@ function topicKey(skillLo: string | null, knowledgeLo: string | null): string {
 
 /**
  * The Insights aggregates for a subject (optionally narrowing `hoursByFocusTopic` to
- * one year). All computation is DB-side (0049 RPCs) so nothing is truncated by the
+ * one year). All computation is DB-side (0050 RPCs) so nothing is truncated by the
  * PostgREST 1000-row cap. Returns empty arrays for a subject with no taxonomy'd rows.
  */
 export async function getInsightsAggregates(
