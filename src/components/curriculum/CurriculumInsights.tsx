@@ -1,23 +1,18 @@
 'use client';
 
-// The coordinator/admin Curriculum → Insights page: four read-only analytics over one
-// subject's scheme of work. It mirrors the Explorer's design language (cards, teal ramp,
-// pill selectors, logical-property RTL) rather than the taxonomy-shaped mock, because the
-// verified per-subject data reality differs from it:
+// Curriculum → Insights (coordinator/admin, read-only). A faithful port of the Alsama
+// "Curriculum health" Claude Design: a title row (subject picker) over a 2×2 grid of
+// analytics cards — Hours per month · Hours per focus area · Spiralling across years ·
+// Coverage & gaps.
 //
-//   1. Hours per month     ← `hoursPerMonth` (calendar count; live for every subject).
-//   2. Hours by focus area ← focus_area/theme (`TopicsData`); english falls back to a
-//      "by theme" breakdown with a relabelled card. Live today.
-//   3. Spiralling          ← focus_area/theme presence per year; taught vs not-taught
-//      ONLY (no depth gradient — no depth signal exists).
-//   4. Coverage & gaps     ← focus_area/theme hour counts per year; a red cross marks a
-//      zero-teaching year, and the narrative callout is generated from the ACTUAL
-//      present→absent→present pattern.
-//
-// Each card owns its own empty state, so a subject that genuinely lacks an analytic's
-// data shows "not available yet" instead of a misleading full-looking chart. Nothing here
-// is hardcoded to look populated; the taxonomy S0/K0 flat artefact never reaches this
-// layer (TopicsData is focus_area/theme, already de-artefacted in #99).
+// The DESIGN is ported verbatim (spacing, the teal magnitude ramp, the clay/red gap
+// tones, the deepening spiral, the coverage matrix with red gap-crosses and the callout).
+// The DATA is real, not the mock's Maths-shaped constants: chart 1 ← hoursPerMonth
+// (calendar count), charts 2–4 ← focus_area/theme (`TopicsData`, #99's cleaned logic —
+// the live per-subject signal; english falls back to a relabelled "by theme" view). Each
+// card owns an empty-state so a subject lacking an analytic's data shows "not available
+// yet" instead of a misleading full-looking chart. The spiral's deepening is POSITIONAL
+// (Nth recurrence), never a fabricated complexity signal.
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -32,19 +27,28 @@ import {
   hoursByFocusArea,
   topicMatrix,
   gapNotes,
-  tealStop,
+  deepeningColor,
+  interiorGapYears,
+  rowMax,
+  monthInitial,
   LOW_MONTH_MEDIAN_FRACTION,
   type MatrixView,
+  type MatrixRow,
 } from '@/lib/curriculum/insights';
 
-/** The single "taught" tone for the spiral matrix — one flat teal, NOT a magnitude ramp
- *  (there is no depth signal to encode). */
-const TAUGHT_TONE = 'var(--color-chart-teal-4)';
+/** Topic-segment palette for the focus-area bars (biggest topic → deepest). */
+const SEGMENT_STOPS = [
+  'var(--color-chart-teal-6)',
+  'var(--color-chart-teal-2)',
+  'var(--color-chart-teal-3)',
+  'var(--color-chart-teal-4)',
+  'var(--color-chart-teal-5)',
+  'var(--color-chart-teal-1)',
+];
 
 export function CurriculumInsights({
   subjects,
   subjectCode,
-  subjectName,
   years,
   year,
   hoursPerMonth,
@@ -52,75 +56,13 @@ export function CurriculumInsights({
 }: {
   subjects: SubjectOption[];
   subjectCode: string;
-  subjectName: string;
+  /** Passed by the page for API symmetry with the Explorer surfaces; the design shows the
+   *  subject in the picker + app chrome, so it isn't rendered separately here. */
+  subjectName?: string;
   years: number[];
   year: number;
   hoursPerMonth: HoursPerMonth[];
   topics: TopicsData;
-}) {
-  const t = useTranslations('insights');
-
-  const explorerHref = (tab: 'calendar' | 'topics') => {
-    const sp = new URLSearchParams({ tab, subject: subjectCode, year: String(year) });
-    return `/curriculum?${sp.toString()}`;
-  };
-
-  return (
-    <div className="mx-auto max-w-[1160px]">
-      <div className="mb-[18px] flex flex-wrap items-start justify-between gap-[12px]">
-        <div>
-          <div className="flex items-center gap-[10px]">
-            <h1 className="text-[22px] font-semibold text-ink">{t('title')}</h1>
-            <span className="rounded-full border border-border-strong bg-surface-subtle px-[9px] py-[3px] text-[11px] font-semibold uppercase tracking-[0.04em] text-neutral-600">
-              {t('readOnly')}
-            </span>
-          </div>
-          <p dir="auto" className="mt-[4px] text-[13.5px] text-text-muted">
-            {t('subtitle', { subject: subjectName })}
-          </p>
-        </div>
-        <Link
-          href="/curriculum"
-          className="inline-flex items-center gap-[6px] rounded-[10px] border border-border-strong bg-surface px-[13px] py-[9px] text-[13px] font-medium text-neutral-800 transition-colors hover:bg-surface-subtle"
-        >
-          <ArrowIcon className="rtl:-scale-x-100" flip />
-          {t('backToExplorer')}
-        </Link>
-      </div>
-
-      <Selector
-        subjects={subjects}
-        subjectCode={subjectCode}
-        years={years}
-        year={year}
-      />
-
-      <div className="mt-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-2">
-        <HoursPerMonthCard hoursPerMonth={hoursPerMonth} year={year} openHref={explorerHref('calendar')} />
-        <FocusAreaCard topics={topics} openHref={explorerHref('topics')} />
-        <div className="lg:col-span-2">
-          <SpiralCard topics={topics} year={year} openHref={explorerHref('topics')} />
-        </div>
-        <div className="lg:col-span-2">
-          <CoverageCard topics={topics} year={year} openHref={explorerHref('topics')} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Selector: subject dropdown + year lens ──────────────────────────────────────────
-
-function Selector({
-  subjects,
-  subjectCode,
-  years,
-  year,
-}: {
-  subjects: SubjectOption[];
-  subjectCode: string;
-  years: number[];
-  year: number;
 }) {
   const t = useTranslations('insights');
   const locale = useLocale();
@@ -133,104 +75,112 @@ function Selector({
     });
     router.push(`/curriculum/insights?${sp.toString()}`);
   };
+  const yearName = (y: number) => (y === 0 ? t('prep') : t('yearShort', { n: formatNumber(y, locale) }));
+  const explorerHref = `/curriculum?${new URLSearchParams({ tab: 'topics', subject: subjectCode, year: String(year) }).toString()}`;
 
   return (
-    <div className="flex flex-wrap items-center gap-[12px] rounded-[16px] border border-border bg-surface px-[18px] py-[14px] shadow-card">
-      <label className="relative inline-flex">
-        <span className="sr-only">{t('subjectLabel')}</span>
-        <select
+    <div className="mx-auto max-w-[1240px] overflow-hidden rounded-[18px] border border-border bg-surface shadow-card">
+      {/* Title row: "Curriculum health" · subject picker (the year lens lives on card 1). */}
+      <div className="flex flex-wrap items-center gap-[12px] px-[24px] pb-[6px] pt-[16px]">
+        <h1 className="m-0 text-[21px] font-semibold tracking-[-0.01em] text-ink">{t('title')}</h1>
+        <span className="mx-[4px] h-[20px] w-px bg-[#E0D6C7]" aria-hidden />
+        <PillSelect
+          ariaLabel={t('subjectLabel')}
           value={subjectCode}
-          onChange={(e) => go({ subject: e.target.value })}
-          className="appearance-none rounded-[10px] border border-border-strong bg-surface py-[9px] pe-[34px] ps-[13px] text-[14px] font-medium text-ink transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
-        >
-          {subjects.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute end-[12px] top-1/2 -translate-y-1/2 text-[#A79E94]" />
-      </label>
+          onChange={(v) => go({ subject: v })}
+          options={subjects.map((s) => ({ value: s.code, label: s.name }))}
+          variant="subject"
+        />
+      </div>
 
-      {years.length > 0 ? (
-        <div className="ms-auto flex flex-wrap items-center gap-[6px]">
-          <span className="me-[2px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#A79E94]">
-            {t('yearLabel')}
-          </span>
-          {years.map((y) => {
-            const active = y === year;
-            return (
-              <button
-                key={y}
-                type="button"
-                onClick={() => go({ year: y })}
-                aria-pressed={active}
-                className={cn(
-                  'rounded-full px-[12px] py-[5px] text-[12.5px] font-semibold transition-colors',
-                  active
-                    ? 'bg-teal text-white'
-                    : 'border border-border-strong bg-surface text-neutral-700 hover:bg-surface-subtle',
-                )}
-              >
-                {t('year', { n: formatNumber(y, locale) })}
-              </button>
-            );
-          })}
+      <div className="bg-[#FBFAF6] px-[24px] pb-[24px] pt-[14px]">
+        <div className="grid grid-cols-1 gap-[16px] lg:grid-cols-2">
+          <HoursPerMonthCard
+            hoursPerMonth={hoursPerMonth}
+            year={year}
+            years={years}
+            yearName={yearName}
+            onYear={(y) => go({ year: y })}
+          />
+          <FocusAreaCard topics={topics} />
+          <SpiralCard topics={topics} yearName={yearName} />
+          <CoverageCard topics={topics} yearName={yearName} explorerHref={explorerHref} />
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
 
-// ── Card shell ───────────────────────────────────────────────────────────────────────
+// ── Shared chrome ────────────────────────────────────────────────────────────────────
 
 function Card({
   title,
-  subtitle,
-  note,
-  openHref,
+  headerRight,
   children,
 }: {
   title: string;
-  subtitle?: string;
-  note?: string;
-  openHref?: string;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const t = useTranslations('insights');
   return (
-    <section className="flex h-full flex-col rounded-[18px] border border-border bg-surface p-[20px] shadow-card">
-      <div className="mb-[14px] flex items-start justify-between gap-[12px]">
-        <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
-          {subtitle ? <p dir="auto" className="mt-[3px] text-[12.5px] text-text-muted">{subtitle}</p> : null}
-          {note ? (
-            <p dir="auto" className="mt-[6px] inline-block rounded-[7px] bg-surface-cream px-[8px] py-[3px] text-[11.5px] text-[#8A6D57]">
-              {note}
-            </p>
-          ) : null}
-        </div>
-        {openHref ? (
-          <Link
-            href={openHref}
-            className="inline-flex shrink-0 items-center gap-[5px] text-[12.5px] font-medium text-teal transition-colors hover:text-teal-deep"
-          >
-            {t('openInExplorer')}
-            <ArrowIcon className="rtl:-scale-x-100" />
-          </Link>
-        ) : null}
+    <section className="rounded-[15px] border border-[#ECE3D5] bg-surface p-[18px]">
+      <div className="mb-[16px] flex items-center justify-between gap-[10px]">
+        <span className="text-[14px] font-semibold text-ink">{title}</span>
+        {headerRight}
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      {children}
     </section>
+  );
+}
+
+/** The small "All years" / "Prep ▾" chip in a card header. `onSelect` makes it a real
+ *  year picker (card 1); without it, it's a static "All years" label (cards 2–4). */
+function LensChip({
+  label,
+  years,
+  value,
+  yearName,
+  onSelect,
+}: {
+  label: string;
+  years?: number[];
+  value?: number;
+  yearName?: (y: number) => string;
+  onSelect?: (y: number) => void;
+}) {
+  if (onSelect && years && value !== undefined && yearName) {
+    return (
+      <span className="relative inline-flex">
+        <select
+          aria-label={label}
+          value={String(value)}
+          onChange={(e) => onSelect(Number(e.target.value))}
+          className="cursor-pointer appearance-none rounded-[8px] bg-[#F1EBE1] py-[4px] pe-[26px] ps-[10px] text-[12px] font-medium text-[#5C544E] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {yearName(y)}
+            </option>
+          ))}
+        </select>
+        <Chevron className="pointer-events-none absolute end-[9px] top-1/2 -translate-y-1/2" />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-[6px] rounded-[8px] bg-[#F1EBE1] px-[10px] py-[4px] text-[12px] font-medium text-[#5C544E]">
+      {label}
+      <Chevron />
+    </span>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   const t = useTranslations('insights');
   return (
-    <div className="flex h-full min-h-[140px] flex-col items-center justify-center rounded-[12px] border border-dashed border-border-strong bg-surface-subtle px-[18px] py-[28px] text-center">
+    <div className="flex min-h-[150px] flex-col items-center justify-center rounded-[10px] border border-dashed border-[#E0D6C7] bg-[#FBFAF6] px-[16px] py-[26px] text-center">
       <p dir="auto" className="text-[13px] text-text-muted">{message}</p>
-      <p className="mt-[6px] text-[11.5px] text-text-faint">{t('fillsInNote')}</p>
+      <p className="mt-[6px] text-[11px] text-text-faint">{t('fillsInNote')}</p>
     </div>
   );
 }
@@ -240,131 +190,122 @@ function EmptyState({ message }: { message: string }) {
 function HoursPerMonthCard({
   hoursPerMonth,
   year,
-  openHref,
+  years,
+  yearName,
+  onYear,
 }: {
   hoursPerMonth: HoursPerMonth[];
   year: number;
-  openHref: string;
+  years: number[];
+  yearName: (y: number) => string;
+  onYear: (y: number) => void;
 }) {
   const t = useTranslations('insights');
   const locale = useLocale();
   const view = useMemo(() => hoursPerMonthForYear(hoursPerMonth, year), [hoursPerMonth, year]);
-  const monthFmt = useMemo(
-    () => new Intl.DateTimeFormat(locale, { month: 'short', calendar: 'gregory', numberingSystem: 'latn' }),
-    [locale],
-  );
-  const monthLabel = (name: string) => {
-    const idx = MONTHS.indexOf(name);
-    return idx === -1 ? name : monthFmt.format(new Date(Date.UTC(2001, idx, 1)));
-  };
+  const max = view.maxHours;
 
-  const hasLow = view.bars.some((b) => b.low);
+  const barColor = (low: boolean, hours: number) => {
+    if (low) return 'var(--color-flag-bar)';
+    if (hours >= max) return 'var(--color-chart-teal-6)';
+    if (max > 0 && hours / max >= 0.8) return 'var(--color-chart-teal-3)';
+    return 'var(--color-chart-teal-2)';
+  };
+  const labelColor = (low: boolean, hours: number) => {
+    if (low) return 'var(--color-gap)';
+    if (hours >= max) return 'var(--color-coverage-text)';
+    return '#A79E94';
+  };
 
   return (
     <Card
       title={t('card1.title')}
-      subtitle={t('card1.subtitle', { year: t('year', { n: formatNumber(year, locale) }) })}
-      openHref={openHref}
+      headerRight={<LensChip label={yearName(year)} years={years} value={year} yearName={yearName} onSelect={onYear} />}
     >
       {view.bars.length === 0 ? (
         <EmptyState message={t('card1.empty')} />
       ) : (
-        <div>
-          <div className="flex items-end gap-[10px] overflow-x-auto pb-[6px]" style={{ minHeight: 168 }}>
-            {view.bars.map((b) => {
-              const heightPct = view.maxHours > 0 ? Math.max(6, (b.hours / view.maxHours) * 100) : 6;
-              return (
-                <div key={b.month} className="flex min-w-[34px] flex-1 flex-col items-center gap-[6px]">
-                  <span className={cn('text-[11px] font-semibold', b.low ? 'text-gap' : 'text-neutral-700')}>
-                    {formatNumber(b.hours, locale)}
-                  </span>
-                  <div className="flex h-[120px] w-full items-end">
-                    <div
-                      className={cn('w-full rounded-t-[6px]', b.low && 'ring-1 ring-inset ring-gap')}
-                      style={{
-                        height: `${heightPct}%`,
-                        background: b.low ? 'var(--color-gap-bg)' : tealStop(b.hours, view.maxHours),
-                      }}
-                      title={b.low ? t('card1.flagNote', { pct: Math.round(LOW_MONTH_MEDIAN_FRACTION * 100), median: formatNumber(view.median, locale) }) : undefined}
-                    />
-                  </div>
-                  <span dir="auto" className="text-[10.5px] text-text-faint">{monthLabel(b.month)}</span>
-                </div>
-              );
-            })}
+        <>
+          <div className="grid items-end gap-[8px]" style={{ gridTemplateColumns: `repeat(${view.bars.length}, 1fr)`, height: 140 }}>
+            {view.bars.map((b) => (
+              <div key={b.month} className="flex h-full flex-col items-center justify-end gap-[6px]">
+                <span className="text-[10px]" style={{ color: labelColor(b.low, b.hours), fontWeight: b.low || b.hours >= max ? 600 : 400 }}>
+                  {formatNumber(b.hours, locale)}
+                </span>
+                <div
+                  className="w-full rounded-t-[5px]"
+                  style={{
+                    height: `${max > 0 ? Math.max(6, (b.hours / max) * 100) : 6}%`,
+                    background: barColor(b.low, b.hours),
+                    border: b.low ? '1px dashed var(--color-gap)' : undefined,
+                  }}
+                  title={b.low ? t('card1.flagNote', { pct: Math.round(LOW_MONTH_MEDIAN_FRACTION * 100), median: formatNumber(view.median, locale) }) : undefined}
+                />
+              </div>
+            ))}
           </div>
-          <div className="mt-[12px] flex flex-wrap items-center gap-x-[16px] gap-y-[6px] border-t border-border pt-[10px] text-[11.5px]">
-            <span className="text-text-muted">
-              {t('card1.medianCaption', { median: formatNumber(view.median, locale) })}
-            </span>
-            {hasLow ? (
-              <span className="inline-flex items-center gap-[6px] text-gap">
-                <span className="size-[9px] rounded-[3px] border border-gap-border bg-gap-bg" />
-                {t('card1.flagLabel')} · {t('card1.flagNote', { pct: Math.round(LOW_MONTH_MEDIAN_FRACTION * 100), median: formatNumber(view.median, locale) })}
+          <div className="mt-[7px] grid gap-[8px]" style={{ gridTemplateColumns: `repeat(${view.bars.length}, 1fr)` }}>
+            {view.bars.map((b) => (
+              <span key={b.month} dir="auto" className="text-center text-[9.5px] text-[#A79E94]">
+                {monthInitial(b.month)}
               </span>
-            ) : null}
+            ))}
           </div>
-        </div>
+        </>
       )}
     </Card>
   );
 }
 
-// ── 2) Hours by focus area / theme ──────────────────────────────────────────────────
+// ── 2) Hours per focus area / theme ─────────────────────────────────────────────────
 
-function FocusAreaCard({ topics, openHref }: { topics: TopicsData; openHref: string }) {
+function FocusAreaCard({ topics }: { topics: TopicsData }) {
   const t = useTranslations('insights');
   const locale = useLocale();
   const view = useMemo(() => hoursByFocusArea(topics), [topics]);
   const isTheme = view.groupedBy === 'theme';
-  const maxHours = view.bars[0]?.hours ?? 0;
 
   return (
     <Card
       title={isTheme ? t('card2.titleTheme') : t('card2.titleFocus')}
-      subtitle={isTheme ? t('card2.subtitleTheme') : t('card2.subtitleFocus')}
-      note={isTheme ? t('card2.themeNote') : undefined}
-      openHref={openHref}
+      headerRight={<LensChip label={t('allYears')} />}
     >
       {view.bars.length === 0 ? (
         <EmptyState message={t('card2.empty')} />
       ) : (
-        <div className="flex flex-col gap-[14px]">
+        <div className="flex flex-col gap-[15px]">
+          {isTheme ? (
+            <p dir="auto" className="-mt-[4px] text-[11px] text-text-faint">{t('card2.themeNote')}</p>
+          ) : null}
           {view.bars.map((b, i) => {
-            const widthPct = maxHours > 0 ? Math.max(3, (b.hours / maxHours) * 100) : 3;
-            const topicMax = b.topics[0]?.hours ?? 0;
+            const segs = b.topics.length > 0 ? b.topics : [{ topic: b.label ?? '', hours: b.hours }];
             return (
-              <div key={`${b.label ?? 'ungrouped'}-${i}`}>
+              <div key={`${b.label ?? 'x'}-${i}`}>
                 <div className="mb-[5px] flex items-baseline justify-between gap-[10px]">
-                  <span dir="auto" className="min-w-0 truncate text-[13px] font-medium text-ink">
-                    {b.label ?? t('card2.titleTheme')}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap text-[12px] tabular-nums text-text-muted">
-                    {t('hoursShort', { n: formatNumber(b.hours, locale) })} · {t('card2.ofTotal', { pct: formatNumber(Math.round(b.pct), locale) })}
+                  <span dir="auto" className="min-w-0 truncate text-[13px] font-medium text-[#3A332E]">{b.label ?? t('card2.titleTheme')}</span>
+                  <span className="shrink-0 whitespace-nowrap text-[12px] tabular-nums text-[#6C6259]">
+                    {t('hoursShort', { n: formatNumber(b.hours, locale) })} · {formatNumber(Math.round(b.pct), locale)}%
                   </span>
                 </div>
-                <div className="h-[12px] w-full overflow-hidden rounded-full" style={{ background: 'var(--color-chart-track)' }}>
-                  <div
-                    className="flex h-full overflow-hidden rounded-full"
-                    style={{ width: `${widthPct}%`, background: tealStop(b.hours, maxHours) }}
-                  >
-                    {/* Topic breakdown: proportional segments within the focus-area bar. */}
-                    {b.topics.map((tp, ti) => (
+                <div className="flex h-[12px] overflow-hidden rounded-full" style={{ background: 'var(--color-chart-track)' }}>
+                  <div className="flex h-full overflow-hidden" style={{ width: `${Math.max(3, b.pct)}%` }}>
+                    {segs.map((s, si) => (
                       <span
-                        key={`${tp.topic}-${ti}`}
-                        title={`${tp.topic} · ${t('hoursShort', { n: formatNumber(tp.hours, locale) })}`}
-                        className={cn('h-full', ti > 0 && 'border-s border-white/50')}
-                        style={{
-                          width: `${b.hours > 0 ? (tp.hours / b.hours) * 100 : 0}%`,
-                          background: tealStop(tp.hours, topicMax),
-                        }}
+                        key={`${s.topic}-${si}`}
+                        title={`${s.topic} · ${formatNumber(s.hours, locale)}`}
+                        style={{ width: `${b.hours > 0 ? (s.hours / b.hours) * 100 : 100}%`, background: SEGMENT_STOPS[si % SEGMENT_STOPS.length] }}
                       />
                     ))}
                   </div>
                 </div>
                 {b.topics.length > 0 ? (
-                  <div className="mt-[5px] text-[11px] text-text-faint">
-                    {t('card2.topicsCount', { count: b.topics.length })}
+                  <div className="mt-[8px] flex flex-wrap gap-x-[14px] gap-y-[4px]">
+                    {b.topics.map((s, si) => (
+                      <span key={`${s.topic}-${si}`} dir="auto" className="text-[11px] text-[#8A8178]">
+                        <span className="me-[5px] inline-block size-[7px] rounded-[2px] align-middle" style={{ background: SEGMENT_STOPS[si % SEGMENT_STOPS.length] }} />
+                        {s.topic} · {formatNumber(s.hours, locale)}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -376,230 +317,247 @@ function FocusAreaCard({ topics, openHref }: { topics: TopicsData; openHref: str
   );
 }
 
-// ── 3) Spiralling across years (taught vs not-taught) ───────────────────────────────
+// ── 3) Spiralling across years ──────────────────────────────────────────────────────
 
-function SpiralCard({ topics, year, openHref }: { topics: TopicsData; year: number; openHref: string }) {
+function SpiralCard({ topics, yearName }: { topics: TopicsData; yearName: (y: number) => string }) {
   const t = useTranslations('insights');
   const view = useMemo(() => topicMatrix(topics), [topics]);
+  const rows = useMemo(() => view.groups.flatMap((g) => g.rows), [view]);
+  const cols = `172px repeat(${view.years.length}, 1fr)`;
 
   return (
-    <Card title={t('card3.title')} subtitle={t('card3.subtitle')} openHref={openHref}>
-      {view.groups.length === 0 ? (
+    <Card title={t('card3.title')} headerRight={<LensChip label={t('allYears')} />}>
+      {rows.length === 0 ? (
         <EmptyState message={t('card3.empty')} />
       ) : (
-        <div>
-          <Matrix
-            view={view}
-            year={year}
-            renderCell={(hours) =>
-              hours !== undefined ? (
-                <span
-                  className="block size-full rounded-[5px]"
-                  style={{ background: TAUGHT_TONE }}
-                  aria-label={t('card3.taught')}
-                />
-              ) : (
-                <span
-                  className="block size-full rounded-[5px] border border-dashed border-border-strong"
-                  aria-label={t('card3.notTaught')}
-                />
-              )
-            }
-          />
-          <Legend
-            items={[
-              { swatch: <span className="size-[11px] rounded-[3px]" style={{ background: TAUGHT_TONE }} />, label: t('card3.taught') },
-              { swatch: <span className="size-[11px] rounded-[3px] border border-dashed border-border-strong" />, label: t('card3.notTaught') },
-            ]}
-          />
-        </div>
+        <>
+          <div className="overflow-x-auto">
+            <div className="grid min-w-max items-center gap-[6px]" style={{ gridTemplateColumns: cols }}>
+              <span />
+              {view.years.map((y) => (
+                <span key={y} className="text-center text-[10px] text-[#A79E94]">{yearName(y)}</span>
+              ))}
+              {rows.map((row, ri) => {
+                const taughtYears = view.years.filter((y) => row.byYear[y] !== undefined);
+                return (
+                  <SpiralRow key={`${row.topic}-${ri}`} row={row} years={view.years} taughtYears={taughtYears} />
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-[16px] flex flex-wrap gap-[16px]">
+            <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
+              <span className="inline-flex">
+                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-1)' }} />
+                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-3)' }} />
+                <span className="size-[9px] rounded-[2px]" style={{ background: 'var(--color-chart-teal-6)' }} />
+              </span>
+              {t('card3.taughtDeepening')}
+            </span>
+            <span className="inline-flex items-center gap-[6px] text-[11px] text-[#8A8178]">
+              <span className="size-[10px] rounded-[2px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
+              {t('card3.notTaught')}
+            </span>
+          </div>
+        </>
       )}
     </Card>
   );
 }
 
-// ── 4) Coverage & gaps (hour counts + red cross + narrative) ────────────────────────
+function SpiralRow({ row, years, taughtYears }: { row: MatrixRow; years: number[]; taughtYears: number[] }) {
+  return (
+    <>
+      <span dir="auto" className="truncate text-[12px] text-[#3A332E] [overflow-wrap:anywhere]">{row.topic}</span>
+      {years.map((y) => {
+        const taught = row.byYear[y] !== undefined;
+        if (!taught) {
+          return (
+            <span key={y} className="h-[20px] rounded-[5px] border border-dashed" style={{ background: 'var(--color-cell-dash-bg)', borderColor: 'var(--color-cell-dash-border)' }} />
+          );
+        }
+        const occ = taughtYears.indexOf(y);
+        return <span key={y} className="h-[20px] rounded-[5px]" style={{ background: deepeningColor(occ, taughtYears.length) }} />;
+      })}
+    </>
+  );
+}
 
-function CoverageCard({ topics, year, openHref }: { topics: TopicsData; year: number; openHref: string }) {
+// ── 4) Coverage & gaps ──────────────────────────────────────────────────────────────
+
+function CoverageCard({
+  topics,
+  yearName,
+  explorerHref,
+}: {
+  topics: TopicsData;
+  yearName: (y: number) => string;
+  explorerHref: string;
+}) {
   const t = useTranslations('insights');
   const locale = useLocale();
   const view = useMemo(() => topicMatrix(topics), [topics]);
   const notes = useMemo(() => gapNotes(view), [view]);
+  const cols = `150px repeat(${view.years.length}, 1fr)`;
 
-  const yearWord = (y: number) => t('year', { n: formatNumber(y, locale) });
   const gapText = (gapYears: number[]) =>
     gapYears.length === 1
-      ? yearWord(gapYears[0])
+      ? yearName(gapYears[0])
       : t('yearsRange', { from: formatNumber(gapYears[0], locale), to: formatNumber(gapYears[gapYears.length - 1], locale) });
-
-  const shown = notes.slice(0, 4);
+  const primary = notes[0];
 
   return (
-    <Card title={t('card4.title')} subtitle={t('card4.subtitle')} openHref={openHref}>
+    <Card
+      title={t('card4.title')}
+      headerRight={
+        <span className="flex items-center gap-[8px]">
+          <LensChip label={t('allYears')} />
+          {notes.length > 0 ? (
+            <span className="text-[11.5px] font-semibold text-gap">{t('card4.gapsFlagged', { count: notes.length })}</span>
+          ) : null}
+        </span>
+      }
+    >
       {view.groups.length === 0 ? (
         <EmptyState message={t('card4.empty')} />
       ) : (
-        <div>
-          <Matrix
-            view={view}
-            year={year}
-            renderCell={(hours) =>
-              hours !== undefined ? (
-                <span
-                  className="flex size-full items-center justify-center rounded-[5px] text-[11px] font-semibold tabular-nums text-white"
-                  style={{ background: tealStop(hours, view.maxCell) }}
-                >
-                  {formatNumber(hours, locale)}
-                </span>
-              ) : (
-                <span
-                  className="flex size-full items-center justify-center rounded-[5px] border border-gap-border bg-gap-bg text-gap"
-                  aria-label={t('card4.gapAria')}
-                >
-                  <CrossIcon />
-                </span>
-              )
-            }
-          />
-          <Legend
-            items={[
-              { swatch: <span className="size-[11px] rounded-[3px]" style={{ background: 'var(--color-chart-teal-2)' }} />, label: t('hoursShort', { n: '1+' }) },
-              { swatch: <span className="size-[11px] rounded-[3px]" style={{ background: 'var(--color-chart-teal-5)' }} />, label: t('hoursShort', { n: formatNumber(view.maxCell, locale) }) },
-              { swatch: <span className="flex size-[11px] items-center justify-center rounded-[3px] border border-gap-border bg-gap-bg text-gap"><CrossIcon small /></span>, label: t('card4.gapAria') },
-            ]}
-          />
+        <>
+          <div className="overflow-x-auto">
+            <div className="grid min-w-max items-center gap-[5px]" style={{ gridTemplateColumns: cols }}>
+              <span />
+              {view.years.map((y) => (
+                <span key={y} className="text-center text-[10px] text-[#A79E94]">{yearName(y)}</span>
+              ))}
+              {view.groups.map((g, gi) => (
+                <CoverageGroup key={`${g.faLabel ?? 'g'}-${gi}`} group={g} years={view.years} gapAria={t('card4.gapAria')} />
+              ))}
+            </div>
+          </div>
 
-          {shown.length > 0 ? (
-            <div className="mt-[14px] rounded-[12px] border border-gap-border bg-gap-bg/50 p-[13px]">
-              <div className="mb-[6px] text-[11px] font-bold uppercase tracking-[0.05em] text-[#9A5A47]">
-                {t('card4.noteHeading')}
-              </div>
-              <ul className="space-y-[5px]">
-                {shown.map((n, i) => (
-                  <li key={`${n.topic}-${i}`} dir="auto" className="text-[12.5px] leading-[1.45] text-neutral-800 [overflow-wrap:anywhere]">
-                    {t('card4.gapNarrative', {
-                      topic: n.topic,
-                      gap: gapText(n.gapYears),
-                      reappear: yearWord(n.reappear),
-                    })}
-                  </li>
-                ))}
-                {notes.length > shown.length ? (
-                  <li className="text-[11.5px] text-text-faint">{t('card4.moreNotes', { count: notes.length - shown.length })}</li>
-                ) : null}
-              </ul>
+          {primary ? (
+            <div className="mt-[14px] flex items-center gap-[8px] rounded-[9px] border border-gap-border bg-gap-bg px-[12px] py-[9px]">
+              <WarningIcon />
+              <span dir="auto" className="flex-1 text-[12.5px] text-[#7A4436] [overflow-wrap:anywhere]">
+                {t.rich('card4.gapNarrative', {
+                  topic: primary.topic,
+                  gap: gapText(primary.gapYears),
+                  reappear: yearName(primary.reappear),
+                  b: (chunks) => <b className="font-semibold">{chunks}</b>,
+                })}
+              </span>
+              <Link href={explorerHref} className="whitespace-nowrap text-[12px] font-semibold text-gap" aria-label={t('openInExplorer')}>
+                {t('openInExplorer')}
+                <span aria-hidden> →</span>
+              </Link>
             </div>
           ) : null}
-        </div>
+        </>
       )}
     </Card>
   );
 }
 
-// ── Shared matrix (topic rows × year columns) ────────────────────────────────────────
-
-function Matrix({
-  view,
-  year,
-  renderCell,
-}: {
-  view: MatrixView;
-  year: number;
-  renderCell: (hours: number | undefined) => React.ReactNode;
-}) {
-  const t = useTranslations('insights');
+function CoverageGroup({ group, years, gapAria }: { group: MatrixView['groups'][number]; years: number[]; gapAria: string }) {
   const locale = useLocale();
-  const cols = `minmax(150px, 1.5fr) repeat(${view.years.length}, minmax(40px, 1fr))`;
-
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-max">
-        {/* Header row: topic label spacer + year columns (selected year highlighted). */}
-        <div className="grid items-center gap-[6px]" style={{ gridTemplateColumns: cols }}>
-          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#A79E94]">{t('card3.topicHeading')}</span>
-          {view.years.map((y) => (
-            <span
-              key={y}
-              className={cn(
-                'rounded-[6px] py-[3px] text-center text-[11px] font-semibold',
-                y === year ? 'bg-teal-tint text-teal-deep' : 'text-neutral-700',
-              )}
-            >
-              {t('yearShort', { n: formatNumber(y, locale) })}
-            </span>
-          ))}
-        </div>
-
-        {view.groups.map((g, gi) => (
-          <div key={`${g.faLabel ?? 'group'}-${gi}`} className="mt-[8px]">
-            {g.faLabel ? (
-              <div dir="auto" className="mb-[4px] mt-[6px] text-[11px] font-semibold text-[#9A7B5C]">
-                {g.faLabel}
-              </div>
-            ) : null}
-            {g.rows.map((row, ri) => (
-              <div key={`${row.topic}-${ri}`} className="grid items-stretch gap-[6px] py-[3px]" style={{ gridTemplateColumns: cols }}>
-                <span dir="auto" className="flex items-center pe-[8px] text-[12.5px] text-neutral-800 [overflow-wrap:anywhere]">
-                  {row.topic}
-                </span>
-                {view.years.map((y) => (
-                  <div
-                    key={y}
-                    className={cn('h-[26px]', y === year && 'rounded-[6px] ring-1 ring-inset ring-teal/25')}
-                  >
-                    {renderCell(row.byYear[y])}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Legend({ items }: { items: { swatch: React.ReactNode; label: string }[] }) {
-  return (
-    <div className="mt-[12px] flex flex-wrap items-center gap-x-[16px] gap-y-[6px] border-t border-border pt-[10px] text-[11.5px] text-text-muted">
-      {items.map((it, i) => (
-        <span key={i} className="inline-flex items-center gap-[6px]">
-          {it.swatch}
-          <span dir="auto">{it.label}</span>
+    <>
+      {group.faLabel ? (
+        <span dir="auto" className="pt-[4px] text-[9.5px] font-bold uppercase tracking-[0.05em] text-[#9A7B5C]" style={{ gridColumn: '1 / -1' }}>
+          {group.faLabel}
         </span>
-      ))}
-    </div>
+      ) : null}
+      {group.rows.map((row, ri) => {
+        const gaps = interiorGapYears(row, years);
+        const rMax = rowMax(row, years);
+        return (
+          <div key={`${row.topic}-${ri}`} className="contents">
+            <span dir="auto" className="truncate text-[11.5px] text-[#3A332E] [overflow-wrap:anywhere]">{row.topic}</span>
+            {years.map((y) => {
+              const hours = row.byYear[y];
+              if (hours !== undefined) {
+                return (
+                  <span
+                    key={y}
+                    className="flex h-[26px] items-center justify-center rounded-[5px] text-[11px] font-semibold tabular-nums"
+                    style={{ background: hours >= rMax ? 'var(--color-coverage-hi)' : 'var(--color-coverage-lo)', color: 'var(--color-coverage-text)' }}
+                  >
+                    {formatNumber(hours, locale)}
+                  </span>
+                );
+              }
+              if (gaps.has(y)) {
+                return (
+                  <span key={y} className="flex h-[26px] items-center justify-center rounded-[5px] border-[1.5px] border-gap bg-gap-bg text-gap" aria-label={gapAria}>
+                    <CrossIcon />
+                  </span>
+                );
+              }
+              return <span key={y} className="h-[26px] rounded-[5px]" style={{ background: 'var(--color-cell-blank)' }} />;
+            })}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
-// ── Icons + constants ────────────────────────────────────────────────────────────────
+// ── Small primitives ─────────────────────────────────────────────────────────────────
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-function ArrowIcon({ className, flip }: { className?: string; flip?: boolean }) {
+function PillSelect({
+  ariaLabel,
+  value,
+  onChange,
+  options,
+  variant,
+}: {
+  ariaLabel: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  variant: 'subject';
+}) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
-      {flip ? <path d="M19 12H5M11 6l-6 6 6 6" /> : <path d="M5 12h14M13 6l6 6-6 6" />}
-    </svg>
+    <span className="relative inline-flex">
+      <span className="sr-only">{ariaLabel}</span>
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'cursor-pointer appearance-none rounded-[9px] border border-border-strong bg-surface py-[8px] pe-[32px] ps-[12px] text-[13.5px] font-medium text-ink transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-teal/40',
+          variant === 'subject' && '',
+        )}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <Chevron className="pointer-events-none absolute end-[11px] top-1/2 -translate-y-1/2" />
+    </span>
   );
 }
 
-function ChevronDown({ className }: { className?: string }) {
+function Chevron({ className }: { className?: string }) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A79E94" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
 
-function CrossIcon({ small }: { small?: boolean }) {
-  const s = small ? 8 : 12;
+function CrossIcon() {
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
-      <path d="M6 6l12 12M18 6L6 18" />
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-gap)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+      <path d="M12 9v4M12 17h.01" />
+      <path d="M10.3 3.9L2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
     </svg>
   );
 }

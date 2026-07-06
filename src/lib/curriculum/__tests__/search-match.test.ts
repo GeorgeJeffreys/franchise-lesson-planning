@@ -7,7 +7,7 @@ import {
   scoreFields,
   tokenize,
   type WeightedField,
-} from '../search-match.ts';
+} from '../search-match';
 
 // ── normalisation ──────────────────────────────────────────────────────────────────
 

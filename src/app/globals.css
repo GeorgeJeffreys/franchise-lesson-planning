@@ -140,15 +140,23 @@
    *      distinct from the reserved destructive delete-red (`--color-danger` #b23a2e)
    *      — the Insights page has no destructive actions, so the two never sit side by
    *      side. No pink (#b62a5c) appears here. */
-  --color-chart-teal-1: #dcece8; /* faint — smallest magnitude */
-  --color-chart-teal-2: #a9cfc7;
-  --color-chart-teal-3: #6fb3a6;
-  --color-chart-teal-4: #3d9084;
-  --color-chart-teal-5: #186155; /* deep — largest magnitude */
-  --color-chart-track: #eef4f2; /* empty bar track behind a teal fill */
-  --color-gap: #b5503f; /* red-adjacent, gaps/flags ONLY; ≠ delete-red #b23a2e */
-  --color-gap-bg: #f7e7e2;
-  --color-gap-border: #ecccc0;
+  --color-chart-teal-1: #a9cfc7; /* faint — smallest magnitude / first taught year */
+  --color-chart-teal-2: #6fb3a6;
+  --color-chart-teal-3: #4c9b8f;
+  --color-chart-teal-4: #2e8577;
+  --color-chart-teal-5: #23786b;
+  --color-chart-teal-6: #1f7a6c; /* deep — largest magnitude / most-recurring */
+  --color-chart-track: #eaf2f0; /* empty bar track behind a teal fill */
+  --color-coverage-hi: #cfe6e0; /* coverage matrix — row-max cell */
+  --color-coverage-lo: #dcebe7; /* coverage matrix — a taught cell */
+  --color-coverage-text: #186155;
+  --color-cell-blank: #f5f1ea; /* absent, outside a topic's taught span */
+  --color-cell-dash-bg: #f3ede6; /* not-taught spiral cell fill */
+  --color-cell-dash-border: #c9beb0;
+  --color-gap: #b4553f; /* red-adjacent, gaps/flags ONLY; ≠ delete-red #b23a2e */
+  --color-gap-bg: #f7e9e4;
+  --color-gap-border: #e7c9bf;
+  --color-flag-bar: #d8b7ac; /* the "unusually low" month bar (clay, dashed) */
 
   /* ── Radius ────────────────────────────────────────────────────────────── */
   --radius-badge: 6px;
