@@ -591,55 +591,33 @@ export function WorksheetBuilder({
       ref={shellRef}
       className="ws-shell"
       style={{
-        background: 'var(--color-surface)',
         display: 'flex',
         flexDirection: 'column',
+        // No inner card/panel fill: transparent so the pane background shows
+        // through and the white A4 page is the only surface. Full-screen needs a
+        // solid backdrop (it's a fixed overlay over the whole app).
         ...(maximised
-          ? { position: 'fixed', inset: 0, zIndex: 120, height: '100vh' }
+          ? { position: 'fixed', inset: 0, zIndex: 120, height: '100vh', background: 'var(--color-surface)' }
           : // Fill the worksheet pane so the CHROME (toolbar) is a fixed header and
             // only the CANVAS scrolls beneath it — the toolbar never scrolls away.
-            { flex: '1 1 auto', minHeight: 0 }),
+            { flex: '1 1 auto', minHeight: 0, background: 'transparent' }),
       }}
     >
-      {/* ── CHROME — ONE slim header row: label · format tools · view controls.
-             It's the flex header above the scrolling canvas (FIX C), so it stays
-             pinned; the page scrolls beneath it. ───────────────────────────── */}
+      {/* ── CHROME — two thin rows (view controls, then format toolbar) above the
+             scrolling canvas. It is the flex header (FIX C), so it stays pinned and
+             the page scrolls beneath it. No card/panel background — the pane shows
+             through and the white A4 page is the only surface. ──────────────── */}
       <div
         className="ws-no-print"
         style={{
           flexShrink: 0,
           display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexWrap: 'wrap',
-          padding: '5px 14px',
-          background: '#fff',
-          borderBottom: '1px solid #F0EAE1',
+          flexDirection: 'column',
+          borderBottom: '1px solid #ECE4D7',
         }}
       >
-        {/* Label */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B62A5C" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h3" />
-          </svg>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>{t('header.title')}</span>
-        </div>
-
-        {/* Shared formatting toolbar — everything acts on the active block; insert
-            controls add a text box / image INTO that block (disabled if none). */}
-        <WordToolbar
-          editor={active?.editor ?? null}
-          canInsert={!!active}
-          onInsertImage={insertFloatingImage}
-          onInsertTextBox={insertTextBox}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-        />
-
-        {/* View controls — zoom · print preview · full screen (compact, right-aligned) */}
-        <div style={{ marginInlineStart: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        {/* Row 1 — zoom · print preview · full screen (right-aligned) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap', padding: '5px 10px 3px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#FBF8F3', border: '1px solid #E7DECF', borderRadius: 999, padding: '2px 6px' }}>
             <button type="button" onClick={() => zoomManual((z) => clampZoom(round2(z - 0.1)))} title={t('zoom.zoomOut')} style={zoomBtn}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5C544E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>
@@ -666,6 +644,21 @@ export function WorksheetBuilder({
             )}
           </button>
         </div>
+
+        {/* Row 2 — format toolbar (acts on the active block; insert controls add a
+            text box / image INTO that block, disabled if none active). */}
+        <div style={{ padding: '0 8px 4px' }}>
+          <WordToolbar
+            editor={active?.editor ?? null}
+            canInsert={!!active}
+            onInsertImage={insertFloatingImage}
+            onInsertTextBox={insertTextBox}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+        </div>
       </div>
 
       {/* ── CANVAS (scrollable; only the page is scaled) ─────────────────── */}
@@ -679,7 +672,10 @@ export function WorksheetBuilder({
           setActive(null);
         }}
         style={{
-          background: '#E8E1D6',
+          // Transparent: the pane background shows around the white A4 page — no
+          // beige box. (Full screen keeps a soft neutral so the page reads as a
+          // sheet on a surface.)
+          background: maximised ? '#E8E1D6' : 'transparent',
           overflow: 'auto',
           // Fill the remaining pane height (chrome is the fixed header above);
           // the page scrolls inside here, so the toolbar stays pinned.

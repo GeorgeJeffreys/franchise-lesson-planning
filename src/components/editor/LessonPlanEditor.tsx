@@ -525,8 +525,8 @@ export function LessonPlanEditor({
                 WorksheetBuilder instance, editable at every step and every plan
                 status (never wrapped in the plan-lock fieldset); edits autosave
                 through `saveWorksheet`. Scrolls independently past `lg`. */}
-            <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-subtle px-[16px] py-[14px] lg:flex-[1.5] lg:px-[22px]">
-              <div className="mx-auto flex min-h-0 w-full max-w-[1000px] flex-1 flex-col">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-subtle lg:flex-[1.5]">
+              <div className="flex min-h-0 w-full flex-1 flex-col">
                 <WorksheetBuilder
                   value={worksheet}
                   onChange={setWorksheet}
