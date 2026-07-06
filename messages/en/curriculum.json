@@ -35,12 +35,56 @@
     },
     "focus": {
       "inFocus": "In focus · {value}",
+      "inFocusPlain": "In focus",
       "dailyOutcome": "Daily learning outcome",
       "resources": "Resources",
       "plan": "Plan this lesson",
       "planning": "Starting…",
       "notMember": "You can only plan lessons for subjects you teach.",
       "genericError": "Couldn’t start a plan. Please try again."
+    },
+    "tabs": {
+      "calendar": "Calendar",
+      "logicTree": "Logic tree",
+      "topics": "Topics",
+      "search": "Search",
+      "logicTreeDisabled": "Logic tree isn’t available for {subject} yet — its curriculum hasn’t been mapped to the outcome taxonomy."
+    },
+    "tree": {
+      "breadcrumb": "Subject › Yearly · Year {year}",
+      "subject": "Subject",
+      "yearly": "Yearly · Year {n}",
+      "yearlyNotRecorded": "Yearly outcome not yet recorded",
+      "subjectNotRecorded": "Subject outcome not yet recorded",
+      "monthlyOutcome": "Monthly outcome",
+      "hours": "{count, plural, one {# hour} other {# hours}}",
+      "composingHours": "Composing hours",
+      "skill": "Skill",
+      "knowledge": "Knowledge",
+      "laddersUpTo": "Ladders up to",
+      "dailyOutcomeHour": "Daily outcome · hour",
+      "composes": "Composes",
+      "yearShort": "YEAR",
+      "subjShort": "SUBJ",
+      "slotYear": "Yr {n}",
+      "slotWeek": "Wk {n}",
+      "slotPeriod": "P{n}"
+    },
+    "topics": {
+      "yearsLabel": "Years",
+      "focusAreaLabel": "Focus area → Topic",
+      "byThemeLabel": "Topics (by theme)",
+      "focusArea": "Focus area",
+      "topicsHeading": "Topics",
+      "notTaught": "Not taught this year",
+      "dailyLearningOutcome": "Daily learning outcome",
+      "inFocusYear": "In focus · Year {year}",
+      "selectYear": "Select a year to see its lesson.",
+      "empty": "No topics recorded for {subject} yet."
+    },
+    "search": {
+      "placeholder": "Search lessons",
+      "comingSoon": "Search is coming soon."
     },
     "noLessons": "No lessons for this week.",
     "emptyState": {

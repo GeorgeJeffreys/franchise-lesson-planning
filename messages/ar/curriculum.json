@@ -35,12 +35,56 @@
     },
     "focus": {
       "inFocus": "قيد التركيز · {value}",
+      "inFocusPlain": "قيد التركيز",
       "dailyOutcome": "ناتج التعلّم اليومي",
       "resources": "الموارد",
       "plan": "خطّط لهذا الدرس",
       "planning": "جارٍ البدء…",
       "notMember": "يمكنك التخطيط للدروس في المواد التي تُدرّسها فقط.",
       "genericError": "تعذّر بدء الخطة. حاول مرة أخرى."
+    },
+    "tabs": {
+      "calendar": "التقويم",
+      "logicTree": "الشجرة المنطقية",
+      "topics": "المواضيع",
+      "search": "بحث",
+      "logicTreeDisabled": "الشجرة المنطقية غير متاحة لـ {subject} بعد — لم تُربط مناهجها بتصنيف النواتج."
+    },
+    "tree": {
+      "breadcrumb": "المادة › السنوي · السنة {year}",
+      "subject": "المادة",
+      "yearly": "السنوي · السنة {n}",
+      "yearlyNotRecorded": "لم يُسجَّل الناتج السنوي بعد",
+      "subjectNotRecorded": "لم يُسجَّل ناتج المادة بعد",
+      "monthlyOutcome": "الناتج الشهري",
+      "hours": "{count, plural, zero {# ساعة} one {ساعة واحدة} two {ساعتان} few {# ساعات} many {# ساعة} other {# ساعة}}",
+      "composingHours": "الساعات المكوِّنة",
+      "skill": "المهارة",
+      "knowledge": "المعرفة",
+      "laddersUpTo": "يرتقي إلى",
+      "dailyOutcomeHour": "الناتج اليومي · ساعة",
+      "composes": "يُكوِّن",
+      "yearShort": "السنة",
+      "subjShort": "المادة",
+      "slotYear": "سنة {n}",
+      "slotWeek": "أسبوع {n}",
+      "slotPeriod": "ح{n}"
+    },
+    "topics": {
+      "yearsLabel": "السنوات",
+      "focusAreaLabel": "مجال التركيز → الموضوع",
+      "byThemeLabel": "المواضيع (حسب الثيمة)",
+      "focusArea": "مجال التركيز",
+      "topicsHeading": "المواضيع",
+      "notTaught": "لم يُدرَّس هذا العام",
+      "dailyLearningOutcome": "ناتج التعلّم اليومي",
+      "inFocusYear": "قيد التركيز · السنة {year}",
+      "selectYear": "اختر سنة لعرض درسها.",
+      "empty": "لا توجد مواضيع مسجّلة لـ {subject} بعد."
+    },
+    "search": {
+      "placeholder": "ابحث في الدروس",
+      "comingSoon": "البحث قريبًا."
     },
     "noLessons": "لا توجد دروس لهذا الأسبوع.",
     "emptyState": {

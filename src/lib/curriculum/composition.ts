@@ -50,6 +50,11 @@ export interface CompositionHour {
   calendarSlot: CalendarSlot;
   resources: CurriculumResource[];
   taxonomyId: string | null;
+  /** The calendar-keyed lesson_key — the tree is taxonomy-organised but plans are
+   *  calendar-keyed, so "Plan this lesson" hands this to the existing create flow. */
+  lessonKey: string;
+  /** The curriculum row's linguistic_skill / focus_area text for the hour's pill. */
+  strandLabel: string | null;
 }
 
 /** One (Skill-LO . Knowledge-LO) monthly-outcome group — the tree's mid tier. */
@@ -58,8 +63,10 @@ export interface CompositionGroup {
   knowledgeLo: string | null; // 'K1'
   key: string; // 'S1.K1'
   focusArea: number | null; // representative Focus Area (segment 1)
-  monthlySkillOutcome: string | null; // monthly_skills_lo where present
-  monthlyKnowledgeOutcome: string | null; // monthly_knowledge_lo where present
+  // Strand cards read the WEEKLY skill/knowledge text where present (english, it);
+  // both null (professionalism) → the node renders with no strand cards.
+  skillOutcome: string | null; // representative weekly_skills_lo
+  knowledgeOutcome: string | null; // representative weekly_knowledge_lo
   hours: CompositionHour[]; // ordered by (week, period, hour)
   weeks: number[]; // distinct calendar weeks this group touches (the scatter)
 }
@@ -102,7 +109,8 @@ function cleanResources(resources: CurriculumResource[] | null): CurriculumResou
 
 /** The columns the tree needs from a scoped (subject, year) read. */
 const TREE_COLUMNS =
-  'year, month, week, period, daily_outcome, resources, taxonomy_id, ' +
+  'year, month, week, period, lesson_key, daily_outcome, resources, taxonomy_id, ' +
+  'linguistic_skill, focus_area, weekly_skills_lo, weekly_knowledge_lo, ' +
   'monthly_skills_lo, monthly_knowledge_lo, subject_learning_outcome, annual_learning_outcome';
 
 interface TreeRow {
@@ -110,9 +118,14 @@ interface TreeRow {
   month: string;
   week: number;
   period: number | null;
+  lesson_key: string;
   daily_outcome: string | null;
   resources: CurriculumResource[] | null;
   taxonomy_id: string | null;
+  linguistic_skill: string | null;
+  focus_area: string | null;
+  weekly_skills_lo: string | null;
+  weekly_knowledge_lo: string | null;
   monthly_skills_lo: string | null;
   monthly_knowledge_lo: string | null;
   subject_learning_outcome: string | null;
@@ -164,7 +177,15 @@ export async function getCompositionTree(
   }
 
   const groups: CompositionGroup[] = [...buckets.entries()].map(([key, bucket]) => {
-    const orderedRows = [...bucket.rows].sort((a, b) => slotRank(a) - slotRank(b));
+    // Hours are ordered by H# (taxonomy segment 4) — the COMPOSITION order — never
+    // re-sorted into calendar order, because the composing slots are deliberately
+    // non-contiguous. A null H# sinks to the end; equal H# breaks by calendar slot.
+    const orderedRows = [...bucket.rows].sort((a, b) => {
+      const ha = parseTaxonomyId(a.taxonomy_id).hour;
+      const hb = parseTaxonomyId(b.taxonomy_id).hour;
+      if (ha !== hb) return (ha ?? Number.MAX_SAFE_INTEGER) - (hb ?? Number.MAX_SAFE_INTEGER);
+      return slotRank(a) - slotRank(b);
+    });
     const hours: CompositionHour[] = orderedRows.map((r) => {
       const p = parseTaxonomyId(r.taxonomy_id);
       return {
@@ -173,6 +194,8 @@ export async function getCompositionTree(
         calendarSlot: { year: r.year, month: r.month, week: r.week, period: r.period },
         resources: cleanResources(r.resources),
         taxonomyId: r.taxonomy_id,
+        lessonKey: r.lesson_key,
+        strandLabel: (r.linguistic_skill ?? r.focus_area ?? '').trim() || null,
       };
     });
     return {
@@ -180,15 +203,16 @@ export async function getCompositionTree(
       knowledgeLo: bucket.parsed.knowledgeLo,
       key,
       focusArea: firstNonNull(orderedRows.map((r) => parseTaxonomyId(r.taxonomy_id).focusArea)),
-      monthlySkillOutcome: firstClean(orderedRows.map((r) => r.monthly_skills_lo)) ?? null,
-      monthlyKnowledgeOutcome: firstClean(orderedRows.map((r) => r.monthly_knowledge_lo)) ?? null,
+      skillOutcome: firstClean(orderedRows.map((r) => r.weekly_skills_lo)) ?? null,
+      knowledgeOutcome: firstClean(orderedRows.map((r) => r.weekly_knowledge_lo)) ?? null,
       hours,
       weeks: [...new Set(orderedRows.map((r) => r.week))].sort((a, b) => a - b),
     };
   });
 
-  // Order groups by their earliest calendar slot (scheme-of-work order).
-  groups.sort((a, b) => firstHourRank(a) - firstHourRank(b));
+  // Order the GROUPS by their earliest calendar appearance (scheme-of-work reading
+  // order) — this orders the list of groups, not the hours inside a group.
+  groups.sort((a, b) => firstGroupRank(a) - firstGroupRank(b));
 
   const years: CompositionYear[] =
     groups.length > 0 ? [{ year, yearlyOutcome, groups }] : [];
@@ -196,11 +220,14 @@ export async function getCompositionTree(
   return { subject, subjectOutcome, years };
 }
 
-function firstHourRank(g: CompositionGroup): number {
-  const first = g.hours[0];
-  return first
-    ? slotRank({ month: first.calendarSlot.month, week: first.calendarSlot.week, period: first.calendarSlot.period })
-    : Number.MAX_SAFE_INTEGER;
+/** Earliest calendar slot across a group's hours — orders the group list only. */
+function firstGroupRank(g: CompositionGroup): number {
+  let best = Number.MAX_SAFE_INTEGER;
+  for (const h of g.hours) {
+    const r = slotRank({ month: h.calendarSlot.month, week: h.calendarSlot.week, period: h.calendarSlot.period });
+    if (r < best) best = r;
+  }
+  return best;
 }
 
 function firstClean(values: (string | null)[]): string | null {
@@ -345,4 +372,169 @@ export async function getInsightsAggregates(
     .sort((a, b) => a.topic.localeCompare(b.topic) || a.year - b.year);
 
   return { subject, year, hoursPerMonth, hoursByFocusTopic, coverageMatrix, spiral };
+}
+
+// ── Per-subject data capabilities (gate the tabs) ───────────────────────────────────
+//
+// The three curriculum surfaces each depend on DIFFERENT data that is present for a
+// DIFFERENT subset of subjects (verified against live rows), so each capability is
+// probed independently — never assume one implies another:
+//   * hasTaxonomy      → the Logic tree spine (english, professionalism, it partial).
+//   * hasFocusAreaText → the Topics focus-area tier (everyone EXCEPT english).
+//   * hasWeeklyText    → the Logic-tree strand cards (english, it).
+// Probed with head-only COUNT queries (no rows returned) so the PostgREST 1000-row cap
+// never applies.
+
+export interface SubjectCapabilities {
+  subject: string;
+  hasTaxonomy: boolean;
+  hasFocusAreaText: boolean;
+  hasWeeklyText: boolean;
+}
+
+export async function getCurriculumSubjectCapabilities(
+  subject: string,
+): Promise<SubjectCapabilities> {
+  const supabase = createAdminClient();
+
+  // Each probe FAILS SAFE to "unavailable": a capability query is a gate for an
+  // optional surface, and one of them reads the `curriculum_taxonomy` view (migration
+  // 0050) that an operator applies by hand. If that view isn't present yet — or any
+  // probe errors — we degrade to false (the tab shows disabled) rather than 500 the
+  // whole Explorer, including the existing Calendar tab.
+  const countOf = async (build: () => PromiseLike<{ count: number | null; error: unknown }>) => {
+    try {
+      const { count, error } = await build();
+      if (error) return 0;
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const [tax, fa, wk] = await Promise.all([
+    countOf(() =>
+      supabase
+        .from('curriculum_taxonomy')
+        .select('id', { count: 'exact', head: true })
+        .eq('subject_code', subject)
+        .eq('is_placeholder', false)
+        .not('focus_area', 'is', null),
+    ),
+    countOf(() =>
+      supabase
+        .from('curriculum_lesson')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('subject_code', subject)
+        .not('focus_area', 'is', null),
+    ),
+    countOf(() =>
+      supabase
+        .from('curriculum_lesson')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('subject_code', subject)
+        .or('weekly_skills_lo.not.is.null,weekly_knowledge_lo.not.is.null'),
+    ),
+  ]);
+
+  return {
+    subject,
+    hasTaxonomy: tax > 0,
+    hasFocusAreaText: fa > 0,
+    hasWeeklyText: wk > 0,
+  };
+}
+
+// ── Topics data (Focus area → Topic → spiral across years) ──────────────────────────
+//
+// Sourced from `focus_area` TEXT where present (all subjects EXCEPT english); for
+// ENGLISH `focus_area` is null and no Focus-Area number→name map exists, so we GROUP BY
+// theme instead and flag it (`groupedBy: 'theme'`). The heavy grouping runs DB-side
+// (curriculum_topic_threads, migration 0051) so a whole-subject read never trips the
+// 1000-row cap. The spiral is presence/recurrence ONLY — there is no depth signal in
+// the source, so no deepening gradient is derived.
+
+export interface TopicThreadYear {
+  year: number;
+  hours: number;
+  lessonKey: string;
+  dailyOutcome: string | null;
+  strandLabel: string | null;
+  resources: CurriculumResource[];
+}
+
+export interface Topic {
+  topic: string; // theme label
+  years: TopicThreadYear[]; // ascending; the years this topic is TAUGHT
+}
+
+export interface FocusAreaGroup {
+  focusArea: string | null; // null only in theme-grouped (english) mode
+  topics: Topic[];
+}
+
+export interface TopicsData {
+  subject: string;
+  groupedBy: 'focusArea' | 'theme';
+  years: number[]; // every year present for the subject (spiral columns)
+  focusAreas: FocusAreaGroup[];
+}
+
+interface TopicThreadRow {
+  focus_area: string | null;
+  theme: string | null;
+  year: number;
+  hours: number;
+  lesson_key: string;
+  daily_outcome: string | null;
+  strand_label: string | null;
+  resources: CurriculumResource[] | null;
+}
+
+export async function getTopicsData(subject: string): Promise<TopicsData> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc('curriculum_topic_threads', { p_subject: subject });
+  if (error) throw new Error(`Topics read failed: ${error.message}`);
+  const rows = (data ?? []) as TopicThreadRow[];
+
+  const hasFocusArea = rows.some((r) => (r.focus_area ?? '').trim() !== '');
+  const groupedBy: 'focusArea' | 'theme' = hasFocusArea ? 'focusArea' : 'theme';
+
+  const years = [...new Set(rows.map((r) => r.year))].sort((a, b) => a - b);
+
+  // Bucket: Focus Area → Topic(theme) → per-year thread. In theme mode every row's
+  // focus area is null, so all topics fall under a single null-keyed group.
+  const faMap = new Map<string, Map<string, TopicThreadYear[]>>();
+  for (const r of rows) {
+    const faKey = hasFocusArea ? (r.focus_area ?? '').trim() : '';
+    const topicKeyLabel = (r.theme ?? r.focus_area ?? '').trim();
+    if (!topicKeyLabel) continue;
+    if (!faMap.has(faKey)) faMap.set(faKey, new Map());
+    const topics = faMap.get(faKey)!;
+    if (!topics.has(topicKeyLabel)) topics.set(topicKeyLabel, []);
+    topics.get(topicKeyLabel)!.push({
+      year: r.year,
+      hours: Number(r.hours),
+      lessonKey: r.lesson_key,
+      dailyOutcome: cleanLO(r.daily_outcome ?? '') || null,
+      strandLabel: (r.strand_label ?? '').trim() || null,
+      resources: cleanResources(r.resources),
+    });
+  }
+
+  const focusAreas: FocusAreaGroup[] = [...faMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([faKey, topics]) => ({
+      focusArea: faKey === '' ? null : faKey,
+      topics: [...topics.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([topic, threadYears]) => ({
+          topic,
+          years: threadYears.sort((a, b) => a.year - b.year),
+        })),
+    }));
+
+  return { subject, groupedBy, years, focusAreas };
 }

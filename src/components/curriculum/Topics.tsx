@@ -1,0 +1,314 @@
+'use client';
+
+// The Topics tab — a faithful port of the Explorer mock's Topics view.
+//
+// Focus area → Topic (left rail) → the topic's SPIRAL across years (middle) → the
+// selected year's lesson (IN FOCUS rail). The spiral is presence/recurrence ONLY: a
+// year is "taught" or "not taught" — there is NO depth gradient, because no source
+// column expresses increasing complexity. Focus areas come from `focus_area` TEXT where
+// present; for subjects without it (english) the data layer groups by THEME and flags
+// it, which we surface with a small note.
+
+import { useMemo, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatNumber } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import {
+  SubjectYearPills,
+  PlanLessonButton,
+  type SubjectOption,
+} from './explorer-ui';
+import type { TopicsData, Topic, TopicThreadYear } from '@/lib/curriculum/composition';
+
+export function Topics({
+  data,
+  subjects,
+  subjectName,
+  year,
+}: {
+  data: TopicsData;
+  subjects: SubjectOption[];
+  subjectName: string;
+  year: number;
+}) {
+  const t = useTranslations('curriculum');
+  const hasTopics = data.focusAreas.some((fa) => fa.topics.length > 0);
+
+  return (
+    <div>
+      <SubjectYearPills
+        tab="topics"
+        subjects={subjects}
+        subjectCode={data.subject}
+        years={data.years}
+        year={year}
+      />
+      {hasTopics ? (
+        <TopicsBody data={data} />
+      ) : (
+        <div className="px-[26px] py-[64px] text-center">
+          <p className="text-[14px] text-text-muted">{t('topics.empty', { subject: subjectName })}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TopicsBody({ data }: { data: TopicsData }) {
+  const t = useTranslations('curriculum');
+  const locale = useLocale();
+
+  // Flatten to a selectable (focusAreaIdx, topicIdx) address; default to the first
+  // non-empty topic.
+  const firstFa = data.focusAreas.findIndex((fa) => fa.topics.length > 0);
+  const [faIdx, setFaIdx] = useState(firstFa === -1 ? 0 : firstFa);
+  const [topicIdx, setTopicIdx] = useState(0);
+
+  const focusArea = data.focusAreas[faIdx] ?? data.focusAreas[0];
+  const topic: Topic | undefined = focusArea?.topics[topicIdx] ?? focusArea?.topics[0];
+
+  // Presence across ALL of the subject's years → the spiral rows.
+  const taughtByYear = useMemo(() => {
+    const m = new Map<number, TopicThreadYear>();
+    for (const ty of topic?.years ?? []) m.set(ty.year, ty);
+    return m;
+  }, [topic]);
+
+  // Selected year for the IN FOCUS rail — default to the topic's first taught year.
+  const [selectedYear, setSelectedYear] = useState<number | null>(topic?.years[0]?.year ?? null);
+  const selectedThread =
+    (selectedYear != null ? taughtByYear.get(selectedYear) : null) ?? topic?.years[0] ?? null;
+
+  const selectTopic = (nextFa: number, nextTopic: number) => {
+    setFaIdx(nextFa);
+    setTopicIdx(nextTopic);
+    setSelectedYear(data.focusAreas[nextFa]?.topics[nextTopic]?.years[0]?.year ?? null);
+  };
+
+  return (
+    <div className="grid gap-[20px] px-[26px] pb-[28px] pt-[18px] lg:grid-cols-[260px_minmax(0,1fr)_300px]">
+      {/* Left rail: Focus area → Topic */}
+      <div className="self-start">
+        <div className="mb-[10px] text-[11px] font-bold uppercase tracking-[0.06em] text-[#8A8178]">
+          {data.groupedBy === 'theme' ? t('topics.byThemeLabel') : t('topics.focusAreaLabel')}
+        </div>
+        <div className="overflow-hidden rounded-[12px] border border-[#EFE8DD]">
+          {data.focusAreas.map((fa, fi) => (
+            <div key={fi} className={fi > 0 ? 'border-t border-[#F3EEE6]' : ''}>
+              <div className="flex items-center gap-[9px] bg-[#F8F1E8] px-[13px] py-[11px]">
+                <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-[0.05em] text-[#9A7B5C]">
+                  {data.groupedBy === 'theme' ? t('topics.topicsHeading') : t('topics.focusArea')}
+                </span>
+                {fa.focusArea ? (
+                  <span dir="auto" className="truncate text-[13px] font-semibold text-ink">{fa.focusArea}</span>
+                ) : null}
+              </div>
+              <div className="bg-[#FCFAF6] p-[6px]">
+                {fa.topics.map((tp, ti) => {
+                  const active = fi === faIdx && ti === topicIdx;
+                  return (
+                    <button
+                      key={ti}
+                      type="button"
+                      onClick={() => selectTopic(fi, ti)}
+                      aria-pressed={active}
+                      className={cn(
+                        'flex w-full items-center gap-[9px] rounded-[8px] px-[10px] py-[9px] text-start transition-colors',
+                        active ? 'bg-teal-tint' : 'hover:bg-surface-subtle',
+                      )}
+                    >
+                      <span className={cn('size-[6px] shrink-0 rounded-full', active ? 'bg-teal' : 'bg-[#CFC6BA]')} />
+                      <span dir="auto" className={cn('min-w-0 flex-1 text-[13px] [overflow-wrap:anywhere]', active ? 'font-semibold text-teal-deep' : 'text-[#5C544E]')}>
+                        {tp.topic}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Middle: the spiral */}
+      <div>
+        <div dir="auto" className="mb-[18px] text-[17px] font-semibold text-ink">{topic?.topic}</div>
+        <div className="flex flex-col">
+          {data.years.map((yr, i) => {
+            const thread = taughtByYear.get(yr);
+            const taught = Boolean(thread);
+            const selected = selectedYear === yr && taught;
+            return (
+              <div key={yr} className="flex gap-[16px]">
+                <div className="flex w-[52px] flex-col items-center">
+                  <span
+                    className="w-[48px] rounded-full py-[5px] text-center text-[11px] font-bold text-white"
+                    style={{ background: yearAccent(i, data.years.length) }}
+                  >
+                    {t('year', { n: formatNumber(yr, locale) })}
+                  </span>
+                  {i < data.years.length - 1 ? <span className="my-[4px] w-[2px] flex-1 bg-[#DCEAE6]" /> : null}
+                </div>
+                <SpiralCard
+                  taught={taught}
+                  selected={selected}
+                  thread={thread ?? null}
+                  presence={data.years.map((y) => taughtByYear.has(y))}
+                  onSelect={() => (taught ? setSelectedYear(yr) : undefined)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Right: IN FOCUS */}
+      <div className="self-start">
+        <div className="mb-[8px] text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#A79E94]">
+          {selectedThread
+            ? t('topics.inFocusYear', { year: formatNumber(selectedThread.year, locale) })
+            : t('focus.inFocusPlain')}
+        </div>
+        {selectedThread && topic ? (
+          <TopicFocus thread={selectedThread} topicLabel={topic.topic} />
+        ) : (
+          <div className="rounded-[14px] border border-border bg-surface-subtle p-[15px] text-[13px] text-text-muted">
+            {t('topics.selectYear')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpiralCard({
+  taught,
+  selected,
+  thread,
+  presence,
+  onSelect,
+}: {
+  taught: boolean;
+  selected: boolean;
+  thread: TopicThreadYear | null;
+  presence: boolean[];
+  onSelect: () => void;
+}) {
+  const t = useTranslations('curriculum');
+  if (!taught) {
+    return (
+      <div className="mb-[12px] flex-1 rounded-[12px] border border-dashed border-[#DBCDBB] bg-[#F5EDE5]/40 px-[16px] py-[12px] text-[13px] italic text-text-faint">
+        {t('topics.notTaught')}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={cn(
+        'mb-[12px] flex-1 rounded-[12px] border px-[16px] py-[12px] text-start transition-shadow',
+        selected
+          ? 'border-[1.5px] border-teal bg-[#EFF6F4] shadow-[0_12px_26px_-20px_rgba(31,122,108,0.5)]'
+          : 'border border-[#EAD9C5] bg-surface-cream',
+      )}
+    >
+      {/* Presence pips — filled where the topic is TAUGHT (recurrence, not depth). */}
+      <div className="mb-[4px] flex gap-[3px]" aria-hidden>
+        {presence.map((on, i) => (
+          <span key={i} className={cn('size-[6px] rounded-full', on ? 'bg-teal' : 'border border-[#C9BEB0]')} />
+        ))}
+      </div>
+      <div dir="auto" className="text-[14px] leading-[1.45] text-ink [overflow-wrap:anywhere]">
+        {thread?.dailyOutcome || t('empty')}
+      </div>
+    </button>
+  );
+}
+
+function TopicFocus({ thread, topicLabel }: { thread: TopicThreadYear; topicLabel: string }) {
+  const t = useTranslations('curriculum');
+  const locale = useLocale();
+  const coords = parseLessonKey(thread.lessonKey);
+  const path = coords
+    ? [
+        t('year', { n: formatNumber(thread.year, locale) }),
+        coords.month,
+        coords.week != null ? t('tree.slotWeek', { n: formatNumber(coords.week, locale) }) : null,
+        coords.period != null ? t('tree.slotPeriod', { n: formatNumber(coords.period, locale) }) : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
+
+  return (
+    <div className="rounded-[14px] border-[1.5px] border-teal bg-surface p-[15px] shadow-[0_14px_30px_-24px_rgba(31,122,108,0.6)]">
+      <div className="mb-[10px] flex flex-wrap gap-[6px]">
+        {thread.strandLabel ? (
+          <span dir="auto" className="rounded-[7px] bg-surface-cream px-[9px] py-[3px] text-[11px] font-semibold text-[#8A6D57]">
+            {thread.strandLabel}
+          </span>
+        ) : null}
+        <span dir="auto" className="rounded-[7px] bg-surface-cream px-[9px] py-[3px] text-[11px] font-semibold text-[#8A6D57]">
+          {topicLabel}
+        </span>
+      </div>
+      {path ? <div className="mb-[8px] text-[10px] text-[#A79E94]">{path}</div> : null}
+      <div className="text-[10px] font-semibold uppercase tracking-[0.04em] text-[#A79E94]">
+        {t('topics.dailyLearningOutcome')}
+      </div>
+      <p dir="auto" className="mb-[14px] mt-[5px] text-[15.5px] font-medium leading-[1.4] text-ink [overflow-wrap:anywhere]">
+        {thread.dailyOutcome || t('empty')}
+      </p>
+      {thread.resources.length > 0 ? (
+        <>
+          <div className="mb-[7px] text-[10px] font-semibold uppercase text-[#A79E94]">{t('focus.resources')}</div>
+          <ul className="mb-[14px] space-y-[6px]">
+            {thread.resources.map((r, i) => (
+              <li key={`${r.label}-${i}`} dir="auto" className="flex items-start gap-[8px] text-[13px] text-ink">
+                <ImageIcon />
+                <span className="min-w-0 break-all">{r.label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <PlanLessonButton lessonKey={thread.lessonKey} period={coords?.period ?? null} />
+    </div>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="mt-[2px] shrink-0 text-teal">
+      <rect x="4" y="6" width="16" height="12" rx="2" />
+      <circle cx="9" cy="12" r="2" />
+    </svg>
+  );
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────────────
+
+/** A teal that deepens with the year index — purely positional chrome, not a depth
+ *  signal (there is none). Prep → pale, final year → deep teal. */
+function yearAccent(i: number, total: number): string {
+  const stops = ['#A9CFC7', '#6FB3A6', '#4C9B8F', '#3D9084', '#2E8577', '#186155'];
+  if (total <= 1) return stops[stops.length - 1];
+  const idx = Math.round((i / (total - 1)) * (stops.length - 1));
+  return stops[idx];
+}
+
+/** Parse `subject|Y{year}|{month}|W{week}|P{period}` into its calendar coordinate. */
+function parseLessonKey(key: string): { month: string; week: number | null; period: number | null } | null {
+  const parts = key.split('|');
+  if (parts.length < 5) return null;
+  const month = parts[2] ?? '';
+  const week = /^W(\d+)$/.exec(parts[3] ?? '');
+  const period = /^P(\d+)$/.exec(parts[4] ?? '');
+  return {
+    month,
+    week: week ? Number(week[1]) : null,
+    period: period ? Number(period[1]) : null,
+  };
+}

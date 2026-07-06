@@ -47,19 +47,20 @@ export type CurriculumView = 'weekly' | 'monthly';
 export function CurriculumBrowse({
   data,
   view,
+  embedded = false,
 }: {
   data: CurriculumBrowseData;
   view: CurriculumView;
+  /** True when rendered as the Explorer's Calendar tab — drop the standalone card
+   *  wrapper (the tab bar already provides it) and render header + body inline. */
+  embedded?: boolean;
 }) {
   if (data.subjects.length === 0) {
     return <EmptyState />;
   }
 
-  return (
-    // No `overflow-hidden` here: an overflow-clipping ancestor would trap the
-    // IN-FOCUS panel's `position: sticky` inside this card. The rounded corners are
-    // still respected by the bordered header / inner content, which clip their own.
-    <div className="rounded-[18px] border border-border bg-surface shadow-card">
+  const inner = (
+    <>
       <Header data={data} view={view} />
       <div className="border-t border-border p-[22px]">
         {view === 'monthly' ? (
@@ -74,7 +75,16 @@ export function CurriculumBrowse({
           <WeeklyBody data={data} />
         )}
       </div>
-    </div>
+    </>
+  );
+
+  if (embedded) return inner;
+
+  return (
+    // No `overflow-hidden` here: an overflow-clipping ancestor would trap the
+    // IN-FOCUS panel's `position: sticky` inside this card. The rounded corners are
+    // still respected by the bordered header / inner content, which clip their own.
+    <div className="rounded-[18px] border border-border bg-surface shadow-card">{inner}</div>
   );
 }
 
