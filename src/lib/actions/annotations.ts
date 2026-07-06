@@ -17,6 +17,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/auth';
+import { composeObjective } from '@/lib/editor/objective';
 import type { Block, TeachingPhase } from '@/types/lesson';
 import type {
   AnchorType,
@@ -369,10 +370,14 @@ export async function decideSuggestion(
     if (ann.to_value == null) return { ok: false, error: 'invalid' };
 
     // objective text → the plain smartt_objective column (no blocks touch).
+    // `to_value` is the stem-free REMAINDER (the objective's stem is a fixed
+    // scaffold that never enters a suggestion), so recompose the whole stored
+    // sentence via composeObjective — this is the one place the stem is baked
+    // back in, keeping a single stored representation.
     if (ann.suggestion_shape === 'text' && ann.anchor_type === 'objective') {
       const { error: objErr } = await supabase
         .from('lesson_plans')
-        .update({ smartt_objective: ann.to_value })
+        .update({ smartt_objective: composeObjective(ann.to_value) })
         .eq('id', plan.id)
         .select('id')
         .maybeSingle();
