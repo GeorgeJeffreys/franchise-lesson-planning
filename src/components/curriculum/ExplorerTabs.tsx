@@ -1,6 +1,11 @@
 'use client';
 
-// The Curriculum Explorer tab bar: Calendar · Logic tree · Topics · Search.
+// The Curriculum Explorer tab bar: Calendar · Logic tree · Search.
+//
+// TOPICS TAB TEMPORARILY DISABLED. The Topics tab is hidden from this bar (its
+// TabLink is commented out below, along with the now-unused TopicsIcon). The
+// Topics component and its data layer are preserved intact; re-enable by
+// reverting this change (and restoring 'topics' to TABS in the page).
 // A thin chrome row above the active tab body (passed as `children`). Each tab is a
 // link that preserves the resolved subject + year in the URL, so subject/year chosen
 // in one tab's own selector row carries across tabs.
@@ -57,7 +62,8 @@ export function ExplorerTabs({
           disabled={!logicTreeEnabled}
           disabledReason={t('tabs.logicTreeDisabled', { subject: subjectName })}
         />
-        <TabLink href={hrefFor('topics')} active={tab === 'topics'} label={t('tabs.topics')} icon={<TopicsIcon />} />
+        {/* Topics tab temporarily disabled — hidden from the bar. Re-enable by reverting this change.
+        <TabLink href={hrefFor('topics')} active={tab === 'topics'} label={t('tabs.topics')} icon={<TopicsIcon />} /> */}
         <TabLink href={hrefFor('search')} active={tab === 'search'} label={t('tabs.search')} icon={<SearchIcon />} />
       </div>
       {children}
@@ -144,6 +150,8 @@ function TreeIcon() {
     </svg>
   );
 }
+// TopicsIcon — kept for re-enable; the Topics tab is currently hidden (see above).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TopicsIcon() {
   return (
     <svg {...iconProps} className="text-[#6C6259]">

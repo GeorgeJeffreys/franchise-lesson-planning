@@ -29,7 +29,12 @@ type SearchParams = {
   q?: string;
 };
 
-const TABS: ExplorerTab[] = ['calendar', 'tree', 'topics', 'search'];
+// Topics is temporarily hidden from the tab bar (see ExplorerTabs). It is omitted
+// here too, so any deep link to ?tab=topics (e.g. an old bookmark or the Insights
+// "open in explorer" link) is not a routable tab and falls back to Calendar below,
+// rather than rendering a tab with no way back to it. Re-enable by restoring
+// 'topics' here and its TabLink in ExplorerTabs.
+const TABS: ExplorerTab[] = ['calendar', 'tree', 'search'];
 
 /**
  * Curriculum Explorer — a read-only browser over the curriculum with four tabs:
