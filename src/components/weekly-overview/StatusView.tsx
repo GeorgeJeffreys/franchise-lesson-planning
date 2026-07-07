@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
@@ -81,6 +82,9 @@ export function StatusView({
   const [error, setError] = useState<BoardError | null>(null);
   // A drop into "Submitted" awaiting confirmation (card not yet moved).
   const [pending, setPending] = useState<PendingSubmit | null>(null);
+  // The card currently being dragged — drives the DragOverlay (the lifted card
+  // that follows the cursor) and the drop-target placeholder in each column.
+  const [activeCard, setActiveCard] = useState<PlanCard | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -128,7 +132,12 @@ export function StatusView({
       });
   };
 
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveCard((event.active.data.current?.card as PlanCard | undefined) ?? null);
+  };
+
   const onDragEnd = (event: DragEndEvent) => {
+    setActiveCard(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -180,16 +189,35 @@ export function StatusView({
         </div>
       ) : null}
 
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setActiveCard(null)}
+      >
         <div className="grid grid-cols-5 items-start gap-[14px]">
           {STATUS_COLUMN_ORDER.map((status) =>
             status === 'not_started' ? (
               <NotStartedColumn key={status} cards={empties} />
             ) : (
-              <StatusColumn key={status} status={status} cards={byStatus[status]} />
+              <StatusColumn
+                key={status}
+                status={status}
+                cards={byStatus[status]}
+                activeStatus={activeCard ? effectiveStatus(activeCard) : null}
+              />
             ),
           )}
         </div>
+        {/* The lifted card follows the cursor instead of stacking on a resident
+            card; the source card stays behind as a dimmed ghost. */}
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? (
+            <div className="cursor-grabbing rounded-[14px] shadow-lg">
+              <StatusLessonCard card={activeCard} />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {pending ? (
@@ -257,15 +285,32 @@ function NotStartedColumn({ cards }: { cards: EmptySlotCard[] }) {
   );
 }
 
+/** A card-sized dashed outline marking where the dragged card will land. */
+function DropPlaceholder() {
+  return (
+    <div
+      aria-hidden
+      className="min-h-[92px] rounded-[14px] border-2 border-dashed border-teal bg-teal-tint"
+    />
+  );
+}
+
 /** A real-status column: a drop target whose cards are draggable. */
 function StatusColumn({
   status,
   cards,
+  activeStatus,
 }: {
   status: PlanStatus;
   cards: PlanCard[];
+  /** The effective status of the card being dragged (null when idle). */
+  activeStatus: PlanStatus | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
+
+  // Show drop feedback only when hovering a column the card would actually move
+  // to — never its own source column, where a drop is a no-op.
+  const showDropTarget = isOver && activeStatus !== null && activeStatus !== status;
 
   return (
     <div>
@@ -274,13 +319,16 @@ function StatusColumn({
         ref={setNodeRef}
         className={cn(
           'flex min-h-[64px] flex-col gap-2 rounded-[10px] transition-colors',
-          isOver && 'bg-surface-subtle ring-2 ring-inset ring-border',
+          showDropTarget && 'bg-teal-tint/50 ring-2 ring-inset ring-teal',
         )}
       >
         {cards.map((card) => (
           <DraggableStatusCard key={card.key} card={card} />
         ))}
-        {cards.length === 0 ? <EmptyColumn /> : null}
+        {/* The placeholder makes the target obvious even when a card already
+            occupies the column (the resident card no longer gets stacked on). */}
+        {showDropTarget ? <DropPlaceholder /> : null}
+        {cards.length === 0 && !showDropTarget ? <EmptyColumn /> : null}
       </div>
     </div>
   );
@@ -310,22 +358,42 @@ function ReadOnlyStatusColumn({
 
 /** A status card wrapped as a @dnd-kit draggable, still a click-through link. */
 function DraggableStatusCard({ card }: { card: PlanCard }) {
-  const { listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { listeners, setNodeRef, isDragging } = useDraggable({
     id: card.planId,
     data: { card },
   });
 
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 50 : undefined,
+  // dnd-kit fires a synthetic click on the card when the pointer lifts, even after
+  // a real drag — which would follow the card's <Link> into the editor. Remember
+  // that a drag happened and swallow the click that immediately follows it, then
+  // clear the guard so a later genuine click still opens the plan.
+  const draggedRef = useRef(false);
+  useEffect(() => {
+    if (isDragging) {
+      draggedRef.current = true;
+    } else if (draggedRef.current) {
+      const id = window.setTimeout(() => {
+        draggedRef.current = false;
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [isDragging]);
+
+  const suppressClickAfterDrag = (event: ReactMouseEvent) => {
+    if (draggedRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   };
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...listeners}
-      className={cn('cursor-grab', isDragging && 'cursor-grabbing opacity-80')}
+      onClickCapture={suppressClickAfterDrag}
+      // The lifted copy lives in the DragOverlay; leave the source in place as a
+      // dimmed ghost so the column doesn't reflow while dragging.
+      className={cn('cursor-grab', isDragging && 'cursor-grabbing opacity-40')}
     >
       <StatusLessonCard card={card} />
     </div>
