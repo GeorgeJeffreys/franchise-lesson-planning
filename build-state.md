@@ -2,7 +2,25 @@
 
 Living record of what each phase delivered and what comes next. Update as you go.
 
-## Review layout: left-half lesson / right-half floating cards (both surfaces) ✅ (this phase)
+## Review layout: full-width curriculum, split begins at the objective ✅ (this phase)
+
+Refinement to the halves layout on the shared surface (`ReadOnlyPlan`, both `/view` and the
+editor Review step). Presentation only; no schema/RLS/server-action change.
+
+- The **curriculum reference block** (daily outcome · grammar & vocabulary · theme) now
+  spans the **full width** like the header — it's reference content at the top, so it moved
+  OUT of the left-half column into its own full-width wrapper above the split.
+- The **left/right split now BEGINS at the SMARTT objective**: the objective + lesson steps
+  sit in the left half; the comment cards float in the right half beside their step. The
+  split container (`<div className="relative">`) wraps only the objective + lesson sections,
+  so the right-half pane's `lg:inset-y-0` spans just that region.
+- Consequence handled: because the pane is scoped to the split region, the **whole-plan card
+  sits at the top of the comment zone beside the first section (the objective), BELOW the
+  full-width curriculum block** — it can no longer float up next to the grammar/theme cards
+  and overlap them (the original bug). Pane top padding (`lg:pt-[24px]`) matches the split
+  content's top padding so the whole-plan card top-aligns with the objective.
+
+## Review layout: left-half lesson / right-half floating cards (both surfaces) ✅ (prior phase)
 
 Replaced the full-width-body + right-edge-overlay model (which let the whole-plan card sit
 OVER the grammar/theme band and drifted section cards mid-page) with a clean two-half split

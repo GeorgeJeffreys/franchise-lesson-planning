@@ -171,16 +171,21 @@ export function ReadOnlyPlan({
       </div>
       )}
 
-      {/* Two halves (lg+): the lesson + curriculum content is capped to the LEFT half
-          (it stops at the midline, it does NOT span the page); the comment cards float in
-          the RIGHT half, each anchored to the vertical position of its section (below).
-          Only the plan header row (above) spans the full width. Below lg both stack. */}
+      {/* Full-width curriculum reference block — daily outcome / grammar & vocabulary /
+          theme span the FULL width like the header (reference content at the top), NOT part
+          of the left/right split below. */}
+      <div className="px-[22px] pt-[22px] lg:px-[30px]">
+        <CurriculumBand curriculum={curriculum} />
+      </div>
+
+      {/* Two halves (lg+) BEGIN at the SMARTT objective: the objective + lesson steps sit in
+          the LEFT half; the comment cards float in the RIGHT half, each anchored to the
+          vertical position of its step. Only the header + the curriculum block above span
+          the full width. Below lg both halves stack. */}
       <div className="relative">
         <div className="min-w-0 lg:w-1/2">
-          <div className="px-[22px] pb-10 pt-[22px] lg:px-[30px]">
-        <CurriculumBand curriculum={curriculum} />
-
-        <section className="mt-[24px]">
+          <div className="px-[22px] pb-10 pt-[24px] lg:px-[30px]">
+        <section>
           <h2 className="mb-[8px] text-[13px] font-bold uppercase tracking-[0.05em] text-text-faint">
             SMARTT objective
           </h2>
@@ -271,7 +276,7 @@ export function ReadOnlyPlan({
           // it never reflows the left half. `pointer-events-none` lets clicks fall through
           // the empty space; the cards re-enable pointer events on themselves. Shown lg+;
           // below lg the pane stacks in normal flow beneath the plan.
-          <div className="pointer-events-none relative mt-6 px-[22px] lg:absolute lg:inset-y-0 lg:start-1/2 lg:top-0 lg:mt-0 lg:w-[360px] lg:px-0 lg:ps-[22px] lg:pt-[22px]">
+          <div className="pointer-events-none relative mt-6 px-[22px] lg:absolute lg:inset-y-0 lg:start-1/2 lg:top-0 lg:mt-0 lg:w-[360px] lg:px-0 lg:ps-[22px] lg:pt-[24px]">
             {/* Wrapper is click-through; the pane re-enables pointer events on the cards
                 themselves, so the empty space (and the section ＋ beside it) stays
                 interactive. */}
