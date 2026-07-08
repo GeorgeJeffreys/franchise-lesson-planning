@@ -105,8 +105,12 @@ export function GhostLessonCard({ card }: { card: EmptySlotCard }) {
         disabled={busy}
         aria-label={t('card.planAria', { topic })}
         className={cn(
+          // Hover/focus feedback matches the planned card (GridLessonCard): a plain
+          // background tint, no ghost-specific teal ring — the resting flat/solid-
+          // border/muted look is unchanged. focus-visible falls back to the browser
+          // default outline, same as the planned card.
           'group flex w-full flex-1 flex-col rounded-[12px] border-[1.5px] border-solid border-border-strong px-[12px] py-[11px] text-start transition-colors',
-          'hover:border-teal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+          'hover:bg-surface-subtle',
           busy && 'cursor-not-allowed',
         )}
       >
