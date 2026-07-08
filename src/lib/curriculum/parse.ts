@@ -79,6 +79,23 @@ export function cleanEnglishWeeklySkillsLo(value: string | null): string | null 
   return /^\s*\d+(\.\d+)?\s*$/.test(value) ? null : value;
 }
 
+// ── Weekly-shape per-lesson outcome ───────────────────────────────────────────────
+//
+// Weekly-shape subjects (Awareness, Yoga) have NO Daily-LO column, so the app's
+// per-lesson outcome field — `daily_outcome`, which every reader resolves the lesson's
+// outcome from (curriculumUtils, curriculum-browse, the gaps `missing` classifier) —
+// would be null for every row and each row classifies `missing`. Their real per-lesson
+// outcome lives in the weekly columns instead. Resolve it here: Weekly Skill LO primary,
+// Weekly Knowledge LO appended on a newline when present. Both stay verbatim in
+// weekly_skills_lo / weekly_knowledge_lo, so this is a lossless display convenience.
+// Returns null only when BOTH are empty (that row stays `missing` — flagged, not a
+// whole-import drop). This runs ONLY when the sheet has no Daily-LO column, so daily
+// subjects (English et al.) are byte-for-byte unchanged, even where a daily cell is blank.
+export function composeWeeklyOutcome(skill: string | null, knowledge: string | null): string | null {
+  if (skill) return knowledge ? `${skill}\n${knowledge}` : skill;
+  return knowledge ?? null;
+}
+
 // ── Inline monthly Knowledge/Skills split (maths, science, it, arabic) ────────────
 //
 // English populates a combined "Monthly Learning Outcome" cell and the browse UI splits
@@ -524,6 +541,11 @@ export function parseCurriculumWorkbook(
 
   const hasWeekCol = byField.has('week');
   const hasPeriodCol = byField.has('period');
+  // A sheet with no Daily-LO column is a weekly-shape subject (Awareness, Yoga): its
+  // per-lesson outcome (`daily_outcome`) is resolved from the weekly columns below.
+  // Gated at sheet level (not per-row) so a daily sheet's occasional blank daily cell
+  // is never backfilled from week-level LOs.
+  const hasDailyOutcomeCol = byField.has('dailyLearningOutcome');
 
   // English weekly-field cleanups run on the ingest path itself (see the functions'
   // provenance note) — no-ops for every other subject.
@@ -634,6 +656,14 @@ export function parseCurriculumWorkbook(
         periodLabel,
       );
       const monthlySplit = splitInlineMonthly(subjectCode, value('monthlyLearningOutcome'));
+      // Resolve the weekly outcome columns once — reused verbatim for the weekly_* fields
+      // and (for weekly-shape sheets with no Daily-LO column) as the per-lesson daily_outcome.
+      const weeklySkillsResolved = cleanWeeklySkills(
+        hasWeekCol ? value('weeklySkillLearningOutcome') : rawWeeklySkill,
+      );
+      const weeklyKnowledgeResolved = cleanWeeklyKnowledge(
+        hasWeekCol ? value('weeklyKnowledgeLearningOutcome') : rawWeeklyKnowledge,
+      );
       lessonRows.set(lessonKey, {
         subject_code: subjectCode,
         year: yearIndex,
@@ -641,7 +671,11 @@ export function parseCurriculumWorkbook(
         week,
         period: periodForKey,
         lesson_key: lessonKey,
-        daily_outcome: rawDaily,
+        // Daily sheets read the Daily-LO column verbatim (unchanged). Weekly-shape sheets
+        // (no Daily-LO column — Awareness, Yoga) resolve the outcome from the weekly columns.
+        daily_outcome: hasDailyOutcomeCol
+          ? rawDaily
+          : composeWeeklyOutcome(weeklySkillsResolved, weeklyKnowledgeResolved),
         focus_area: rawAt(r, 'focusArea'),
         linguistic_skill: rawAt(r, 'linguisticSkill'),
         theme: rawAt(r, 'theme') ?? rawAt(r, 'topic'),
@@ -657,12 +691,8 @@ export function parseCurriculumWorkbook(
         monthly_skills_lo: monthlySplit
           ? monthlySplit.skills
           : value('monthlySkillLearningOutcome'),
-        weekly_knowledge_lo: cleanWeeklyKnowledge(
-          hasWeekCol ? value('weeklyKnowledgeLearningOutcome') : rawWeeklyKnowledge,
-        ),
-        weekly_skills_lo: cleanWeeklySkills(
-          hasWeekCol ? value('weeklySkillLearningOutcome') : rawWeeklySkill,
-        ),
+        weekly_knowledge_lo: weeklyKnowledgeResolved,
+        weekly_skills_lo: weeklySkillsResolved,
         grammar_vocabulary: rawAt(r, 'grammarVocabulary'),
         monthly_lo: value('monthlyLearningOutcome'),
         // Subject-level LO is a sheet constant; annual LO is a forward-filled per-year
