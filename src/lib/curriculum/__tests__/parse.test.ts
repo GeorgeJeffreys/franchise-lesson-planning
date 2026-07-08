@@ -114,10 +114,14 @@ test('English: sheet/header/grain detected; helper excluded; English mapping int
   assert.equal(lessonRows[1].grammar_vocabulary, null);
 
   // Baseline: period NULL, daily NULL, a sentinel lesson_key that can't collide with
-  // the numeric-period keys teacher lessons link to.
+  // the numeric-period keys teacher lessons link to. Its weekly cells forward-fill to
+  // non-null from P1, yet daily_outcome stays NULL — proving the weekly-outcome fallback
+  // is gated at SHEET level (English has a Daily-LO column) and never backfills a daily
+  // sheet's blank daily cell from week-level LOs.
   const baselineRow = lessonRows[2];
   assert.equal(baselineRow.period, null);
   assert.equal(baselineRow.daily_outcome, null);
+  assert.equal(baselineRow.weekly_skills_lo, 'Skill: write letters');
   assert.equal(baselineRow.lesson_key, 'english|Y0|February|W1|wk:baseline-evaluation');
 
   // Canonical record captures the richer model (incl. single monthly LO + grammar).
@@ -271,6 +275,11 @@ test('weekly grain: one row per week, written with NULL period + sentinel key', 
   assert.equal(lessonRows[0].lesson_key, 'awareness|Y1|October|W1|wk');
   assert.equal(lessonRows[0].weekly_skills_lo, 'Skill one');
   assert.equal(lessonRows[1].lesson_key, 'awareness|Y1|October|W2|wk');
+  // No Daily-LO column → the per-lesson daily_outcome is resolved from the weekly
+  // columns (skill primary, knowledge appended on a newline) so rows are no longer
+  // `missing`. Both LOs also remain verbatim in weekly_skills_lo/weekly_knowledge_lo.
+  assert.equal(lessonRows[0].daily_outcome, 'Skill one\nKnow one');
+  assert.equal(lessonRows[1].daily_outcome, 'Skill two\nKnow two');
   assert.ok(report.warnings.some((w) => w.includes('weekly grain')));
 });
 
