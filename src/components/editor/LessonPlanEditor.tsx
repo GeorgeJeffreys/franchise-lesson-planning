@@ -32,6 +32,7 @@ import { recordUsageAction } from '@/lib/actions/resources';
 import { EditorSubHeader } from '@/components/editor/EditorSubHeader';
 import { Stepper, STEP_COUNT } from '@/components/editor/Stepper';
 import { SubmitControl } from '@/components/editor/SubmitControl';
+import { Spinner } from '@/components/ui/Spinner';
 import { LockedBanner } from '@/components/editor/LockedBanner';
 import { CurriculumCard } from '@/components/editor/CurriculumCard';
 import { ObjectiveStep } from '@/components/editor/ObjectiveStep';
@@ -79,6 +80,7 @@ export function LessonPlanEditor({
   viewerName,
   phaseTitles,
   backHref = '/',
+  coordinatorAuthor = false,
 }: {
   data: EditorPlanData;
   /** Coordinator feedback on this plan. When present, the Review step (step 5) renders
@@ -92,6 +94,13 @@ export function LessonPlanEditor({
   phaseTitles: Record<string, string>;
   /** Where "‹ This week" returns — the board week this plan was opened from. */
   backHref?: string;
+  /**
+   * True when the viewer is the plan's author AND coordinates its subject — a
+   * coordinator authoring their own plan. Such a plan is born `approved`, so there is
+   * no submit/review lifecycle: the plan stays editable at every status (never
+   * locked) and the primary control is "Save", not "Submit for approval".
+   */
+  coordinatorAuthor?: boolean;
 }) {
   const { plan, classContext, curriculum, activitiesByBlock, resourceBank } = data;
   const t = useTranslations('wizard');
@@ -150,7 +159,9 @@ export function LessonPlanEditor({
   // `submitted` and `approved` both lock the plan pane read-only; `in_progress`
   // and `needs_review` leave it editable. The student WORKSHEET pane is exempt —
   // it stays editable at every status (its writes go through `saveWorksheet`).
-  const locked = status === 'submitted' || status === 'approved';
+  // A coordinator-authored plan is born `approved` but has no review lifecycle, so
+  // it is NEVER locked — its author keeps editing and just Saves.
+  const locked = !coordinatorAuthor && (status === 'submitted' || status === 'approved');
 
   const total = useMemo(() => inSessionMinutes(blocks), [blocks]);
 
@@ -252,7 +263,9 @@ export function LessonPlanEditor({
   // (`submitted_at` is cleared when a plan is recalled to `in_progress`, so status
   // is the durable signal. A recalled plan re-gates, but its stored pass is
   // re-seeded above, so it stays approved without a redundant re-check.)
-  const objectiveGateActive = status === 'in_progress';
+  // A coordinator authoring their own plan IS the approval authority, so the Aya
+  // objective gate never applies to them.
+  const objectiveGateActive = status === 'in_progress' && !coordinatorAuthor;
 
   // The exact string a check would evaluate for the current objective — mirrors the
   // stored-objective composition and the `handleCheck` payload.
@@ -412,7 +425,40 @@ export function LessonPlanEditor({
     }
   }
 
-  const submitControl = (
+  // A coordinator-authored plan has no submit lifecycle — flush the pending autosave
+  // and persist immediately. Status is untouched (stays `approved`); no submit, no
+  // notification. RLS (`lp_update`, author branch) and the unchanged
+  // `enforce_approval_role` (status doesn't change) both permit this write.
+  async function handleSave() {
+    setSubmitting(true);
+    setSubmitError(null);
+    if (timer.current) clearTimeout(timer.current);
+    const res = await saveLessonPlan({
+      id: plan.id,
+      smartt_objective: composeObjective(remainder),
+      blocks,
+      required_materials: materials,
+      smartt_check: checkResult ?? undefined,
+    });
+    setSubmitting(false);
+    setSaveState(res.ok ? 'saved' : 'error');
+    if (!res.ok) setSubmitError(res.error ?? t('errors.couldNotSubmit'));
+  }
+
+  const submitControl = coordinatorAuthor ? (
+    // Coordinator-author: Save, not Submit. The plan is already `approved`; this
+    // just commits edits, so it reads as a plain primary action.
+    <button
+      type="button"
+      onClick={handleSave}
+      disabled={submitting}
+      aria-busy={submitting || undefined}
+      className="inline-flex min-w-[92px] items-center justify-center gap-[7px] rounded-[9px] border-none bg-[#1F7A6C] px-4 py-[9px] text-[13px] font-semibold text-white hover:bg-[#186155] disabled:cursor-not-allowed disabled:bg-[#AFD0CA]"
+    >
+      {submitting ? <Spinner size={15} /> : null}
+      {submitting ? t('save.saving') : t('submit.save')}
+    </button>
+  ) : (
     <SubmitControl
       status={status}
       canSubmit={canSubmit}
