@@ -15,6 +15,7 @@ import type {
   WorksheetDoc,
   WorksheetFreeBlock,
   WorksheetResourceBlock,
+  WorksheetV3,
 } from '@/types/lesson';
 
 /** Generate a stable client id for a worksheet block. */
@@ -144,6 +145,13 @@ function asElement(value: unknown): FloatingElement | null {
 export function parseWorksheet(raw: unknown): Worksheet {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
     const obj = raw as Record<string, unknown>;
+    // v3 (the continuous document editor's shape). An old-builder read must
+    // degrade this gracefully rather than fall through to the empty branch, so
+    // the whole doc is re-homed into a single Free block (migrateV3ToV2). The
+    // new editor never reads through here — it consumes the v3 envelope directly.
+    if (obj.version === 3 && isTiptapDoc(obj.doc)) {
+      return migrateV3ToV2(obj.doc);
+    }
     if (obj.version === 2 && Array.isArray(obj.blocks)) {
       const blocks = obj.blocks.map(asBlock).filter((b): b is WorksheetBlock => b !== null);
       // Backfill: a legacy page-level `elements` array (from the pre-containment
@@ -174,6 +182,132 @@ export function parseWorksheet(raw: unknown): Worksheet {
     }
   }
   return emptyWorksheet();
+}
+
+// ── v3 → v2 downgrade (the kill-switch read path) ──────────────────────────
+
+/** Node/mark types the LEGACY worksheet schema (worksheetEditorExtensions) can
+ *  parse. A v3 doc may carry nodes/marks outside this set; feeding those to the old
+ *  `generateHTML(doc, worksheetEditorExtensions())` throws ("no node/mark type X in
+ *  this schema") or strips content, so `downgradeV3Doc` must rewrite them first. */
+const LEGACY_NODE_TYPES = new Set([
+  'doc', 'paragraph', 'heading', 'bulletList', 'orderedList', 'listItem',
+  'blockquote', 'horizontalRule', 'hardBreak', 'text', 'image', 'codeBlock',
+]);
+const LEGACY_MARK_TYPES = new Set([
+  'bold', 'italic', 'underline', 'strike', 'code', 'textStyle', 'link',
+]);
+// `link` is not in the legacy schema, so it is stripped (keeping the text) rather
+// than kept — listed above only to document that it is handled explicitly below.
+LEGACY_MARK_TYPES.delete('link');
+
+type MigrateNode = {
+  type?: string;
+  attrs?: Record<string, unknown>;
+  content?: MigrateNode[];
+  text?: string;
+  marks?: { type?: string }[];
+};
+
+/** Plain-text of a node subtree (used to collapse tables into paragraphs). */
+function nodeText(node: MigrateNode | undefined): string {
+  if (!node) return '';
+  if (typeof node.text === 'string') return node.text;
+  return (node.content ?? []).map(nodeText).join('');
+}
+
+/** A paragraph node carrying the given plain text (empty text → empty paragraph). */
+function textParagraph(text: string): MigrateNode {
+  const value = text.trim();
+  return value
+    ? { type: 'paragraph', content: [{ type: 'text', text: value }] }
+    : { type: 'paragraph' };
+}
+
+/** Strip marks the legacy schema can't parse (notably `link`), keeping the text. */
+function downgradeMarks(node: MigrateNode): MigrateNode {
+  const next: MigrateNode = { ...node };
+  if (Array.isArray(node.marks)) {
+    const kept = node.marks.filter((m) => m.type && LEGACY_MARK_TYPES.has(m.type));
+    if (kept.length > 0) next.marks = kept;
+    else delete next.marks;
+  }
+  if (Array.isArray(node.content)) next.content = node.content.flatMap(downgradeNode);
+  return next;
+}
+
+/**
+ * Rewrite ONE v3 node into zero or more legacy-schema-safe nodes:
+ *  - table → one paragraph per row (cells joined by " | "); the caption/plain text
+ *    survives, the grid does not (the old builder has no table extension);
+ *  - taskList/taskItem → bulletList/listItem;
+ *  - resourceRef → a placeholder paragraph;
+ *  - caption → paragraph;
+ *  - pageBreak → horizontalRule;
+ *  - anything already legacy → recurse into its content, stripping stray marks.
+ */
+function downgradeNode(node: MigrateNode): MigrateNode[] {
+  switch (node.type) {
+    case 'table': {
+      const rows = node.content ?? [];
+      return rows.map((row) =>
+        textParagraph((row.content ?? []).map((cell) => nodeText(cell).trim()).join(' | ')),
+      );
+    }
+    case 'taskList':
+      return [
+        {
+          type: 'bulletList',
+          content: (node.content ?? []).flatMap(downgradeNode),
+        },
+      ];
+    case 'taskItem':
+      return [{ type: 'listItem', content: (node.content ?? []).flatMap(downgradeNode) }];
+    case 'resourceRef': {
+      const uploader =
+        node.attrs && typeof node.attrs.uploaderName === 'string' ? node.attrs.uploaderName : null;
+      return [textParagraph(uploader ? `[Attached resource — ${uploader}]` : '[Attached resource]')];
+    }
+    case 'caption':
+      return [{ type: 'paragraph', content: (node.content ?? []).flatMap(downgradeNode) }];
+    case 'pageBreak':
+      return [{ type: 'horizontalRule' }];
+    default: {
+      if (node.type && !LEGACY_NODE_TYPES.has(node.type)) {
+        // An unknown node the old schema can't hold: keep its text as a paragraph
+        // so nothing silently vanishes and generateHTML never throws.
+        return [textParagraph(nodeText(node))];
+      }
+      return [downgradeMarks(node)];
+    }
+  }
+}
+
+/** Rewrite a whole v3 doc into a legacy-schema-safe doc (see `downgradeNode`). */
+export function downgradeV3Doc(doc: WorksheetV3['doc']): WorksheetDoc {
+  const content = Array.isArray((doc as MigrateNode).content)
+    ? ((doc as MigrateNode).content as MigrateNode[]).flatMap(downgradeNode)
+    : [];
+  return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] } as WorksheetDoc;
+}
+
+/**
+ * Degrade a v3 continuous document back to a v2 worksheet (the flag kill-switch /
+ * old-builder read path). The doc is first rewritten to legacy-schema-safe nodes
+ * (`downgradeV3Doc`: tables → paragraphs, taskList → bulletList, link marks
+ * dropped, resourceRef → placeholder, caption → paragraph, pageBreak → hr) so the
+ * old `generateHTML(doc, worksheetEditorExtensions())` never throws or blanks, then
+ * wrapped as ONE Free block. Lossy by design (the multi-block split and rich nodes
+ * collapse), but the text/headings/lists/images survive.
+ *
+ * IMPORTANT: this is a RENDER-ONLY path. Its result must never be written back over
+ * the source v3 row — the caller (LessonPlanEditor) mounts a read-only view for a
+ * v3 row when the document-editor flag is off, so no autosave can clobber it.
+ */
+export function migrateV3ToV2(doc: WorksheetV3['doc']): Worksheet {
+  const block = newFreeBlock();
+  block.doc = coalesceDocLists(downgradeV3Doc(doc));
+  return { version: 2, blocks: [block] };
 }
 
 /** True when the worksheet has no exercises (drives the empty state). */
