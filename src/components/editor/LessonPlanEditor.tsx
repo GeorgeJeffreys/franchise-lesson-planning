@@ -19,6 +19,7 @@ import {
   isObjectiveCheckResult,
   requestObjectiveCheck,
   ObjectiveCheckRequestError,
+  SMARTT_LETTERS,
   type ObjectiveCheckResult,
 } from '@/lib/editor/objective-check';
 import {
@@ -123,6 +124,18 @@ export function LessonPlanEditor({
   const [checkResult, setCheckResult] = useState<ObjectiveCheckResult | null>(() =>
     isObjectiveCheckResult(plan.smartt_check) ? plan.smartt_check : null,
   );
+  // The exact objective payload the current `checkResult` was produced for. Kept in
+  // lockstep with `checkResult` so approval binds to the string Aya actually
+  // evaluated, not a mere "has been checked" flag. Seeded from the stored objective
+  // when a stored check exists, so a previously-passing objective stays approved
+  // across sessions without a redundant re-check — computed the SAME way as
+  // `currentPayload` below so a canonical stored value matches on mount (a legacy /
+  // paraphrased stored value simply fails closed → a re-check is required).
+  const [lastCheckedPayload, setLastCheckedPayload] = useState<string | null>(() => {
+    if (!isObjectiveCheckResult(plan.smartt_check)) return null;
+    const seed = stripStem(plan.smartt_objective);
+    return composeObjective(seed) || seed;
+  });
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
 
@@ -230,9 +243,56 @@ export function LessonPlanEditor({
     setRemainder(stripStem(plan.smartt_objective));
   }, [plan.blocks, plan.smartt_objective]);
 
-  const goStep = useCallback((n: number) => {
-    setStep(Math.max(1, Math.min(STEP_COUNT, n)));
-  }, []);
+  // ── Objective gate ───────────────────────────────────────────────────────────
+  // A NEW lesson cannot advance past the objective step (step 1) until its SMARTT
+  // objective has been checked by Aya and all six criteria passed. Once a plan has
+  // reached a coordinator it is trusted, so the gate applies only to the initial
+  // draft (`in_progress`); `submitted` / `needs_review` / `approved` are exempt.
+  // (`submitted_at` is cleared when a plan is recalled to `in_progress`, so status
+  // is the durable signal. A recalled plan re-gates, but its stored pass is
+  // re-seeded above, so it stays approved without a redundant re-check.)
+  const objectiveGateActive = status === 'in_progress';
+
+  // The exact string a check would evaluate for the current objective — mirrors the
+  // stored-objective composition and the `handleCheck` payload.
+  const currentPayload = composeObjective(remainder) || remainder;
+
+  // Whether the current result still describes the current text. Trim-only compare:
+  // a genuine wording change re-locks; leading/trailing whitespace does not.
+  const checkAppliesToCurrent =
+    checkResult != null &&
+    lastCheckedPayload != null &&
+    currentPayload.trim() === lastCheckedPayload.trim();
+
+  // Approved ⇔ the applicable result passed every one of the six SMARTT letters.
+  // `ObjectiveCheckResult` carries no overall flag, so require all six `strong`.
+  const isObjectiveApproved =
+    checkAppliesToCurrent &&
+    SMARTT_LETTERS.every((l) => checkResult![l.key].status === 'strong');
+
+  // Forward advancement is blocked while the gate is active and unapproved.
+  const advanceBlocked = objectiveGateActive && !isObjectiveApproved;
+
+  // The single teal gate-reason line beside the disabled advance control (step 1).
+  //   • no check yet, or the check applies but didn't all-pass → run/pass it
+  //   • the check no longer matches the edited objective        → it's stale
+  const gateHint = !advanceBlocked
+    ? null
+    : checkResult != null && !checkAppliesToCurrent
+      ? t('objectiveGate.stale')
+      : t('objectiveGate.mustPass');
+
+  const goStep = useCallback(
+    (n: number) => {
+      // Gate: a gated, unapproved objective blocks every jump PAST the objective
+      // step (step 1). Both the Next button and the step-header nodes route through
+      // here, so this one check governs both. Returning to the objective step or
+      // earlier is always free.
+      if (advanceBlocked && n > 1) return;
+      setStep(Math.max(1, Math.min(STEP_COUNT, n)));
+    },
+    [advanceBlocked],
+  );
 
   const patchType = useCallback((type: LessonBlockType, patch: Partial<Block>) => {
     setBlocks((bs) => patchBlock(bs, type, patch));
@@ -289,8 +349,13 @@ export function LessonPlanEditor({
   async function handleCheck() {
     setChecking(true);
     setCheckError(null);
+    // The exact string Aya evaluates — captured at fire time and stored alongside
+    // the result so approval binds to this payload, not a stale one. Mirrors the
+    // stored-objective composition, so it equals what autosave/submit persist.
+    const payload = composeObjective(remainder) || remainder;
+    setLastCheckedPayload(payload);
     try {
-      const result = await requestObjectiveCheck(composeObjective(remainder) || remainder, {
+      const result = await requestObjectiveCheck(payload, {
         dailyOutcome: curriculum?.dailyLO || undefined,
         grammarVocab: curriculum?.grammarVocab || undefined,
         theme: curriculum?.theme || undefined,
@@ -454,6 +519,8 @@ export function LessonPlanEditor({
           onNext={() => goStep(step + 1)}
           nextLabel={step === 4 ? t('nav.toReview') : t('nav.next')}
           submitSlot={submitControl}
+          advanceBlocked={advanceBlocked}
+          gateHint={gateHint}
         />
       </div>
 
@@ -474,6 +541,7 @@ export function LessonPlanEditor({
                   remainder={remainder}
                   onChange={setRemainder}
                   checkResult={checkResult}
+                  checkApplies={checkAppliesToCurrent}
                   checking={checking}
                   checkError={checkError}
                   onCheck={handleCheck}

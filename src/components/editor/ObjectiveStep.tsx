@@ -73,6 +73,7 @@ export function ObjectiveStep({
   remainder,
   onChange,
   checkResult,
+  checkApplies = true,
   checking,
   checkError,
   onCheck,
@@ -81,6 +82,12 @@ export function ObjectiveStep({
   remainder: string;
   onChange: (next: string) => void;
   checkResult: ObjectiveCheckResult | null;
+  /** Whether `checkResult` still describes the CURRENT objective text. When false
+   *  (the teacher edited the objective since the last check, or a stored result no
+   *  longer matches), the six SMARTT pills fall back to their idle state — the
+   *  result no longer applies, so it must not read as a live pass/fail verdict. The
+   *  feedback disclosure still shows the last check's notes as advisory context. */
+  checkApplies?: boolean;
   checking: boolean;
   checkError: string | null;
   onCheck: () => void;
@@ -148,7 +155,7 @@ export function ObjectiveStep({
           <SmarttPill
             key={l.key}
             label={l.label}
-            result={checkResult?.[l.key]}
+            result={checkApplies ? checkResult?.[l.key] : undefined}
             checking={checking}
           />
         ))}
