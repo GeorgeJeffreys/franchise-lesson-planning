@@ -33,13 +33,15 @@ gold-master workbooks:
 | arabic | `Arabic Curriculum (2)` | E / F / L / M | **N** `نتائج التعلم اليومية` | H · K (weekly) | daily (row 7) |
 | maths | `Curriculum Math` | D / F / N / O | **P** `Daily LO` | J · M (weekly) | daily |
 | science | `Version 2 ` (sic) | E / G / O / P | **Q** `Daily LO` | K · N (weekly) | daily |
-| professionalism | `V1` | E / G / O / P | **Q** `Daily LO` | J · M (**monthly**) | daily |
+| professionalism | `V4` (only visible) | E / G / K / L | **M** `Daily LO` | I · J (weekly) | daily (Y3–6) |
 | awareness | `Awareness Cirriculum V3` | E / G / K / — | **compose(I, J)** | I · J (weekly) | weekly |
 | yoga | `Yoga Curriculum` | E / G / P / (forced P1) | **compose(K, N)** | K · N (weekly) | daily (P1) |
 
 Sheet-selection gotchas the pins encode: arabic uses `Arabic Curriculum (2)` (the other
 tab has taxonomy-code junk in the daily column); science's sheet name has a **trailing
-space**; professionalism uses `V1` (V2 is a near-dup, V4 has a different layout). Yoga's
+space**; professionalism uses **`V4`** — the only *visible* sheet (V1/V2/Detail*/Sheet1
+are hidden legacy versions, and the DB was mistakenly ingested from the hidden, stale
+`V1`). Yoga's
 source is one row per week with blank period cells, so its period is **forced to 1** to
 match the DB key; prof carries **Monthly** S/K (the DB's `weekly_*` are NULL for prof, so
 they're not diffed — a product decision left open).
@@ -103,7 +105,7 @@ decoys ≈ 0. The gate is red only for real, explained reasons — hand these to
 | Subject | Gate | What the audit found |
 |---|---|---|
 | **maths** | ✅ pass | 1240/1240 exact, incl. Year 0. Cross-check 1.000. |
-| **professionalism** | ✅ pass | 840/840 exact; 8 August Orientation/Evaluation markers excused. |
+| **professionalism** | ❌ fail | DB is stale **V1** (a hidden legacy sheet). Repinned to the only-visible **V4**: daily content AND week-numbering differ entirely (jaccard 0.000, 160/160 daily mismatch on overlapping keys), so it reads red until re-ingested from V4. This is the bug the V1 pin was hiding. |
 | **science** | ❌ fail | 5 `Y5 May W36` lessons drift across all fields — the source was **edited after ingest** (DB: reproduction; source: mitosis/cancer). Reconcile or re-import. 17 holiday markers excused; 10 duplicate source keys noted. |
 | **awareness** | ❌ fail | `daily_outcome` is **NULL for all 248 rows** — `composeWeekly` (skill `\n` knowledge) was never applied at ingest. Weekly fields already correct. Fix = re-ingest. |
 | **yoga** | ❌ fail | Same `composeWeekly` NULL defect (215 rows). Plus 12 un-imported new weeks (source-only) and the known `Y5 "Year 5" W5 P5` artefact (excused). |

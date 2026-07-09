@@ -214,23 +214,26 @@ const PROFESSIONALISM: PinnedMapping = {
   subject: 'professionalism',
   file: 'Alsama_Professionalism_Curriculum__1_.xlsx',
   fallbackFile: 'professionalism.xlsx',
-  sheet: 'V1', // NOT V2 (near-dup) / V4 (different layout) / Detail*/Sheet1
+  // V4 is the ONLY VISIBLE sheet (the current logic-tree content); V1/V2/Detail*/Sheet1
+  // are all hidden legacy versions. The DB was ingested from the hidden, STALE V1 (the
+  // ingest reads the first sheet without consulting visibility — the bug fixed on
+  // claude/ingest-sheet-and-weekly-fixes). Pinning to V4 makes the gate report the
+  // stale daily_outcome (Y3–6) that the V1 pin was hiding — a CORRECT red until re-ingest.
+  sheet: 'V4',
   headerRow: 7,
-  firstDataRow: 9,
-  outcome: { kind: 'single', col: 'Q' }, // Daily LO
-  key: { year: 'E', month: 'G', week: 'O', period: 'P' },
-  grain: 'daily',
-  // Prof carries MONTHLY skill/knowledge (J/M), not Weekly — and the DB's weekly_* fields
-  // are NULL for prof. So no `fields` diff (it would be all-null noise); J/M are kept only
-  // as cross-check candidates. Whether monthly LOs should populate weekly_* is a product
-  // decision left open — the audit expects them NULL until then.
-  fillColumns: ['E', 'G', 'O', 'J', 'M'],
+  firstDataRow: 8, // annual/baseline row above the first Period-1 lesson (row 9)
+  outcome: { kind: 'single', col: 'M' }, // V4 Daily LO (different layout from V1's Q)
+  key: { year: 'E', month: 'G', week: 'K', period: 'L' }, // V4: week K, period L
+  grain: 'daily', // Years 3–6 only (~773 lessons)
+  fillColumns: ['E', 'G', 'K', 'I', 'J'], // year/month/week + merged weekly skill/knowledge
+  fields: { weekly_skills_lo: 'I', weekly_knowledge_lo: 'J' }, // V4 has WEEKLY S/K (I/J)
   candidates: [
-    { label: 'Daily LO (Q)', rule: { kind: 'single', col: 'Q' } },
-    { label: 'Monthly Skill (J)', rule: { kind: 'single', col: 'J' } },
-    { label: 'Monthly Knowledge (M)', rule: { kind: 'single', col: 'M' } },
+    { label: 'Daily LO (M)', rule: { kind: 'single', col: 'M' } },
+    { label: 'Weekly Skill (I)', rule: { kind: 'single', col: 'I' } },
+    { label: 'Weekly Knowledge (J)', rule: { kind: 'single', col: 'J' } },
+    { label: 'Monthly LO (H)', rule: { kind: 'single', col: 'H' } },
   ],
-  isMarker: isNonInstructionalMarker, // 8 Orientation/Evaluation week markers
+  isMarker: isNonInstructionalMarker,
   pinned: true,
 };
 
