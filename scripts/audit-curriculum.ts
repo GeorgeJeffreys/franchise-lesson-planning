@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { loadAppGoldText } from '../src/lib/curriculum/audit/app-source';
 import { extractWorkbook } from '../src/lib/curriculum/audit/extract';
-import { canAudit, fixturesDir, goldPath, workbookPath } from '../src/lib/curriculum/audit/fixtures';
+import { canAudit, fixturesDir, goldTextFor, workbookPath } from '../src/lib/curriculum/audit/fixtures';
 import { pinnedSubjects, unpinnedSubjects } from '../src/lib/curriculum/audit/pinned-map';
 import { formatSubjectReport, reconcileSubject } from '../src/lib/curriculum/audit/reconcile';
 
@@ -36,7 +36,7 @@ for (const pin of pinned) {
   }
   const buf = readFileSync(workbookPath(pin)!);
   const extract = extractWorkbook(buf, pin);
-  const appRows = loadAppGoldText(pin.subject, readFileSync(goldPath(pin.subject), 'utf8'));
+  const appRows = loadAppGoldText(pin.subject, goldTextFor(pin.subject)!);
   const report = reconcileSubject(pin, extract, appRows);
   console.log(formatSubjectReport(report));
   console.log('');

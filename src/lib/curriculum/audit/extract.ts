@@ -147,7 +147,14 @@ export function extractWorkbook(buffer: Buffer | ArrayBuffer, pin: PinnedMapping
     const year = normalizeYear(valueOf(pin.key.year));
     const month = normalizeMonth(valueOf(pin.key.month));
     const week = normalizeWeek(valueOf(pin.key.week));
-    const period = pin.key.period ? normalizePeriod(valueOf(pin.key.period)) : null;
+    // A pinned periodOverride forces every lesson to a fixed period (yoga: the source is
+    // one row per week with blank period cells, but the DB keys every row Period 1).
+    const period =
+      pin.periodOverride != null
+        ? pin.periodOverride
+        : pin.key.period
+          ? normalizePeriod(valueOf(pin.key.period))
+          : null;
 
     // A valid lesson row resolves the whole natural key. Daily grain also needs a
     // period (non-instructional rows without a period digit are not standard lessons).

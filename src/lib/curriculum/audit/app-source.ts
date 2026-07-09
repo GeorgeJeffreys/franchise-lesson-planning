@@ -92,9 +92,13 @@ const FIELD_COLUMNS = [
   'linguistic_skill',
 ] as const;
 
-/** Parse gold-master CSV text into app rows for a subject (key rebuilt from columns). */
+/** Parse gold-master CSV text into app rows for a subject (key rebuilt from columns).
+ *  Filters by `subject_code`, so a single COMBINED export (all subjects in one CSV) is
+ *  scoped correctly and never bleeds another subject's rows in. */
 export function loadAppGoldText(subject: string, text: string): AppRow[] {
-  return parseCsvRecords(text).map((r) => {
+  return parseCsvRecords(text)
+    .filter((r) => (r.subject_code ?? subject) === subject)
+    .map((r) => {
     const year = normalizeYear(r.year) ?? 0;
     const month = normalizeMonth(r.month) ?? '';
     const week = normalizeWeek(r.week) ?? 0;

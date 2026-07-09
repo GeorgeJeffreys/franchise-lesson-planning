@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadAppGoldText } from '../audit/app-source';
 import { extractWorkbook } from '../audit/extract';
-import { canAudit, goldPath, workbookPath } from '../audit/fixtures';
+import { canAudit, goldTextFor, workbookPath } from '../audit/fixtures';
 import { pinnedSubjects, unpinnedSubjects } from '../audit/pinned-map';
-import { formatSubjectReport, reconcileSubject, totalContentMismatches } from '../audit/reconcile';
+import { formatSubjectReport, hardContentMismatches, reconcileSubject } from '../audit/reconcile';
 
 // ── Curriculum fidelity GATE (independent, full-content reconciliation) ────────────
 //
@@ -29,19 +29,19 @@ for (const pin of pinnedSubjects()) {
 
   test(`fidelity gate — ${pin.subject}`, { skip }, () => {
     const extract = extractWorkbook(readFileSync(workbookPath(pin)!), pin);
-    const appRows = loadAppGoldText(pin.subject, readFileSync(goldPath(pin.subject), 'utf8'));
+    const appRows = loadAppGoldText(pin.subject, goldTextFor(pin.subject)!);
     const report = reconcileSubject(pin, extract, appRows);
 
     assert.equal(
-      report.coverage.appOnly.length,
+      report.coverage.appOnlyOrphans.length,
       0,
-      `${pin.subject}: ${report.coverage.appOnly.length} DB row(s) have NO backing source row ` +
-        `(fabricated/orphaned).\n${formatSubjectReport(report)}`,
+      `${pin.subject}: ${report.coverage.appOnlyOrphans.length} DB row(s) have NO backing ` +
+        `source row and are not documented markers (fabricated/orphaned).\n${formatSubjectReport(report)}`,
     );
     assert.equal(
-      totalContentMismatches(report),
+      hardContentMismatches(report),
       0,
-      `${pin.subject}: Tier-1 outcome corruption on matched rows.\n${formatSubjectReport(report)}`,
+      `${pin.subject}: Tier-1 daily_outcome corruption on matched rows.\n${formatSubjectReport(report)}`,
     );
   });
 }

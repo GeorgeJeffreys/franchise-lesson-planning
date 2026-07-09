@@ -79,7 +79,7 @@ test('coverage + Tier-1 content diff on matched rows (app-only fails the gate)',
   const report = reconcileSubject(DAILY_PIN, res, loadAppGoldText('english', gold));
 
   assert.equal(report.coverage.matched, 3);
-  assert.deepEqual(report.coverage.appOnly, ['english|Y5|may|W9|P3']);
+  assert.deepEqual(report.coverage.appOnlyOrphans, ['english|Y5|may|W9|P3']);
   assert.deepEqual(report.coverage.sourceOnly, ['english|Y4|may|W1|P1']); // un-imported
   assert.equal(totalContentMismatches(report), 1);
   assert.equal(report.content[0].mismatches, 1);

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PinnedMapping } from './pinned-map';
 
@@ -29,13 +29,30 @@ export function workbookPath(pin: PinnedMapping): string | null {
   return null;
 }
 
-/** The exported DB gold master for a subject (full-text `curriculum_lesson` rows). */
+/** Per-subject DB gold master (`goldmaster/<subject>.csv`). */
 export function goldPath(subject: string): string {
   return resolve(fixturesDir(), 'goldmaster', `${subject}.csv`);
 }
 
+/** A single COMBINED export of all subjects (`goldmaster.csv`) — what Track A produces. */
+export function combinedGoldPath(): string {
+  return resolve(fixturesDir(), 'goldmaster.csv');
+}
+
+/**
+ * Resolve a subject's gold-master CSV text: the per-subject file first, else the combined
+ * export (`loadAppGoldText` filters it by subject_code). Null when neither is present.
+ */
+export function goldTextFor(subject: string): string | null {
+  const per = goldPath(subject);
+  if (existsSync(per)) return readFileSync(per, 'utf8');
+  const combined = combinedGoldPath();
+  if (existsSync(combined)) return readFileSync(combined, 'utf8');
+  return null;
+}
+
 export function hasGold(subject: string): boolean {
-  return existsSync(goldPath(subject));
+  return existsSync(goldPath(subject)) || existsSync(combinedGoldPath());
 }
 
 /** True when a subject can actually be audited here (source workbook + DB gold both present). */

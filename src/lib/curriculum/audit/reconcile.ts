@@ -11,12 +11,12 @@ import type { PinnedMapping } from './pinned-map';
 //   3. Set cross-check      — which source column the DB set ACTUALLY matches (mis-bind).
 //   4. Whitespace-only      — Tier-0 fail / Tier-1 pass, reported separately, low priority.
 //
-// GATE invariant (what blocks an ingest): every DB row is backed by a source row
-// (app-only == 0, no fabricated/orphaned lessons) AND every matched row's outcome is
-// content-identical (Tier-1 mismatches == 0). Source-only rows (in the workbook, not
-// yet in the DB) are surfaced but not fatal on their own — a newer workbook legitimately
-// carries un-imported new curriculum (same rationale as the parser parity gate's
-// non-fatal "extra"). Run against the exact ingest source, source-only is ~zero too.
+// GATE invariant (what blocks an ingest): every DB row is backed by a source row OR is a
+// documented structural marker (no fabricated/orphaned lessons) AND every matched row's
+// `daily_outcome` is content-identical (Tier-1). The weekly_* field diffs are reported as
+// INFORMATIONAL (merge-boundary-sensitive), not gated. Years with no source workbook are
+// excluded from coverage on both sides (documented), not silently dropped. Source-only
+// rows (in the workbook, not yet in the DB) are surfaced but not fatal on their own.
 
 const SAMPLE_LIMIT = 5;
 
@@ -34,6 +34,8 @@ export interface ContentSample {
 
 export interface FieldContentDiff {
   field: string;
+  /** Informational fields (weekly_*) are reported but do NOT block the gate. */
+  informational: boolean;
   compared: number;
   mismatches: number;
   samples: ContentSample[];
@@ -41,9 +43,7 @@ export interface FieldContentDiff {
 
 export interface CandidateScore {
   label: string;
-  /** |appSet ∩ candSet| / |appSet ∪ candSet| — overall set agreement. */
   jaccard: number;
-  /** |appSet ∩ candSet| / |appSet| — how much of the DB set this column explains. */
   appCoverage: number;
   exactMatch: boolean;
 }
@@ -51,12 +51,16 @@ export interface CandidateScore {
 export interface SubjectReport {
   subject: string;
   sheet: string;
+  excludedYears: number[];
   coverage: {
     sourceRows: number;
     appRows: number;
     matched: number;
     sourceOnly: string[];
-    appOnly: string[];
+    /** DB rows with no source row, EXCLUDING documented markers — these block the gate. */
+    appOnlyOrphans: string[];
+    /** DB rows with no source row that are documented structural markers — excused. */
+    appOnlyMarkers: string[];
   };
   content: FieldContentDiff[];
   setCrossCheck: {
@@ -68,19 +72,25 @@ export interface SubjectReport {
   whitespaceOnly: { count: number; samples: ContentSample[] };
   duplicateSourceKeys: { keyStr: string; sourceRows: number[] }[];
   skippedSourceRows: number;
-  /** appOnly==0 AND all Tier-1 content mismatches==0 — the ingest-blocking invariant. */
+  /** appOnlyOrphans==0 AND daily_outcome Tier-1 mismatches==0 — the ingest-blocking invariant. */
   gatePass: boolean;
   /** gatePass AND sourceOnly==0 — full zero-diff (source == app both directions). */
   strictPass: boolean;
 }
 
-/** Total Tier-1 content mismatches across daily_outcome and every diffed extra field. */
+/** Tier-1 mismatches on the HARD (gated) daily_outcome field only. */
+export function hardContentMismatches(report: SubjectReport): number {
+  return report.content.find((c) => !c.informational)?.mismatches ?? 0;
+}
+
+/** Tier-1 mismatches across every diffed field (hard + informational). */
 export function totalContentMismatches(report: SubjectReport): number {
   return report.content.reduce((sum, c) => sum + c.mismatches, 0);
 }
 
 function diffField(
   field: string,
+  informational: boolean,
   matched: string[],
   sourceOf: (k: string) => string | null,
   appOf: (k: string) => string | null,
@@ -95,7 +105,7 @@ function diffField(
       if (samples.length < SAMPLE_LIMIT) samples.push({ keyStr: k, source: s, app: a });
     }
   }
-  return { field, compared: matched.length, mismatches, samples };
+  return { field, informational, compared: matched.length, mismatches, samples };
 }
 
 /**
@@ -107,8 +117,12 @@ export function reconcileSubject(
   extract: ExtractResult,
   appRows: AppRow[],
 ): SubjectReport {
-  const srcByKey = new Map(extract.rows.map((r) => [r.keyStr, r] as const));
-  const appByKey = new Map(appRows.map((r) => [r.keyStr, r] as const));
+  const excluded = new Set(pin.excludeYears ?? []);
+  const srcRows = extract.rows.filter((r) => !excluded.has(r.key.year));
+  const appAll = appRows.filter((r) => !excluded.has(r.key.year));
+
+  const srcByKey = new Map(srcRows.map((r) => [r.keyStr, r] as const));
+  const appByKey = new Map(appAll.map((r) => [r.keyStr, r] as const));
 
   // ── Layer 1: coverage ──
   const srcKeys = new Set(srcByKey.keys());
@@ -116,11 +130,18 @@ export function reconcileSubject(
   const matched = [...srcKeys].filter((k) => appKeys.has(k)).sort();
   const sourceOnly = [...srcKeys].filter((k) => !appKeys.has(k)).sort();
   const appOnly = [...appKeys].filter((k) => !srcKeys.has(k)).sort();
+  const appOnlyMarkers: string[] = [];
+  const appOnlyOrphans: string[] = [];
+  for (const k of appOnly) {
+    const row = appByKey.get(k)!;
+    (pin.isMarker?.(row) ? appOnlyMarkers : appOnlyOrphans).push(k);
+  }
 
-  // ── Layer 2: content (Tier-1) on matched rows ──
+  // ── Layer 2: content (Tier-1) on matched rows — daily_outcome HARD, weekly_* informational ──
   const content: FieldContentDiff[] = [
     diffField(
       'daily_outcome',
+      false,
       matched,
       (k) => srcByKey.get(k)?.outcome ?? null,
       (k) => appByKey.get(k)?.dailyOutcome ?? null,
@@ -131,6 +152,7 @@ export function reconcileSubject(
     content.push(
       diffField(
         dbField,
+        true,
         matched,
         (k) => srcByKey.get(k)?.values[sourceCol] ?? null,
         (k) => appByKey.get(k)?.fields[dbField] ?? null,
@@ -138,17 +160,16 @@ export function reconcileSubject(
     );
   }
 
-  // ── Layer 3: set cross-check (which source column did the DB set actually match?) ──
+  // ── Layer 3: set cross-check ──
   const appSet = new Set(
-    appRows.map((r) => tier1(r.dailyOutcome)).filter((v): v is string => v != null),
+    appAll.map((r) => tier1(r.dailyOutcome)).filter((v): v is string => v != null),
   );
   const pinnedLabel = pin.candidates.find(
-    (c) =>
-      JSON.stringify(c.rule) === JSON.stringify(pin.outcome),
+    (c) => JSON.stringify(c.rule) === JSON.stringify(pin.outcome),
   )?.label;
   const candidates: CandidateScore[] = pin.candidates.map((cand) => {
     const candSet = new Set(
-      extract.rows
+      srcRows
         .map((r) => tier1(applyOutcomeRule(cand.rule, (col) => r.values[col] ?? null)))
         .filter((v): v is string => v != null),
     );
@@ -173,22 +194,25 @@ export function reconcileSubject(
     const a = appByKey.get(k)?.dailyOutcome ?? null;
     if (tier1(s) === tier1(a) && tier0(s) !== tier0(a)) {
       wsCount++;
-      if (wsSamples.length < SAMPLE_LIMIT) wsSamples.push({ keyStr: k, source: truncate(s), app: truncate(a) });
+      if (wsSamples.length < SAMPLE_LIMIT)
+        wsSamples.push({ keyStr: k, source: truncate(s), app: truncate(a) });
     }
   }
 
-  const contentMismatches = content.reduce((sum, c) => sum + c.mismatches, 0);
-  const gatePass = appOnly.length === 0 && contentMismatches === 0;
+  const dailyMismatches = content[0].mismatches;
+  const gatePass = appOnlyOrphans.length === 0 && dailyMismatches === 0;
 
   return {
     subject: pin.subject,
     sheet: pin.sheet,
+    excludedYears: [...excluded].sort(),
     coverage: {
       sourceRows: srcKeys.size,
       appRows: appKeys.size,
       matched: matched.length,
       sourceOnly,
-      appOnly,
+      appOnlyOrphans,
+      appOnlyMarkers,
     },
     content,
     setCrossCheck: {
@@ -209,28 +233,34 @@ export function reconcileSubject(
 export function formatSubjectReport(r: SubjectReport): string {
   const L: string[] = [];
   const cov = r.coverage;
+  const excl = r.excludedYears.length ? ` excl-years=[${r.excludedYears.join(',')}]` : '';
   L.push(
     `${r.subject.padEnd(15)} [${r.sheet}]  source=${cov.sourceRows} app=${cov.appRows} ` +
-      `matched=${cov.matched} source-only=${cov.sourceOnly.length} app-only=${cov.appOnly.length}`,
+      `matched=${cov.matched} source-only=${cov.sourceOnly.length} ` +
+      `app-only(orphan=${cov.appOnlyOrphans.length}, marker=${cov.appOnlyMarkers.length})${excl}`,
   );
-  if (cov.appOnly.length)
-    L.push(`  ⚠ app-only (fabricated/orphaned): ${cov.appOnly.slice(0, 8).join(', ')}`);
+  if (cov.appOnlyOrphans.length)
+    L.push(`  ⚠ orphan app-only (blocks gate): ${cov.appOnlyOrphans.slice(0, 8).join(', ')}`);
+  if (cov.appOnlyMarkers.length)
+    L.push(`  · marker app-only (excused): ${cov.appOnlyMarkers.slice(0, 6).join(', ')}`);
   if (cov.sourceOnly.length)
-    L.push(`  · source-only (un-imported new content): ${cov.sourceOnly.slice(0, 8).join(', ')}`);
+    L.push(`  · source-only (un-imported): ${cov.sourceOnly.slice(0, 6).join(', ')}`);
   for (const c of r.content) {
-    const tag = c.mismatches === 0 ? '✓' : '✗';
-    L.push(`  ${tag} ${c.field}: ${c.mismatches}/${c.compared} Tier-1 mismatch`);
-    for (const s of c.samples) L.push(`      ${s.keyStr}\n        source: ${truncate(s.source)}\n        app:    ${truncate(s.app)}`);
+    const tag = c.mismatches === 0 ? '✓' : c.informational ? '·' : '✗';
+    const label = c.informational ? `${c.field} (informational)` : c.field;
+    L.push(`  ${tag} ${label}: ${c.mismatches}/${c.compared} Tier-1 mismatch`);
+    if (!c.informational)
+      for (const s of c.samples)
+        L.push(`      ${s.keyStr}\n        source: ${truncate(s.source)}\n        app:    ${truncate(s.app)}`);
   }
   L.push(`  set cross-check (app daily_outcome set, |${r.setCrossCheck.appSetSize}|):`);
   for (const c of r.setCrossCheck.candidates)
     L.push(
-      `      ${c.exactMatch ? '=' : ' '} ${c.label.padEnd(32)} jaccard=${c.jaccard.toFixed(3)} appCoverage=${c.appCoverage.toFixed(3)}`,
+      `      ${c.exactMatch ? '=' : ' '} ${c.label.padEnd(30)} jaccard=${c.jaccard.toFixed(3)} appCoverage=${c.appCoverage.toFixed(3)}`,
     );
   if (!r.setCrossCheck.pinnedColumnIsBest && r.setCrossCheck.bestLabel)
     L.push(`  ⚠ DB set best matches "${r.setCrossCheck.bestLabel}", NOT the pinned outcome column`);
-  if (r.whitespaceOnly.count)
-    L.push(`  · whitespace-only (Tier-0 noise): ${r.whitespaceOnly.count}`);
+  if (r.whitespaceOnly.count) L.push(`  · whitespace-only (Tier-0 noise): ${r.whitespaceOnly.count}`);
   if (r.duplicateSourceKeys.length)
     L.push(`  ⚠ duplicate source keys: ${r.duplicateSourceKeys.length}`);
   L.push(`  → ${r.gatePass ? 'GATE PASS' : 'GATE FAIL'}${r.strictPass ? ' (strict zero-diff)' : ''}`);

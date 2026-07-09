@@ -21,20 +21,32 @@ proves the parser is *correct*, on **content**.
 
 ## The trust anchor: `pinned-map.ts`
 
-Each subject is a human-declared extraction rule in raw coordinates — sheet name, header
-row, explicit column letters for the key parts, and the exact **outcome column(s)**.
+Each subject is a human-declared extraction rule in raw coordinates — sheet name, first
+data row, explicit column letters for the key parts, and the exact **outcome column(s)**.
 Simple enough to verify by eye on 3–5 rows against the live workbook, then applied by
-machine to every row.
+machine to every row. All seven source-backed subjects are verified against the real
+gold-master workbooks:
 
-- **Verified pins:** `english` (outcome = col **R** `Daily LO`, the abbreviated column
-  surrounded by decoy "…Learning Outcome" columns — the prime mis-bind trigger),
-  `awareness` (Weekly Skill **I** `\n` Weekly Knowledge **J**), `yoga` (Weekly Skill
-  **K** `\n` Weekly Knowledge **N**). Source: the audit brief §3.
-- **Unpinned:** `arabic, maths, professionalism, science, it` are declared `pinned:
-  false`. Their outcome columns can't be pinned honestly without the real gold-master
-  workbooks in hand, so the harness **refuses** to audit them and surfaces them loudly
-  (CLI + a non-fatal test warning) rather than silently skipping. Declare each against
-  its real workbook and set `pinned: true`.
+| Subject | Sheet | Year/Month/Week/Period | Outcome (pinned) | Weekly/Monthly S · K | Grain |
+|---|---|---|---|---|---|
+| english | `English Curriculum` | E / G / O / Q | **R** `Daily LO` | K · N (weekly) | daily |
+| arabic | `Arabic Curriculum (2)` | E / F / L / M | **N** `نتائج التعلم اليومية` | H · K (weekly) | daily (row 7) |
+| maths | `Curriculum Math` | D / F / N / O | **P** `Daily LO` | J · M (weekly) | daily |
+| science | `Version 2 ` (sic) | E / G / O / P | **Q** `Daily LO` | K · N (weekly) | daily |
+| professionalism | `V1` | E / G / O / P | **Q** `Daily LO` | J · M (**monthly**) | daily |
+| awareness | `Awareness Cirriculum V3` | E / G / K / — | **compose(I, J)** | I · J (weekly) | weekly |
+| yoga | `Yoga Curriculum` | E / G / P / (forced P1) | **compose(K, N)** | K · N (weekly) | daily (P1) |
+
+Sheet-selection gotchas the pins encode: arabic uses `Arabic Curriculum (2)` (the other
+tab has taxonomy-code junk in the daily column); science's sheet name has a **trailing
+space**; professionalism uses `V1` (V2 is a near-dup, V4 has a different layout). Yoga's
+source is one row per week with blank period cells, so its period is **forced to 1** to
+match the DB key; prof carries **Monthly** S/K (the DB's `weekly_*` are NULL for prof, so
+they're not diffed — a product decision left open).
+
+- **Unpinned:** `it` has **no source workbook**, so it stays `pinned: false`. The harness
+  **refuses** to audit it and surfaces it loudly (CLI + a non-fatal test warning) rather
+  than silently skipping. Do not fabricate a mapping for it.
 
 ## The four layers (`reconcile.ts`)
 
@@ -66,10 +78,11 @@ when they're absent** (CI, or before the files are dropped in) — exactly like 
 parity gate.
 
 ```
-# 1. Export the ACTIVE curriculum_lesson rows per subject to CSV (see Track A in the
-#    audit brief) → test/fixtures/curriculum/goldmaster/<subject>.csv
-#    Columns: subject_code,year,month,week,period,lesson_key,daily_outcome,
-#             weekly_skills_lo,weekly_knowledge_lo,monthly_lo,... (README in test/fixtures)
+# 1. Export the ACTIVE curriculum_lesson rows to CSV (see Track A in the audit brief).
+#    Either a single COMBINED export → <fixtures>/goldmaster.csv (all subjects; the
+#    loader filters by subject_code) OR per-subject → <fixtures>/goldmaster/<subject>.csv.
+#    Columns used: subject_code,year,month,week,period,daily_outcome,
+#                  weekly_skills_lo,weekly_knowledge_lo (extra columns are ignored).
 # 2. Drop the real source workbooks under the fixtures dir (real filename or
 #    <subject>.xlsx), or point CURRICULUM_FIXTURES_DIR at an out-of-tree copy.
 
@@ -80,6 +93,26 @@ npm test                   # the wired gate (audit-reconciliation.test.ts) fails
 
 `audit-extract.test.ts` proves the extractor and every reconciliation layer on synthetic
 in-memory workbooks, so the mechanism is verified even without the IP fixtures.
+
+## Findings from the first full run (real workbooks + DB gold master)
+
+The set cross-check confirms **no wrong-column binding** anywhere: every daily subject's
+DB `daily_outcome` set matches its pinned Daily-LO column (jaccard ≈ 0.99–1.0), all
+decoys ≈ 0. The gate is red only for real, explained reasons — hand these to the operator:
+
+| Subject | Gate | What the audit found |
+|---|---|---|
+| **maths** | ✅ pass | 1240/1240 exact, incl. Year 0. Cross-check 1.000. |
+| **professionalism** | ✅ pass | 840/840 exact; 8 August Orientation/Evaluation markers excused. |
+| **science** | ❌ fail | 5 `Y5 May W36` lessons drift across all fields — the source was **edited after ingest** (DB: reproduction; source: mitosis/cancer). Reconcile or re-import. 17 holiday markers excused; 10 duplicate source keys noted. |
+| **awareness** | ❌ fail | `daily_outcome` is **NULL for all 248 rows** — `composeWeekly` (skill `\n` knowledge) was never applied at ingest. Weekly fields already correct. Fix = re-ingest. |
+| **yoga** | ❌ fail | Same `composeWeekly` NULL defect (215 rows). Plus 12 un-imported new weeks (source-only) and the known `Y5 "Year 5" W5 P5` artefact (excused). |
+| **english** | ❌ fail | daily content exact (0/1179); one genuine orphan `Y5 Mar W27` — a real lesson mis-stored with NULL period. Sweep it. |
+| **arabic** | ❌ fail | daily content exact (0/1235); one genuine orphan `Y5 Dec W15` — same NULL-period anomaly. |
+
+Note: maths and arabic Year 0 **is** present in both workbook and DB and matches exactly,
+so no year is excluded. `excludeYears` remains available for any subject whose source
+genuinely lacks a year, but none currently need it.
 
 ## Independence boundary (a note on SheetJS)
 
