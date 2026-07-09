@@ -348,5 +348,23 @@ export async function generateResource(
     );
   }
 
+  // TEMPORARY cost diagnostic (removed in this branch's final commit). Real USD
+  // per call from the response usage at Sonnet 4.6 rates: input $3/M, output
+  // $15/M, cache write (5-min) 1.25×=$3.75/M, cache read 0.1×=$0.30/M. Defined
+  // locally rather than imported from check-objective to keep this module free of
+  // the next-intl / server-client graph (see the LANGUAGE INVARIANT above).
+  {
+    const u = message.usage;
+    const input = u.input_tokens ?? 0;
+    const output = u.output_tokens ?? 0;
+    const cacheWrite = u.cache_creation_input_tokens ?? 0;
+    const cacheRead = u.cache_read_input_tokens ?? 0;
+    const usd =
+      (input / 1e6) * 3 + (output / 1e6) * 15 + (cacheWrite / 1e6) * 3.75 + (cacheRead / 1e6) * 0.3;
+    console.log(
+      `[cost] generate-resource in=${input} out=${output} cache_write=${cacheWrite} cache_read=${cacheRead} usd=${usd.toFixed(6)}`,
+    );
+  }
+
   return parseResult(extractText(message));
 }
