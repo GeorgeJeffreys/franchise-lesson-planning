@@ -43,6 +43,7 @@ import type { WorksheetContext } from '@/components/editor/worksheet/context';
 import { LinkItStep } from '@/components/editor/LinkItStep';
 import { ReviewStep } from '@/components/editor/ReviewStep';
 import { ReadOnlyPlan } from '@/components/editor/ReadOnlyPlan';
+import { WorksheetPipelineSplit } from '@/components/editor/WorksheetPipelineSplit';
 import { AnnotationProvider } from '@/components/review/annotation/context';
 import { AnnotationPane } from '@/components/review/annotation/AnnotationPane';
 
@@ -580,9 +581,13 @@ export function LessonPlanEditor({
           </section>
         ) : (
           // STEPS 2–5 (and the Review step with NO feedback) — split: plan (left) ·
-          // persistent worksheet (right).
-          <>
-            <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[12px] lg:border-e lg:border-[#EFE8DD] lg:px-[30px]">
+          // persistent worksheet (right). Past `lg` the divider between them is a
+          // draggable handle (WorksheetPipelineSplit); below `lg` the two panes
+          // stack, unchanged. The divider is owned by the split's handle now, so
+          // the left pane no longer draws its own `lg:border-e`.
+          <WorksheetPipelineSplit
+            pipeline={
+            <section className="min-h-0 min-w-0 flex-1 overflow-y-auto px-[22px] py-[12px] lg:px-[30px]">
               <div className="mx-auto max-w-[820px]">
                 {locked && step < STEP_COUNT ? (
                   <LockedBanner status={status} onGoToReview={() => goStep(STEP_COUNT)} />
@@ -649,8 +654,9 @@ export function LessonPlanEditor({
                 {errorBox}
               </div>
             </section>
-
-            {/* RIGHT — the persistent student worksheet for Steps 2–5. One
+            }
+            worksheet={
+            /* RIGHT — the persistent student worksheet for Steps 2–5. One
                 WorksheetBuilder instance, editable at every step and every plan
                 status (never wrapped in the plan-lock fieldset); edits autosave
                 through `saveWorksheet`. Scrolls independently past `lg`.
@@ -659,7 +665,7 @@ export function LessonPlanEditor({
                 as its own full-width branch — it renders the coordinator /view
                 surface (ReadOnlyPlan + AnnotationPane) so the teacher works feedback
                 in place — so this split (and its worksheet) is only reached by Steps
-                2–4 and the Review step with NO feedback. */}
+                2–4 and the Review step with NO feedback. */
             <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-subtle lg:flex-[1.5]">
               <div className="flex min-h-0 w-full flex-1 flex-col">
                 <WorksheetBuilder
@@ -670,7 +676,8 @@ export function LessonPlanEditor({
                 />
               </div>
             </section>
-          </>
+            }
+          />
         )}
       </div>
     </div>
