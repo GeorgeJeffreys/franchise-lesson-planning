@@ -316,6 +316,14 @@ export async function getCurriculumBrowseData(input: {
         .map(toBrowseRow)
     : [];
 
+  // Where the Monthly Outcome resolves from. Multi-period subjects keep the original
+  // single-week source (`weekRows`). Single-period subjects resolve from the SAME
+  // unfiltered month-rows that feed the table (`monthRows`) — Awareness carries its
+  // monthly outcome on its `period = NULL` weekly-grain rows, which `weekRows` keeps but
+  // any isDailyRow-filtered set would drop, leaving the block blank though the DB holds
+  // it. Sourcing table + monthly from one set keeps them consistent.
+  const monthlyRows = singlePeriod ? monthRows : weekRows;
+
   return {
     subjects,
     years,
@@ -335,9 +343,9 @@ export async function getCurriculumBrowseData(input: {
       knowledge: firstOutcome(weekRows, (r) => r.weekly_knowledge_lo),
     },
     monthly: {
-      combined: firstOutcome(weekRows, (r) => r.monthly_lo),
-      knowledge: firstOutcome(weekRows, (r) => r.monthly_knowledge_lo),
-      skills: firstOutcome(weekRows, (r) => r.monthly_skills_lo),
+      combined: firstOutcome(monthlyRows, (r) => r.monthly_lo),
+      knowledge: firstOutcome(monthlyRows, (r) => r.monthly_knowledge_lo),
+      skills: firstOutcome(monthlyRows, (r) => r.monthly_skills_lo),
     },
     rows,
     singlePeriod,
