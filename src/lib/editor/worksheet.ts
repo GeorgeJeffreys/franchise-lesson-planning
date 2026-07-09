@@ -15,6 +15,7 @@ import type {
   WorksheetDoc,
   WorksheetFreeBlock,
   WorksheetResourceBlock,
+  WorksheetV3,
 } from '@/types/lesson';
 
 /** Generate a stable client id for a worksheet block. */
@@ -144,6 +145,13 @@ function asElement(value: unknown): FloatingElement | null {
 export function parseWorksheet(raw: unknown): Worksheet {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
     const obj = raw as Record<string, unknown>;
+    // v3 (the continuous document editor's shape). An old-builder read must
+    // degrade this gracefully rather than fall through to the empty branch, so
+    // the whole doc is re-homed into a single Free block (migrateV3ToV2). The
+    // new editor never reads through here — it consumes the v3 envelope directly.
+    if (obj.version === 3 && isTiptapDoc(obj.doc)) {
+      return migrateV3ToV2(obj.doc);
+    }
     if (obj.version === 2 && Array.isArray(obj.blocks)) {
       const blocks = obj.blocks.map(asBlock).filter((b): b is WorksheetBlock => b !== null);
       // Backfill: a legacy page-level `elements` array (from the pre-containment
@@ -174,6 +182,22 @@ export function parseWorksheet(raw: unknown): Worksheet {
     }
   }
   return emptyWorksheet();
+}
+
+/**
+ * Degrade a v3 continuous document back to a v2 worksheet by wrapping the whole
+ * doc as ONE Free block. Lossy on purpose: the multi-block split and any
+ * app-specific v3 nodes (`resourceRef` / `pageBreak`) the old editor doesn't know
+ * are dropped when that block later serialises through the v2 render path, but the
+ * text/headings/lists/images survive and the old builder opens without data loss
+ * of the flowing content. Only used by `parseWorksheet` so a flag flip-back after a
+ * v3 save still reads (rather than showing an empty worksheet). See
+ * `migrateWorksheetToV3` for the forward direction.
+ */
+export function migrateV3ToV2(doc: WorksheetV3['doc']): Worksheet {
+  const block = newFreeBlock();
+  block.doc = coalesceDocLists(doc);
+  return { version: 2, blocks: [block] };
 }
 
 /** True when the worksheet has no exercises (drives the empty state). */

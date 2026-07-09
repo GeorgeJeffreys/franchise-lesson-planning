@@ -212,6 +212,34 @@ export interface Worksheet {
 }
 
 /**
+ * The v3 student-worksheet body: a SINGLE continuous tiptap document (the
+ * Docs-style flow that replaces the v2 ordered block list). Stored in the same
+ * unenforced `lesson_plans.worksheet` JSONB column.
+ *
+ * Migration policy (see @/lib/editor/worksheet-migrate):
+ *  - Un-edited v1/v2 rows stay on disk as-is and are migrated to v3 at read time
+ *    (`migrateWorksheetToV3`) — so the on-disk value is auto-reversible until the
+ *    teacher actually edits under the new editor.
+ *  - A row is only rewritten to `{ version: 3, doc }` when the document editor
+ *    saves it. `legacyV2` is deliberately NOT persisted (per the approved plan).
+ *  - Reversibility after a v3 save rides on `parseWorksheet`, which detects a v3
+ *    envelope and degrades it back to a v2 single Free block (`migrateV3ToV2`),
+ *    so an old-builder read never falls through to the empty-worksheet branch.
+ *
+ * The `doc` is a tiptap `{ type: 'doc', content: [...] }`. Beyond the standard
+ * flow/format nodes it may carry two app-specific nodes: `resourceRef` (a
+ * render-only reference to a bank resource, migrated from a legacy
+ * {@link WorksheetResourceBlock}) and `pageBreak` (an export-only break marker).
+ */
+export interface WorksheetV3 {
+  version: 3;
+  doc: WorksheetDoc;
+}
+
+/** Either persisted worksheet envelope shape (the current v2 list or the v3 doc). */
+export type WorksheetEnvelope = Worksheet | WorksheetV3;
+
+/**
  * Domain representation of a `lesson_plans` row, with the JSONB columns typed.
  * Dates/timestamps are ISO strings as returned by Supabase.
  */
