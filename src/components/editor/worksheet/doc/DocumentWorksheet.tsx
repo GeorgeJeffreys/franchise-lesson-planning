@@ -4,40 +4,38 @@
 // (native history) renders a white A4-width page on a soft-grey canvas: a single
 // masthead at the top, the flowing body, and a footer. It re-houses every v2
 // capability as inline behaviour — image insert/resize/crop (ResizableImage), AI
-// generation (flowing insert + selection "Adjust"), bank-resource insertion, the
-// slash menu, selection bubble, and the persistent toolbar — and autosaves the v3
-// envelope through the parent's debounced saveWorksheet.
+// generation (inline-at-caret generate + selection "Adjust"), bank-resource
+// insertion, the slash menu, selection bubble, and the persistent toolbar — and
+// autosaves the v3 envelope through the parent's debounced saveWorksheet.
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
-import type { JSONContent } from '@tiptap/core';
+import type { Editor, JSONContent } from '@tiptap/core';
 import type { WorksheetV3 } from '@/types/lesson';
 import type { ResourceWithTags, TagsByDimension } from '@/types/resource';
 import { migrateWorksheetToV3 } from '@/lib/editor/worksheet-migrate';
 import { buildBlocksFromResource } from '@/lib/editor/resource-to-block';
 import { uploadWorksheetImageAction } from '@/lib/actions/worksheet';
 import type { WorksheetContext } from '../context';
-import { AiComposer } from '../AiComposer';
 import { ResourceBankModal } from '../ResourceBankModal';
 import { worksheetDocExtensions } from './extensions';
 import { SlashCommands } from './SlashMenu';
 import { Toolbar } from './Toolbar';
 import { BubbleToolbar } from './BubbleToolbar';
 import { DocMasthead, DocFooter } from './DocMasthead';
+import { InlinePromptPopover, type Anchor } from './InlinePromptPopover';
 import { insertGeneratedResource, adjustSelectionWithAI } from './aiInsert';
-import { BRAND, PAGE_WIDTH, PAGE_PAD_X, PAGE_PAD_TOP, PAGE_PAD_BOTTOM } from './theme';
+import { BRAND, PAGE_WIDTH, PAGE_PAD_X, PAGE_PAD_TOP, PAGE_PAD_BOTTOM, type SaveState } from './theme';
 
-export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+export type { SaveState } from './theme';
 
-function SaveIndicator({ state }: { state: SaveState }) {
-  const label =
-    state === 'saving' ? 'Saving…' : state === 'saved' ? 'All changes saved' : state === 'error' ? 'Couldn’t save' : '';
-  if (!label) return null;
-  return (
-    <span style={{ fontSize: 12, color: state === 'error' ? BRAND.pink : BRAND.faint, whiteSpace: 'nowrap' }}>
-      {label}
-    </span>
-  );
+/** Which inline AI popover is open, and where it is anchored (viewport coords). */
+type PromptState = { mode: 'generate' | 'adjust'; anchor: Anchor } | null;
+
+/** The caret/selection position in viewport coordinates, for anchoring a popover. */
+function anchorAt(editor: Editor, pos: number): Anchor {
+  const c = editor.view.coordsAtPos(pos);
+  return { x: c.left, y: c.bottom + 6 };
 }
 
 export function DocumentWorksheet({
@@ -59,14 +57,9 @@ export function DocumentWorksheet({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bankOpen, setBankOpen] = useState(false);
-  const [genOpen, setGenOpen] = useState(false);
-  const [prompt, setPrompt] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustText, setAdjustText] = useState('');
-  const [adjusting, setAdjusting] = useState(false);
-  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<PromptState>(null);
+  const [busy, setBusy] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
   const [teacherNotes, setTeacherNotes] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -80,7 +73,13 @@ export function DocumentWorksheet({
       // eslint-disable-next-line react-hooks/refs
       SlashCommands.configure({
         onInsertImage: () => pickImage(),
-        onGenerateAI: () => setGenOpen(true),
+        // Anchor the generate popover at the caret where "/" was typed. Computed
+        // inline from the passed editor so it doesn't depend on state declared below.
+        onGenerateAI: (ed) => {
+          setPromptError(null);
+          setPrompt({ mode: 'generate', anchor: anchorAt(ed, ed.state.selection.head) });
+        },
+        onInsertResource: () => setBankOpen(true),
       }),
     ],
     content: initialDoc as JSONContent,
@@ -88,6 +87,24 @@ export function DocumentWorksheet({
     editorProps: { attributes: { class: 'ws-doc', spellcheck: 'true' } },
     onUpdate: ({ editor }) => onChange({ version: 3, doc: editor.getJSON() as WorksheetV3['doc'] }),
   });
+
+  /** Open the generate popover anchored at the caret. */
+  const openGenerate = useCallback(
+    (ed?: Editor) => {
+      const e = ed ?? editor;
+      if (!e) return;
+      setPromptError(null);
+      setPrompt({ mode: 'generate', anchor: anchorAt(e, e.state.selection.head) });
+    },
+    [editor],
+  );
+
+  /** Open the adjust popover anchored at the end of the current selection. */
+  const openAdjust = useCallback(() => {
+    if (!editor || editor.state.selection.empty) return;
+    setPromptError(null);
+    setPrompt({ mode: 'adjust', anchor: anchorAt(editor, editor.state.selection.to) });
+  }, [editor]);
 
   const onFilePicked = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,55 +137,46 @@ export function DocumentWorksheet({
     [editor],
   );
 
-  const runGenerate = useCallback(async () => {
-    if (!editor || prompt.trim().length === 0) return;
-    setGenerating(true);
-    setGenError(null);
-    try {
-      const { teacherNotes } = await insertGeneratedResource(editor, context, prompt);
-      setTeacherNotes(teacherNotes);
-      setGenOpen(false);
-      setPrompt('');
-    } catch (err) {
-      setGenError(err instanceof Error ? err.message : 'The generator failed.');
-    } finally {
-      setGenerating(false);
-    }
-  }, [editor, prompt, context]);
-
-  const runAdjust = useCallback(async () => {
-    if (!editor || adjustText.trim().length === 0) return;
-    setAdjusting(true);
-    setAdjustError(null);
-    try {
-      const { teacherNotes, changed } = await adjustSelectionWithAI(editor, context, adjustText);
-      if (changed) {
-        setTeacherNotes(teacherNotes);
-        setAdjustOpen(false);
-        setAdjustText('');
-      } else {
-        setAdjustError('Select some text first, then describe the change.');
+  /** Run the open popover's prompt (generate at caret / adjust the selection). */
+  const runPrompt = useCallback(
+    async (text: string) => {
+      if (!editor || !prompt) return;
+      setBusy(true);
+      setPromptError(null);
+      try {
+        if (prompt.mode === 'generate') {
+          const { teacherNotes } = await insertGeneratedResource(editor, context, text);
+          setTeacherNotes(teacherNotes);
+          setPrompt(null);
+        } else {
+          const { teacherNotes, changed } = await adjustSelectionWithAI(editor, context, text);
+          if (changed) {
+            setTeacherNotes(teacherNotes);
+            setPrompt(null);
+          } else {
+            setPromptError('Select some text first, then describe the change.');
+          }
+        }
+      } catch (err) {
+        setPromptError(err instanceof Error ? err.message : 'The AI request failed.');
+      } finally {
+        setBusy(false);
       }
-    } catch (err) {
-      setAdjustError(err instanceof Error ? err.message : 'The adjust request failed.');
-    } finally {
-      setAdjusting(false);
-    }
-  }, [editor, adjustText, context]);
+    },
+    [editor, prompt, context],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* Chrome — toolbar + save state (never printed) */}
-      <div className="ws-no-print" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Toolbar
-            editor={editor}
-            onInsertImage={pickImage}
-            onInsertResource={() => setBankOpen(true)}
-            onGenerateAI={() => setGenOpen(true)}
-          />
-        </div>
-        <SaveIndicator state={saveState} />
+      {/* Chrome — toolbar (never printed) */}
+      <div className="ws-no-print" style={{ padding: '8px 10px' }}>
+        <Toolbar
+          editor={editor}
+          onInsertImage={pickImage}
+          onInsertResource={() => setBankOpen(true)}
+          onGenerateAI={() => openGenerate()}
+          saveState={saveState}
+        />
       </div>
 
       {teacherNotes ? (
@@ -198,7 +206,7 @@ export function DocumentWorksheet({
         </div>
       </div>
 
-      <BubbleToolbar editor={editor} onAdjustAI={() => setAdjustOpen(true)} />
+      <BubbleToolbar editor={editor} onAdjustAI={openAdjust} />
 
       <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
 
@@ -211,61 +219,22 @@ export function DocumentWorksheet({
         />
       ) : null}
 
-      {genOpen ? (
-        <ModalShell onClose={() => (generating ? null : setGenOpen(false))}>
-          <AiComposer
-            prompt={prompt}
-            onPromptChange={setPrompt}
-            onGenerate={runGenerate}
-            onCancel={() => setGenOpen(false)}
-            generating={generating}
-            error={genError}
-          />
-        </ModalShell>
+      {prompt ? (
+        <InlinePromptPopover
+          anchor={prompt.anchor}
+          title={prompt.mode === 'generate' ? 'Generate a resource' : 'Adjust with AI'}
+          placeholder={
+            prompt.mode === 'generate'
+              ? 'Describe the resource you need…'
+              : 'How should I change this? e.g. simpler, add a word bank'
+          }
+          submitLabel={prompt.mode === 'generate' ? 'Generate' : 'Apply'}
+          busy={busy}
+          error={promptError}
+          onSubmit={runPrompt}
+          onCancel={() => (busy ? null : setPrompt(null))}
+        />
       ) : null}
-
-      {adjustOpen ? (
-        <ModalShell onClose={() => (adjusting ? null : setAdjustOpen(false))}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: 460, maxWidth: '92vw' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.ink, marginBottom: 4 }}>Adjust with AI</div>
-            <div style={{ fontSize: 12.5, color: BRAND.faint, marginBottom: 12 }}>
-              The selected text will be rewritten with your instruction.
-            </div>
-            <textarea
-              rows={3}
-              value={adjustText}
-              onChange={(ev) => setAdjustText(ev.target.value)}
-              disabled={adjusting}
-              placeholder="e.g. make it simpler, add a word bank, shorten it"
-              dir="auto"
-              style={{ width: '100%', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5, border: '1px solid #CFE6E0', borderRadius: 10, padding: '10px 12px', outline: 'none', resize: 'vertical' }}
-            />
-            {adjustError ? <div style={{ marginTop: 8, fontSize: 12.5, color: BRAND.pink }}>{adjustError}</div> : null}
-            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-              <button type="button" onClick={runAdjust} disabled={adjusting || adjustText.trim().length === 0} style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: '#fff', background: BRAND.teal, border: 'none', padding: '10px 18px', borderRadius: 10, cursor: adjusting ? 'default' : 'pointer', opacity: adjusting || adjustText.trim().length === 0 ? 0.6 : 1 }}>
-                {adjusting ? 'Adjusting…' : 'Apply'}
-              </button>
-              <button type="button" onClick={() => setAdjustOpen(false)} disabled={adjusting} style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 500, color: '#5C544E', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </ModalShell>
-      ) : null}
-    </div>
-  );
-}
-
-/** A centred modal backdrop shared by the generate + adjust dialogs. */
-function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(30,22,16,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-    >
-      <div onClick={(e) => e.stopPropagation()} style={{ borderRadius: 16, overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
-        {children}
-      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@
 
 import { useState, type ReactNode } from 'react';
 import type { Editor } from '@tiptap/core';
+import { Baseline } from 'lucide-react';
 import { BRAND, BLOCK_STYLES, TEXT_COLOURS, type BlockStyle } from './theme';
 
 export function TBtn({
@@ -153,16 +154,10 @@ export function ColourPicker({ editor }: { editor: Editor }) {
   return (
     <div style={{ position: 'relative' }}>
       <TBtn title="Text colour" onClick={() => setOpen((o) => !o)} active={!!current}>
-        <span
-          style={{
-            width: 15,
-            height: 15,
-            borderRadius: 4,
-            border: '1px solid #D8C9B4',
-            background: current ?? 'linear-gradient(135deg,#B62A5C,#1F7A6C)',
-            display: 'inline-block',
-          }}
-        />
+        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <Baseline size={17} />
+          <span style={{ width: 15, height: 3, borderRadius: 2, background: current ?? BRAND.pink }} />
+        </span>
       </TBtn>
       {open ? (
         <>

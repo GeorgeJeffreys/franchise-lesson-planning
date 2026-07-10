@@ -5,6 +5,9 @@
 // Colours are the Alsama brand palette only; the on-screen surface is a white A4
 // page on a soft-grey "Docs" canvas (not the old beige-on-beige).
 
+/** Autosave lifecycle for the Docs-style "Saving… / All changes saved" indicator. */
+export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 /** A4 page geometry at 96dpi (the printout width the surface mirrors on screen). */
 export const PAGE_WIDTH = 794;
 /** A4 height — used only to draw the export page-break hints in print, never to

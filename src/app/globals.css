@@ -643,6 +643,8 @@ html:lang(ar) body {
   }
   .ws-print-footer {
     display: flex !important;
+    align-items: center;
+    justify-content: space-between;
     visibility: visible !important;
     position: fixed;
     left: 0;
@@ -660,6 +662,13 @@ html:lang(ar) body {
   }
 }
 
+/* Exactly one footer on the pageless editing surface (layout via class, never an
+ * inline `display`, so the print footer's `display:none` below is not overridden). */
+.ws-doc-footer-screen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 /* The running footer only exists for print; hidden on screen. */
 .ws-print-footer {
   display: none;
