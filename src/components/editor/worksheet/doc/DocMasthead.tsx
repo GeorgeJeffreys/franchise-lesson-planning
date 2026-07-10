@@ -87,13 +87,14 @@ export function DocMasthead({ ctx }: { ctx: WorksheetContext }) {
 
 export function DocFooter({ ctx, className }: { ctx: WorksheetContext; className?: string }) {
   return (
+    // NOTE: display/flex layout is set via the className's CSS (ws-doc-footer-screen
+    // / ws-print-footer), NOT inline — an inline `display` would override the
+    // `.ws-print-footer { display:none }` screen rule and the print footer would
+    // duplicate on the pageless surface. Keep only visual styling inline here.
     <div
       className={className}
       contentEditable={false}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         background: BRAND.cream,
         borderTop: `2px solid ${BRAND.creamBorder}`,
         padding: '10px 52px',
@@ -101,7 +102,6 @@ export function DocFooter({ ctx, className }: { ctx: WorksheetContext; className
     >
       <span style={{ fontSize: 12, color: BRAND.faint }}>{ctx.lessonCode ? `Lesson ${ctx.lessonCode}` : 'Lesson'}</span>
       <span style={{ fontFamily: 'var(--font-sacramento), cursive', fontSize: 20, lineHeight: 0.7, color: '#C58FA4' }}>Alsama</span>
-      <span className="ws-print-pageno" style={{ fontSize: 12, color: BRAND.faint }} />
     </div>
   );
 }

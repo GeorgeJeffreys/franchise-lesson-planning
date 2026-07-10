@@ -27,6 +27,7 @@ import { ResizableImage } from '../resizableImage';
 import { Caption } from './nodes/Caption';
 import { PageBreak } from './nodes/PageBreak';
 import { ResourceRef } from './nodes/ResourceRef';
+import { Indent } from './nodes/Indent';
 
 /** Cmd/Ctrl-K → link (Docs/Word parity): prompt for a URL on the current selection.
  *  Bold/italic/underline (Mod-b/i/u), undo/redo (Mod-z / Mod-Shift-z), and Docs-style
@@ -72,7 +73,8 @@ export function worksheetDocExtensions(): AnyExtension[] {
     Underline,
     TextStyle,
     Color,
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right', 'justify'] }),
+    Indent,
     Link.configure({
       openOnClick: false,
       autolink: true,

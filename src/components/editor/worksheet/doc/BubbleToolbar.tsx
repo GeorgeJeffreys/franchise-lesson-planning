@@ -2,14 +2,17 @@
 
 // The selection bubble: a compact inline-formatting toolbar that floats above any
 // non-empty text selection (bold/italic/underline, link, brand colour) plus the
-// selection-level "Adjust with AI" action. Hidden when the selection sits in a
-// non-text context (e.g. an image/atom is selected).
+// selection-level "Adjust with AI" action, which opens an inline prompt anchored at
+// the selection. Hidden when an image/atom is selected.
 
 import { BubbleMenu } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
+import { Bold, Italic, Underline, Link as LinkIcon, Sparkles } from 'lucide-react';
 import { useEditorTick } from './useEditorTick';
 import { BRAND } from './theme';
 import { TBtn, TSep, ColourPicker, toggleLink } from './toolbarControls';
+
+const ICON = 16;
 
 export function BubbleToolbar({
   editor,
@@ -42,16 +45,16 @@ export function BubbleToolbar({
         }}
       >
         <TBtn title="Bold" active={e.isActive('bold')} onClick={() => e.chain().focus().toggleBold().run()}>
-          <b>B</b>
+          <Bold size={ICON} />
         </TBtn>
         <TBtn title="Italic" active={e.isActive('italic')} onClick={() => e.chain().focus().toggleItalic().run()}>
-          <i>I</i>
+          <Italic size={ICON} />
         </TBtn>
         <TBtn title="Underline" active={e.isActive('underline')} onClick={() => e.chain().focus().toggleUnderline().run()}>
-          <span style={{ textDecoration: 'underline' }}>U</span>
+          <Underline size={ICON} />
         </TBtn>
         <TBtn title="Link" active={e.isActive('link')} onClick={() => toggleLink(e)}>
-          🔗
+          <LinkIcon size={ICON} />
         </TBtn>
         <ColourPicker editor={e} />
         <TSep />
@@ -75,7 +78,8 @@ export function BubbleToolbar({
             cursor: 'pointer',
           }}
         >
-          ✦ Adjust
+          <Sparkles size={13} />
+          Adjust
         </button>
       </div>
     </BubbleMenu>

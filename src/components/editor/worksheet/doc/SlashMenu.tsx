@@ -18,6 +18,7 @@ import { BRAND } from './theme';
 export interface SlashOptions {
   onInsertImage: (editor: Editor) => void;
   onGenerateAI: (editor: Editor) => void;
+  onInsertResource: (editor: Editor) => void;
 }
 
 interface SlashItem {
@@ -87,6 +88,15 @@ const ITEMS: SlashItem[] = [
     run: (e, r, opts) => {
       e.chain().focus().deleteRange(r).run();
       opts.onGenerateAI(e);
+    },
+  },
+  {
+    title: 'Add from resource bank',
+    hint: 'Insert a shared resource',
+    keywords: 'bank resource attach library shared insert',
+    run: (e, r, opts) => {
+      e.chain().focus().deleteRange(r).run();
+      opts.onInsertResource(e);
     },
   },
   {
@@ -247,6 +257,7 @@ export const SlashCommands = Extension.create<SlashOptions>({
     return {
       onInsertImage: () => {},
       onGenerateAI: () => {},
+      onInsertResource: () => {},
     };
   },
 
