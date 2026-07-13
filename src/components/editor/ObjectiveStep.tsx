@@ -112,10 +112,10 @@ export function ObjectiveStep({
   const checkDisabled = checking || locked || remainder.trim().length === 0;
 
   // The remainder is an inline, flowing editable region (so the teacher's text
-  // continues on the same line as the fixed stem and wraps as one paragraph). It
-  // stays a *controlled* field: we write `remainder` into the node only when it
-  // genuinely differs, so typing never moves the caret (on a keystroke the node
-  // already holds the new value, so the effect is a no-op).
+  // continues on the same line as the fixed stem and wraps as one paragraph). It is
+  // UNCONTROLLED after an initial seed: the DOM node owns the text and reports it up
+  // via `onInput`, mirroring the worksheet editor's seed-once model. React never
+  // rewrites the node on re-render, so the caret is immune to background re-syncs.
   const editableRef = useRef<HTMLSpanElement>(null);
   const [focused, setFocused] = useState(false);
 
@@ -133,10 +133,20 @@ export function ObjectiveStep({
     if (checkResult) setFeedbackOpen(true);
   }
 
+  // Seed the editable node's text ONCE on mount from the initial `remainder`. After
+  // that, the DOM is the source of truth and only the teacher's `onInput` changes it.
+  // We deliberately do NOT re-run on `[remainder]`: writing into a contentEditable
+  // resets the caret to position 0, so re-seeding on any background re-render was
+  // exactly the idle-caret-jump / lost-text bug. Re-initialisation happens only by
+  // remounting — a different plan remounts the whole editor (`key={plan.id}`), and
+  // returning to this step remounts ObjectiveStep — so this seed always runs against
+  // the correct current value.
   useEffect(() => {
     const el = editableRef.current;
     if (el && el.textContent !== remainder) el.textContent = remainder;
-  }, [remainder]);
+    // Seed-once by design — re-running on `[remainder]` is the caret-reset bug.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Focus the editable region and drop the caret at the END of any existing text.
   // Used when the teacher clicks the fixed stem or the padding around the field —

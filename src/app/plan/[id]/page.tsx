@@ -81,6 +81,11 @@ export default async function PlanEditorPage({
   return (
     <AppShell name={name} subtitle={`${data.classContext.schoolName} · ${data.classContext.subjectName}`}>
       <LessonPlanEditor
+        // Remount on navigation to a different plan so the editor re-seeds its local
+        // buffer from the new plan's data. This is the ONLY way plan fields re-init
+        // from server data — never a mid-session prop-sync effect, which would let a
+        // background re-render stomp the live caret / unsaved text.
+        key={data.plan.id}
         data={data}
         annotations={annotations}
         viewerName={name}

@@ -48,6 +48,7 @@ import { ReviewStep } from '@/components/editor/ReviewStep';
 import { ReadOnlyPlan } from '@/components/editor/ReadOnlyPlan';
 import { WorksheetPipelineSplit } from '@/components/editor/WorksheetPipelineSplit';
 import { AnnotationProvider } from '@/components/review/annotation/context';
+import type { AppliedSuggestion } from '@/lib/actions/annotations';
 import { AnnotationPane } from '@/components/review/annotation/AnnotationPane';
 
 const AUTOSAVE_DELAY_MS = 1500;
@@ -240,27 +241,30 @@ export function LessonPlanEditor({
     };
   }, [worksheet, plan.id]);
 
-  // ── Re-seed plan fields when a pane action changed them on the server ────────
-  // The Review step's embedded comments pane refreshes the route after each mutation
-  // (router.refresh). Accepting a coordinator SUGGESTION applies it to the plan's
-  // `blocks` / `smartt_objective` server-side — the same columns this editor
-  // autosaves — so without re-syncing, a later autosave would write the stale local
-  // copy back and silently REVERT the accepted change. Keyed on the server content
-  // signature: it fires only when blocks/objective actually changed on the server
-  // (never on reply/resolve/reject refreshes, whose plan columns are untouched), and
-  // never for a plain editor with no pane (nothing refreshes its data mid-session).
-  const serverPlanSig = useRef<string | null>(null);
-  useEffect(() => {
-    const sig = JSON.stringify([plan.blocks, plan.smartt_objective]);
-    if (serverPlanSig.current === null) {
-      serverPlanSig.current = sig; // initial mount — local state is already seeded
-      return;
+  // ── Apply an ACCEPTED coordinator suggestion to the local buffer ─────────────
+  // Accepting a suggestion (in the Review step's embedded pane) applies the change
+  // to the plan's `blocks` / `smartt_objective` server-side — the same columns this
+  // editor autosaves — so the local buffer must fold it in, or a later autosave would
+  // write the stale copy back and silently REVERT the accepted change.
+  //
+  // This is done as an EXPLICIT effect of the user's accept action (the pane passes
+  // the applied change up via `onApplyAccepted`), NOT by re-deriving state from a
+  // prop-sync effect on a route re-render. That distinction is the whole fix: a
+  // background re-render (autosave, token refresh, anything) no longer re-seeds these
+  // fields, so it can never reset the caret or wipe unsaved text. Navigation to a
+  // DIFFERENT plan is handled by remounting the editor with `key={plan.id}` at the
+  // page level — never by syncing a setter off a data dependency.
+  //
+  // The objective / block fields are unmounted while the Review step's pane is open,
+  // so updating their state here never disturbs a live caret; when the user navigates
+  // back to that step, the field seeds fresh from the updated state.
+  const applyAcceptedSuggestion = useCallback((applied: AppliedSuggestion) => {
+    if (applied.target === 'objective') {
+      setRemainder(stripStem(applied.smartt_objective));
+    } else {
+      setBlocks(normalizeBlocks(applied.blocks));
     }
-    if (sig === serverPlanSig.current) return;
-    serverPlanSig.current = sig;
-    setBlocks(normalizeBlocks(plan.blocks));
-    setRemainder(stripStem(plan.smartt_objective));
-  }, [plan.blocks, plan.smartt_objective]);
+  }, []);
 
   // ── Objective gate ───────────────────────────────────────────────────────────
   // A NEW lesson cannot advance past the objective step (step 1) until its SMARTT
@@ -638,6 +642,7 @@ export function LessonPlanEditor({
               viewerName={viewerName}
               annotations={annotations}
               phaseTitles={phaseTitles}
+              onApplyAccepted={applyAcceptedSuggestion}
             >
               <ReadOnlyPlan
                 data={reviewData}

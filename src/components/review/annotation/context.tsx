@@ -33,6 +33,7 @@ import {
   updateSuggestion,
   deleteSuggestion,
   type CreateAnnotationInput,
+  type AppliedSuggestion,
 } from '@/lib/actions/annotations';
 
 export type ReviewTab = 'lesson' | 'worksheet';
@@ -171,6 +172,12 @@ export interface AnnotationProviderProps {
   viewerName: string;
   annotations: Annotation[];
   phaseTitles: Record<string, string>;
+  /** Fold an ACCEPTED suggestion's change into the host editor's local plan buffer.
+   *  Optional: the coordinator's read-only /view has no editable buffer, so it omits
+   *  this and relies on `router.refresh()` alone. When present (the teacher's embedded
+   *  Review step), the accept applies directly to local state — no prop-sync effect,
+   *  so a background re-render can never re-derive and stomp the live editable fields. */
+  onApplyAccepted?: (applied: AppliedSuggestion) => void;
   children: ReactNode;
 }
 
@@ -182,6 +189,7 @@ export function AnnotationProvider({
   viewerName,
   annotations,
   phaseTitles,
+  onApplyAccepted,
   children,
 }: AnnotationProviderProps) {
   const router = useRouter();
@@ -241,7 +249,20 @@ export function AnnotationProvider({
       resolve: (annotationId, resolved) =>
         runAndRefresh(() => setAnnotationResolved(annotationId, resolved)),
       decide: (annotationId, decision) =>
-        runAndRefresh(() => decideSuggestion(annotationId, decision)),
+        new Promise((resolve) => {
+          startTransition(async () => {
+            const res = await decideSuggestion(annotationId, decision);
+            if (res.ok) {
+              // Apply an accepted change to the editor's local buffer FIRST (explicit
+              // user action), then refresh the route so the annotation pane reflects
+              // the new decided/pending state. The refresh no longer re-syncs plan
+              // fields (the serverPlanSig effect is gone), so it can't stomp edits.
+              if (res.applied) onApplyAccepted?.(res.applied);
+              router.refresh();
+            }
+            resolve(res.ok);
+          });
+        }),
       update: (annotationId, toValue) => runAndRefresh(() => updateSuggestion(annotationId, toValue)),
       remove: (annotationId) => runAndRefresh(() => deleteSuggestion(annotationId)),
       forPhase: (phaseRef) =>
@@ -269,7 +290,7 @@ export function AnnotationProvider({
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, status, scope, role, viewerName, editable, annotations, phaseTitles, activeId, tab, composingKey, layoutVersion, registerSection, pending]);
+  }, [planId, status, scope, role, viewerName, editable, annotations, phaseTitles, activeId, tab, composingKey, layoutVersion, registerSection, pending, onApplyAccepted]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
