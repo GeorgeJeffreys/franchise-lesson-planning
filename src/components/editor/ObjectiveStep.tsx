@@ -222,7 +222,12 @@ export function ObjectiveStep({
               stays muted (text-stem) so it reads as a fixed label; the teacher's
               text renders in body ink (text-ink), clearly distinct from the stem. */}
           <p className="text-[16px] leading-[1.55]">
-            <span className="text-stem">{t('stem')} </span>
+            {/* One word-space between the fixed stem and the editable, via a LOGICAL
+                margin so it falls on the inner side in both LTR and RTL. Not a literal
+                space/&nbsp; inside the editable — onInput reads the editable's
+                textContent as the saved remainder, so whitespace there would leak a
+                leading space into stored data. */}
+            <span className="text-stem me-[4px]">{t('stem')}</span>
             <span
               ref={editableRef}
               role="textbox"
