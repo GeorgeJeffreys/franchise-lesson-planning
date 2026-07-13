@@ -33,6 +33,22 @@ export interface ActionResult {
   error?: 'empty' | 'invalid' | 'locked' | 'forbidden' | 'failed';
 }
 
+/**
+ * The plan change an ACCEPTED suggestion applied server-side, returned so the
+ * editor can fold it into its local buffer via the explicit accept action —
+ * instead of re-deriving editable state from a background route re-render (which
+ * would stomp the live caret / unsaved text). `objective` carries the fully
+ * recomposed sentence; `blocks` carries the whole new blocks array.
+ */
+export type AppliedSuggestion =
+  | { target: 'objective'; smartt_objective: string }
+  | { target: 'blocks'; blocks: Block[] };
+
+export interface DecideResult extends ActionResult {
+  /** Present only on a successful ACCEPT — the change to apply to local state. */
+  applied?: AppliedSuggestion;
+}
+
 export interface CreateAnnotationInput {
   kind: AnnotationKind;
   anchorType: AnchorType;
@@ -313,7 +329,7 @@ export async function deleteSuggestion(annotationId: string): Promise<ActionResu
 export async function decideSuggestion(
   annotationId: string,
   decision: 'accepted' | 'rejected',
-): Promise<ActionResult> {
+): Promise<DecideResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -366,6 +382,8 @@ export async function decideSuggestion(
     return { ok: false, error: 'locked' };
   }
 
+  let applied: AppliedSuggestion | undefined;
+
   if (decision === 'accepted') {
     if (ann.to_value == null) return { ok: false, error: 'invalid' };
 
@@ -378,13 +396,15 @@ export async function decideSuggestion(
     // pasted a full "By the end of…" sentence) may carry a stem in `to_value`;
     // peeling it before composing guarantees the stored value can never double.
     if (ann.suggestion_shape === 'text' && ann.anchor_type === 'objective') {
+      const nextObjective = composeObjective(stripStem(ann.to_value));
       const { error: objErr } = await supabase
         .from('lesson_plans')
-        .update({ smartt_objective: composeObjective(stripStem(ann.to_value)) })
+        .update({ smartt_objective: nextObjective })
         .eq('id', plan.id)
         .select('id')
         .maybeSingle();
       if (objErr) return { ok: false, error: 'failed' };
+      applied = { target: 'objective', smartt_objective: nextObjective };
     } else {
       // dur / enum / phase_description text → the matched block in the blocks JSONB.
       const blocks = Array.isArray(plan.blocks) ? plan.blocks : [];
@@ -414,6 +434,7 @@ export async function decideSuggestion(
         .select('id')
         .maybeSingle();
       if (blockErr) return { ok: false, error: 'failed' };
+      applied = { target: 'blocks', blocks: next };
     }
   }
 
@@ -435,5 +456,5 @@ export async function decideSuggestion(
 
   revalidatePath(`/plan/${ann.plan_id}/view`);
   void stamped;
-  return { ok: true };
+  return { ok: true, applied };
 }

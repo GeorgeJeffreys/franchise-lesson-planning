@@ -61,9 +61,14 @@ export async function saveLessonPlan(input: SavePlanInput): Promise<ActionResult
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: false, error: 'Plan not found or not permitted.' };
 
-  // Keep the board fresh so a returning teacher sees the card in the right place
-  // (a new plan is created `in_progress`, so it has already left "Not started").
-  revalidatePath('/');
+  // NOTE: deliberately NOT revalidating '/' here. This is the debounced content
+  // autosave, which fires on every typing pause. A Server Action that revalidates
+  // makes Next re-render the CURRENT route too, so revalidating here re-rendered the
+  // force-dynamic /plan/[id] editor mid-edit — the churn behind the caret-reset bug.
+  // The board ('/') is itself `force-dynamic`, so it re-loads whenever the teacher
+  // navigates back to it; genuine board-visible changes (status transitions, drag
+  // placement) still revalidate '/' from their own actions (submit/return/approve/
+  // setPlanStatus/reorder). Autosaved objective/blocks text is not shown on the board.
   return { ok: true, updated_at: data.updated_at };
 }
 
