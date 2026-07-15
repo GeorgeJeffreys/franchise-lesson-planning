@@ -53,6 +53,12 @@ import { AnnotationPane } from '@/components/review/annotation/AnnotationPane';
 
 const AUTOSAVE_DELAY_MS = 1500;
 
+// Kill switch for the SMARTT objective advance-gate. Unset / non-`'true'` → the
+// gate is OFF, so a teacher may advance past the objective step with a failing
+// (or unrun) check; `'true'` restores the gate unchanged. `NEXT_PUBLIC_` because
+// this is a client component and the flag must be readable in the browser.
+const SMARTT_GATE_ENABLED = process.env.NEXT_PUBLIC_SMARTT_GATE_ENABLED === 'true';
+
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /** Ensure every block carries an explicit editable `minutes` (older plans don't). */
@@ -276,7 +282,7 @@ export function LessonPlanEditor({
   // re-seeded above, so it stays approved without a redundant re-check.)
   // A coordinator authoring their own plan IS the approval authority, so the Aya
   // objective gate never applies to them.
-  const objectiveGateActive = status === 'in_progress' && !coordinatorAuthor;
+  const objectiveGateActive = SMARTT_GATE_ENABLED && status === 'in_progress' && !coordinatorAuthor;
 
   // The exact string a check would evaluate for the current objective — mirrors the
   // stored-objective composition and the `handleCheck` payload.
